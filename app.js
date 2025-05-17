@@ -384,6 +384,10 @@ document.addEventListener('DOMContentLoaded', () => {
             headerRow.appendChild(th);
         });
         cashflowTableHead.appendChild(headerRow);
+        
+        // 1️⃣  Guardamos la etiqueta de la primera columna + todas las del período
+        const headerLabels = Array.from(headerRow.children).map(th => th.innerHTML.replace(/<br\s*\/?>/gi, ' ').trim());
+
 
         // Data Rows
         const cf_row_definitions = [ // Simplified cf_row_indices
@@ -407,8 +411,6 @@ document.addEventListener('DOMContentLoaded', () => {
         cf_row_definitions.push({ key: 'NET_FLOW', label: "Flujo Neto del Período", isBold: true });
         cf_row_definitions.push({ key: 'END_BALANCE', label: "Saldo Final Estimado", isBold: true, isHeaderBg: true });
 
-        let currentBalance = initialBalance;
-
         cf_row_definitions.forEach((def, rowIndex) => {
             const tr = document.createElement('tr');
             const tdLabel = document.createElement('td');
@@ -416,7 +418,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (def.isBold) tdLabel.classList.add('bold');
             if (def.isHeaderBg) tr.classList.add('bg-header');
             else if (rowIndex % 2 !== 0) tr.classList.add('bg-alt-row'); // Alt row for non-header bg
+            
+            tdLabel.setAttribute('data-label', headerLabels[0]); // ‘Categoría / Concepto’
             tr.appendChild(tdLabel);
+
 
             for (let i = 0; i < periodDates.length; i++) {
                 const tdValue = document.createElement('td');
@@ -441,6 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                 }
                 tdValue.textContent = formatCurrencyJS(value, symbol);
+                tdValue.setAttribute('data-label', headerLabels[i + 1]); // ‘+1’ porque la 0 es la de categoría
                 if (colorClass) tdValue.classList.add(colorClass);
                 if (def.isBold) tdValue.classList.add('bold');
                 tr.appendChild(tdValue);

@@ -69,6 +69,20 @@ button:hover {
     margin-top: 20px;
 }
 
+/* Scroll horizontal suave en escritorio/tablet */
+.table-responsive::-webkit-scrollbar { 
+    height: 8px; /* Un poco más grueso para mejor agarre */
+    background-color: #f0f0f0; /* Fondo de la barra de scroll */
+}
+.table-responsive::-webkit-scrollbar-thumb { 
+    background: #ccc; /* Color del "pulgar" */
+    border-radius: 4px; 
+}
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #bbb; /* Color del "pulgar" al pasar el mouse */
+}
+
+
 #cashflow-table {
     width: 100%;
     border-collapse: collapse;
@@ -90,7 +104,7 @@ button:hover {
 }
 
 #cashflow-table tbody tr:nth-child(even) {
-    background-color: #f9f9f9;
+    background-color: #f9f9f9; /* Para filas pares si no son bg-header o bg-alt-row */
 }
 
 #cashflow-table td:not(:first-child) {
@@ -115,14 +129,130 @@ button:hover {
     color: #2980b9;
 }
 .bg-header {
-    background-color: #f8f8f8 !important;
+    background-color: #f0f0f0 !important; /* Un poco más oscuro que th para destacar */
 }
 .bg-alt-row {
-    background-color: #fafafa !important;
+    background-color: #fdfdfd !important; /* Muy sutil para filas impares */
 }
 
 #loading-message {
     text-align: center;
     font-style: italic;
     margin-top: 15px;
+}
+
+/* Sticky header para pantallas ≥ 768 px */
+@media (min-width: 768px) {
+    #cashflow-table thead th { 
+        position: sticky; 
+        top: 0; 
+        z-index: 2;
+        background-color: #ecf0f1; /* Asegurar que el fondo del sticky header sea el mismo que el normal */
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    /* Ajuste para que el primer th de la primera fila sticky no tenga sombra a la izquierda si se scrollea */
+    #cashflow-table thead tr:first-child th:first-child {
+        /* box-shadow: none; /* Opcional, si se quiere un look más plano */
+    }
+}
+
+
+/* --- MOBILE LAYOUT (<768 px) ------------------------------ */
+@media (max-width: 767.98px) { /* Usar .98px para evitar solapamientos con min-width: 768px */
+
+  body           { padding: 10px; font-size:1rem; } /* Aumentar ligeramente el tamaño base en móvil */
+  h1             { font-size: 1.5rem; }
+  h2             { font-size: 1.2rem; }
+
+
+  .container     { max-width: 100%; box-shadow: none; padding: 10px; border-radius: 0; }
+
+  #auth-container, #data-container {
+    padding: 10px;
+  }
+  input[type="email"], input[type="password"], select, button {
+    font-size: 1rem; /* Mejorar legibilidad de inputs */
+  }
+  
+  .table-responsive {
+    overflow-x: visible; /* En móvil no queremos scroll horizontal de la tabla "apilada" */
+  }
+
+  #cashflow-table,
+  #cashflow-table thead,
+  #cashflow-table tbody,
+  #cashflow-table th,
+  #cashflow-table td,
+  #cashflow-table tr {
+      display: block;
+      width: 100% !important; 
+      box-sizing: border-box;
+  }
+
+  #cashflow-table thead tr {
+      position: absolute;
+      top: -9999px;
+      left: -9999px;
+  }
+
+  #cashflow-table tr { 
+      margin-bottom: 1rem; 
+      border: 1px solid #ccc; /* Borde alrededor de cada "bloque" de fila */
+      border-radius: 4px; /* Bordes redondeados para los bloques */
+      overflow: hidden; /* Para que los bordes redondeados afecten a los hijos */
+  }
+  
+  #cashflow-table td {
+      border: none; 
+      border-bottom: 1px solid #eee; 
+      padding: 10px; /* Más padding en móvil */
+      padding-left: 45% !important; /* Espacio para el label. Ajustar según necesidad */
+      position: relative;
+      white-space: normal;
+      text-align: right !important; 
+      min-height: 1.5em; /* Asegurar altura mínima para celdas con poco contenido */
+      display: flex; /* Usar flex para mejor alineación vertical */
+      align-items: center; /* Centrar verticalmente el contenido */
+      justify-content: flex-end; /* Alinear el valor a la derecha */
+  }
+   #cashflow-table td:last-child {
+      border-bottom: none; /* No borde en la última celda del bloque */
+  }
+
+
+  #cashflow-table td::before {
+      content: attr(data-label);
+      position: absolute;
+      left: 10px;
+      /* top: 10px;  Ya no es necesario con flex */
+      width: calc(45% - 20px); /* Ancho del label, restando los paddings */
+      font-weight: 600;
+      white-space: normal; 
+      text-align: left !important; 
+      color: #555;
+      display: flex; /* Para alinear con el valor si es necesario */
+      align-items: center;
+  }
+
+  #cashflow-table td:first-child {
+      background: #ecf0f1;
+      font-weight: 700;
+      padding-left: 10px !important;     
+      text-align: left !important; 
+      justify-content: flex-start; /* Alinear el texto de categoría a la izquierda */
+  }
+
+  #cashflow-table td:first-child::before {
+    content: ""; /* No mostrar pseudo-label para la celda de categoría */
+    display: none;
+  }
+
+  #cashflow-table td,
+  #cashflow-table td::before { 
+      font-size: 0.9rem; 
+  }
+
+  /* Aplicar colores de texto también al pseudo-label si es necesario */
+  #cashflow-table td.text-red::before { color: #c0392b; }
+  #cashflow-table td.text-blue::before { color: #2980b9; }
 }
