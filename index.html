@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor de Flujo de Caja Firebase</title>
+    <title>Visor y Editor de Flujo de Caja</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>Visor de Flujo de Caja</h1>
+        <h1>Gestor Financiero Web</h1>
 
         <div id="auth-container">
             <div id="login-form">
@@ -24,9 +24,9 @@
         </div>
 
         <div id="data-selection-container" style="display:none;">
-            <h2>Seleccionar Versión a Cargar</h2>
+            <h2>Seleccionar Versión de Datos</h2>
             <select id="backup-selector">
-                <option value="">-- Selecciona un backup --</option>
+                <option value="">-- Selecciona una versión --</option>
             </select>
             <button id="load-backup-button">Cargar Versión</button>
             <p id="loading-message" style="display:none;"></p>
@@ -34,11 +34,137 @@
 
         <div id="main-content-container" style="display:none;">
             <div class="tabs-container">
+                <button class="tab-button" data-tab="ingresos">Ingresos</button>
+                <button class="tab-button" data-tab="gastos">Gastos</button>
                 <button class="tab-button active" data-tab="flujo-caja">Flujo de Caja</button>
                 </div>
 
-            <div id="flujo-caja" class="tab-content active">
-                <div id="cashflow-container"> <h2 id="cashflow-title">Flujo de Caja</h2>
+            <div id="ingresos" class="tab-content">
+                <h2>Gestión de Ingresos</h2>
+                <div class="form-and-table-layout">
+                    <div class="form-container">
+                        <h3>Registrar Nuevo Ingreso</h3>
+                        <form id="income-form">
+                            <label for="income-name">Nombre:</label>
+                            <input type="text" id="income-name" required>
+
+                            <label for="income-amount">Monto Neto:</label>
+                            <input type="number" id="income-amount" step="any" required>
+
+                            <label for="income-frequency">Frecuencia:</label>
+                            <select id="income-frequency">
+                                <option value="Mensual">Mensual</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Bi-semanal">Bi-semanal</option>
+                                <option value="Único">Único</option>
+                            </select>
+
+                            <label for="income-start-date">Fecha Inicio / Única:</label>
+                            <input type="date" id="income-start-date" required>
+
+                            <label for="income-end-date">Fecha Fin (si aplica):</label>
+                            <input type="date" id="income-end-date">
+                            <div class="checkbox-container">
+                                <input type="checkbox" id="income-ongoing" checked>
+                                <label for="income-ongoing">Ingreso recurrente sin fin</label>
+                            </div>
+
+                            <button type="submit" id="add-income-button">Agregar Ingreso</button>
+                            <button type="button" id="cancel-edit-income-button" style="display:none;" class="danger">Cancelar Edición</button>
+                        </form>
+                    </div>
+                    <div class="table-container-dynamic">
+                        <h3>Ingresos Registrados</h3>
+                        <div class="table-responsive dynamic-table-scroll">
+                            <table id="incomes-table-view">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Monto</th>
+                                        <th>Frecuencia</th>
+                                        <th>Inicio</th>
+                                        <th>Fin</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="gastos" class="tab-content">
+                <h2>Gestión de Gastos</h2>
+                <div class="form-and-table-layout">
+                    <div class="form-container">
+                        <h3>Registrar Nuevo Gasto</h3>
+                        <form id="expense-form">
+                            <label for="expense-name">Nombre:</label>
+                            <input type="text" id="expense-name" required>
+
+                            <label for="expense-amount">Monto:</label>
+                            <input type="number" id="expense-amount" step="any" required>
+
+                            <label for="expense-category">Categoría:</label>
+                            <select id="expense-category" required>
+                                </select>
+
+                            <label for="expense-frequency">Frecuencia:</label>
+                            <select id="expense-frequency">
+                                <option value="Mensual">Mensual</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Bi-semanal">Bi-semanal</option>
+                                <option value="Único">Único</option>
+                            </select>
+
+                            <label for="expense-start-date">Fecha Inicio / Única:</label>
+                            <input type="date" id="expense-start-date" required>
+
+                            <label for="expense-end-date">Fecha Fin (si aplica):</label>
+                            <input type="date" id="expense-end-date">
+                             <div class="checkbox-container">
+                                <input type="checkbox" id="expense-ongoing" checked>
+                                <label for="expense-ongoing">Gasto recurrente sin fin</label>
+                            </div>
+
+                            <div class="checkbox-container">
+                                <input type="checkbox" id="expense-is-real">
+                                <label for="expense-is-real">Es un gasto real (ya ocurrido)</label>
+                            </div>
+
+                            <button type="submit" id="add-expense-button">Agregar Gasto</button>
+                            <button type="button" id="cancel-edit-expense-button" style="display:none;" class="danger">Cancelar Edición</button>
+                        </form>
+                    </div>
+                    <div class="table-container-dynamic">
+                        <h3>Gastos Registrados</h3>
+                        <div class="table-responsive dynamic-table-scroll">
+                            <table id="expenses-table-view">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Monto</th>
+                                        <th>Categoría</th>
+                                        <th>Frecuencia</th>
+                                        <th>Inicio</th>
+                                        <th>Fin</th>
+                                        <th>Real</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="flujo-caja" class="tab-content">
+                <div id="cashflow-container">
+                    <h2 id="cashflow-title">Flujo de Caja</h2>
                     <div class="table-responsive">
                         <table id="cashflow-table">
                             <thead></thead>
@@ -47,7 +173,10 @@
                     </div>
                 </div>
             </div>
+            <div class="save-changes-container">
+                 <button id="save-changes-button" class="accent">Guardar Cambios (como nueva versión)</button>
             </div>
+        </div>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>

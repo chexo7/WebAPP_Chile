@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Elementos de Autenticación
+    // --- ELEMENTOS GLOBALES ---
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const loginButton = document.getElementById('login-button');
@@ -9,39 +9,71 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('login-form');
     const logoutArea = document.getElementById('logout-area');
 
-    // Elementos de Selección de Datos
     const dataSelectionContainer = document.getElementById('data-selection-container');
     const backupSelector = document.getElementById('backup-selector');
     const loadBackupButton = document.getElementById('load-backup-button');
     const loadingMessage = document.getElementById('loading-message');
 
-    // Elementos de Contenido Principal y Pestañas
     const mainContentContainer = document.getElementById('main-content-container');
     const tabsContainer = document.querySelector('.tabs-container');
-    const tabButtons = document.querySelectorAll('.tab-button');
-    const tabContents = document.querySelectorAll('.tab-content');
+    // const tabButtons = document.querySelectorAll('.tab-button'); // Se obtendrán dinámicamente
+    // const tabContents = document.querySelectorAll('.tab-content'); // Se obtendrán dinámicamente
 
-    // Elementos del Flujo de Caja (dentro de su pestaña)
-    const cashflowContainer = document.getElementById('cashflow-container'); // Este ya existe
+    const saveChangesButton = document.getElementById('save-changes-button');
+
+
+    // --- ELEMENTOS PESTAÑA INGRESOS ---
+    const incomeForm = document.getElementById('income-form');
+    const incomeNameInput = document.getElementById('income-name');
+    const incomeAmountInput = document.getElementById('income-amount');
+    const incomeFrequencySelect = document.getElementById('income-frequency');
+    const incomeStartDateInput = document.getElementById('income-start-date');
+    const incomeEndDateInput = document.getElementById('income-end-date');
+    const incomeOngoingCheckbox = document.getElementById('income-ongoing');
+    const addIncomeButton = document.getElementById('add-income-button');
+    const cancelEditIncomeButton = document.getElementById('cancel-edit-income-button');
+    const incomesTableView = document.querySelector('#incomes-table-view tbody');
+    let editingIncomeIndex = null; // Para rastrear si estamos editando un ingreso existente
+
+
+    // --- ELEMENTOS PESTAÑA GASTOS ---
+    const expenseForm = document.getElementById('expense-form');
+    const expenseNameInput = document.getElementById('expense-name');
+    const expenseAmountInput = document.getElementById('expense-amount');
+    const expenseCategorySelect = document.getElementById('expense-category');
+    const expenseFrequencySelect = document.getElementById('expense-frequency');
+    const expenseStartDateInput = document.getElementById('expense-start-date');
+    const expenseEndDateInput = document.getElementById('expense-end-date');
+    const expenseOngoingCheckbox = document.getElementById('expense-ongoing');
+    const expenseIsRealCheckbox = document.getElementById('expense-is-real');
+    const addExpenseButton = document.getElementById('add-expense-button');
+    const cancelEditExpenseButton = document.getElementById('cancel-edit-expense-button');
+    const expensesTableView = document.querySelector('#expenses-table-view tbody');
+    let editingExpenseIndex = null; // Para rastrear si estamos editando un gasto
+
+
+    // --- ELEMENTOS PESTAÑA FLUJO DE CAJA ---
     const cashflowTableBody = document.querySelector('#cashflow-table tbody');
     const cashflowTableHead = document.querySelector('#cashflow-table thead');
     const cashflowTitle = document.getElementById('cashflow-title');
 
+    // --- CONSTANTES Y ESTADO ---
     const MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     const DATE_WEEK_START_FORMAT = (date) => `${date.getDate()}-${MONTH_NAMES_ES[date.getMonth()]}`;
+    let currentBackupData = null; // Almacena los datos de la versión cargada
+    let currentBackupKey = null; // Almacena la clave de la versión cargada
 
-    let currentBackupData = null;
-
-    // --- Lógica de UI ---
+    // --- LÓGICA DE UI (VISIBILIDAD DE SECCIONES) ---
     function showLoginScreen() {
         authContainer.style.display = 'block';
         loginForm.style.display = 'block';
         logoutArea.style.display = 'none';
         dataSelectionContainer.style.display = 'none';
         mainContentContainer.style.display = 'none';
-        clearCashflowTable(); // Limpiar tabla al cerrar sesión o volver a login
-        currentBackupData = null; // Resetear datos
-        backupSelector.innerHTML = '<option value="">-- Selecciona un backup --</option>'; // Reset selector
+        clearAllDataViews();
+        currentBackupData = null;
+        currentBackupKey = null;
+        backupSelector.innerHTML = '<option value="">-- Selecciona una versión --</option>';
     }
 
     function showDataSelectionScreen(user) {
@@ -51,39 +83,39 @@ document.addEventListener('DOMContentLoaded', () => {
         authStatus.textContent = `Conectado como: ${user.email}`;
         dataSelectionContainer.style.display = 'block';
         mainContentContainer.style.display = 'none';
-        fetchBackups(); // Cargar backups disponibles
+        fetchBackups();
     }
 
     function showMainContentScreen() {
-        // authContainer sigue visible con el área de logout
-        // dataSelectionContainer sigue visible para cambiar de backup
         mainContentContainer.style.display = 'block';
-        // Activar la primera pestaña por defecto (Flujo de Caja)
-        activateTab('flujo-caja');
+        activateTab('ingresos'); // Activar la pestaña de Ingresos por defecto
     }
 
+    function clearAllDataViews() {
+        if (cashflowTableHead) cashflowTableHead.innerHTML = '';
+        if (cashflowTableBody) cashflowTableBody.innerHTML = '';
+        if (cashflowTitle) cashflowTitle.textContent = 'Flujo de Caja';
+        if (incomesTableView) incomesTableView.innerHTML = '';
+        if (expensesTableView) expensesTableView.innerHTML = '';
+        if (expenseCategorySelect) expenseCategorySelect.innerHTML = '<option value="">Cargando categorías...</option>';
+        resetIncomeForm();
+        resetExpenseForm();
+    }
 
-    // --- Autenticación ---
+    // --- AUTENTICACIÓN ---
     loginButton.addEventListener('click', () => {
         const email = emailInput.value;
         const password = passwordInput.value;
-        authStatus.textContent = "Ingresando..."; // Mensaje temporal
+        authStatus.textContent = "Ingresando...";
         auth.signInWithEmailAndPassword(email, password)
-            .then(userCredential => {
-                // No se muestra el status aquí, se maneja en onAuthStateChanged
-            })
             .catch(error => {
                 authStatus.textContent = `Error: ${error.message}`;
-                logoutArea.style.display = 'block'; // Mostrar área de status/logout para el mensaje de error
-                loginForm.style.display = 'block'; // Mantener formulario de login visible
+                logoutArea.style.display = 'block';
+                loginForm.style.display = 'block';
             });
     });
 
-    logoutButton.addEventListener('click', () => {
-        auth.signOut().then(() => {
-            // El cambio de UI se maneja en onAuthStateChanged
-        });
-    });
+    logoutButton.addEventListener('click', () => { auth.signOut(); });
 
     auth.onAuthStateChanged(user => {
         if (user) {
@@ -93,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Carga de Backups ---
+    // --- CARGA DE VERSIONES (BACKUPS) ---
     function fetchBackups() {
         loadingMessage.textContent = "Cargando lista de versiones...";
         loadingMessage.style.display = 'block';
@@ -116,15 +148,15 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(error => {
                 console.error("Error fetching backups:", error);
-                authStatus.textContent = `Error cargando versiones: ${error.message}`; // Mostrar error en authStatus
+                authStatus.textContent = `Error cargando versiones: ${error.message}`;
                 loadingMessage.textContent = "Error al cargar versiones.";
-                loadingMessage.style.display = 'block';
             });
     }
 
     loadBackupButton.addEventListener('click', () => {
         const selectedKey = backupSelector.value;
         if (selectedKey) {
+            currentBackupKey = selectedKey; // Guardar la clave de la versión actual
             loadSpecificBackup(selectedKey);
         } else {
             alert("Por favor, selecciona una versión.");
@@ -134,50 +166,52 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadSpecificBackup(key) {
         loadingMessage.textContent = `Cargando datos de la versión: ${formatBackupKey(key)}...`;
         loadingMessage.style.display = 'block';
-        mainContentContainer.style.display = 'none'; // Ocultar contenido anterior mientras carga
-        clearCashflowTable();
+        mainContentContainer.style.display = 'none';
+        clearAllDataViews();
 
         database.ref(`backups/${key}`).once('value')
             .then(snapshot => {
                 if (snapshot.exists()) {
                     currentBackupData = snapshot.val();
-                    // Parsear fechas (sin cambios aquí)
-                    currentBackupData.analysis_start_date = new Date(currentBackupData.analysis_start_date + 'T00:00:00');
-                    if (currentBackupData.incomes) {
-                        currentBackupData.incomes.forEach(inc => {
-                            if (inc.start_date) inc.start_date = new Date(inc.start_date + 'T00:00:00');
-                            if (inc.end_date) inc.end_date = new Date(inc.end_date + 'T00:00:00');
-                        });
-                    }
-                    if (currentBackupData.expenses) {
-                        currentBackupData.expenses.forEach(exp => {
-                            if (exp.start_date) exp.start_date = new Date(exp.start_date + 'T00:00:00');
-                            if (exp.end_date) exp.end_date = new Date(exp.end_date + 'T00:00:00');
-                        });
-                    }
+                    if (!currentBackupData.incomes) currentBackupData.incomes = [];
+                    if (!currentBackupData.expenses) currentBackupData.expenses = [];
+                    if (!currentBackupData.expense_categories) currentBackupData.expense_categories = {};
 
-                    const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(currentBackupData);
-                    renderCashflowTable(periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p, currentBackupData);
-                    
-                    showMainContentScreen(); // Mostrar el contenedor con pestañas
+                    // Parsear fechas
+                    currentBackupData.analysis_start_date = new Date(currentBackupData.analysis_start_date + 'T00:00:00');
+                    currentBackupData.incomes.forEach(inc => {
+                        if (inc.start_date) inc.start_date = new Date(inc.start_date + 'T00:00:00');
+                        if (inc.end_date) inc.end_date = new Date(inc.end_date + 'T00:00:00');
+                    });
+                    currentBackupData.expenses.forEach(exp => {
+                        if (exp.start_date) exp.start_date = new Date(exp.start_date + 'T00:00:00');
+                        if (exp.end_date) exp.end_date = new Date(exp.end_date + 'T00:00:00');
+                    });
+
+                    renderIncomesTable();
+                    renderExpensesTable();
+                    populateExpenseCategoriesDropdown();
+                    renderCashflowTable();
+                    showMainContentScreen();
                 } else {
                     alert("La versión seleccionada no contiene datos.");
                     currentBackupData = null;
+                    currentBackupKey = null;
                 }
                 loadingMessage.style.display = 'none';
             })
             .catch(error => {
                 console.error("Error loading backup data:", error);
                 alert(`Error al cargar datos de la versión: ${error.message}`);
-                loadingMessage.textContent = "Error al cargar datos de la versión.";
-                loadingMessage.style.display = 'block';
+                loadingMessage.textContent = "Error al cargar datos.";
                 currentBackupData = null;
+                currentBackupKey = null;
             });
     }
 
     function formatBackupKey(key) {
         const ts = key.replace("backup_", "");
-        if (ts.length === 15) {
+        if (ts.length === 15) { // YYYYMMDDTHHMMSS
             const year = ts.substring(0, 4);
             const month = ts.substring(4, 6);
             const day = ts.substring(6, 8);
@@ -188,27 +222,59 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return key;
     }
+    
+    // --- GUARDAR CAMBIOS (COMO NUEVA VERSIÓN) ---
+    saveChangesButton.addEventListener('click', () => {
+        if (!currentBackupData) {
+            alert("No hay datos cargados para guardar.");
+            return;
+        }
 
-    function clearCashflowTable() {
-        cashflowTableHead.innerHTML = '';
-        cashflowTableBody.innerHTML = '';
-        cashflowTitle.textContent = 'Flujo de Caja'; // Resetear título
-    }
+        // Preparar datos para Firebase (convertir fechas a ISO strings)
+        const dataToSave = JSON.parse(JSON.stringify(currentBackupData)); // Deep copy
+        dataToSave.analysis_start_date = getISODate(currentBackupData.analysis_start_date).split('T')[0];
+        dataToSave.incomes.forEach(inc => {
+            if (inc.start_date) inc.start_date = getISODate(new Date(inc.start_date)).split('T')[0];
+            if (inc.end_date) inc.end_date = getISODate(new Date(inc.end_date)).split('T')[0];
+        });
+        dataToSave.expenses.forEach(exp => {
+            if (exp.start_date) exp.start_date = getISODate(new Date(exp.start_date)).split('T')[0];
+            if (exp.end_date) exp.end_date = getISODate(new Date(exp.end_date)).split('T')[0];
+        });
 
-    // --- Lógica de Pestañas ---
+
+        const now = new Date();
+        const newBackupKey = `backup_${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}T${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+
+        loadingMessage.textContent = "Guardando cambios como nueva versión...";
+        loadingMessage.style.display = 'block';
+
+        database.ref('backups/' + newBackupKey).set(dataToSave)
+            .then(() => {
+                loadingMessage.style.display = 'none';
+                alert(`Cambios guardados exitosamente como nueva versión: ${formatBackupKey(newBackupKey)}`);
+                fetchBackups(); // Actualizar la lista de versiones
+                backupSelector.value = newBackupKey; // Seleccionar la nueva versión
+                currentBackupKey = newBackupKey; // Actualizar la clave actual
+            })
+            .catch(error => {
+                loadingMessage.style.display = 'none';
+                console.error("Error saving new version:", error);
+                alert(`Error al guardar la nueva versión: ${error.message}`);
+            });
+    });
+
+
+    // --- LÓGICA DE PESTAÑAS ---
     function activateTab(tabId) {
-        tabContents.forEach(content => {
-            content.classList.remove('active');
-            if (content.id === tabId) {
-                content.classList.add('active');
-            }
-        });
-        tabButtons.forEach(button => {
-            button.classList.remove('active');
-            if (button.dataset.tab === tabId) {
-                button.classList.add('active');
-            }
-        });
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
+
+        const activeContent = document.getElementById(tabId);
+        const activeButton = document.querySelector(`.tab-button[data-tab="${tabId}"]`);
+
+        if (activeContent) activeContent.classList.add('active');
+        if (activeButton) activeButton.classList.add('active');
     }
 
     tabsContainer.addEventListener('click', (event) => {
@@ -218,54 +284,379 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Lógica de Flujo de Caja (sin cambios, adaptada de tu original) ---
-    // ... (TODA TU LÓGICA EXISTENTE PARA calculateCashFlowData, renderCashflowTable, formatCurrencyJS, addMonths, etc. VA AQUÍ) ...
-    // PEGA AQUÍ TU CÓDIGO ORIGINAL DESDE: function formatCurrencyJS(value, symbol) { ... HASTA EL FINAL DE renderCashflowTable(...) }
-    // ES IMPORTANTE QUE TODO ESE BLOQUE ESTÉ PRESENTE.
 
-    function formatCurrencyJS(value, symbol) {
-        if (value === null || typeof value !== 'number') {
-            return `${symbol}0`;
+    // --- PESTAÑA INGRESOS ---
+    incomeOngoingCheckbox.addEventListener('change', () => {
+        incomeEndDateInput.disabled = incomeOngoingCheckbox.checked;
+        if (incomeOngoingCheckbox.checked) {
+            incomeEndDateInput.value = '';
         }
-        return `${symbol}${Math.round(value).toLocaleString('es-CL')}`;
+    });
+    incomeFrequencySelect.addEventListener('change', () => {
+        const isUnico = incomeFrequencySelect.value === 'Único';
+        incomeOngoingCheckbox.disabled = isUnico;
+        incomeEndDateInput.disabled = isUnico || incomeOngoingCheckbox.checked;
+        if (isUnico) {
+            incomeOngoingCheckbox.checked = false;
+            incomeEndDateInput.value = '';
+        }
+    });
+
+
+    incomeForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = incomeNameInput.value.trim();
+        const amount = parseFloat(incomeAmountInput.value);
+        const frequency = incomeFrequencySelect.value;
+        const startDate = incomeStartDateInput.value ? new Date(incomeStartDateInput.value + 'T00:00:00') : null;
+        const isOngoing = incomeOngoingCheckbox.checked;
+        const endDate = (frequency === 'Único' || isOngoing || !incomeEndDateInput.value) ? null : new Date(incomeEndDateInput.value + 'T00:00:00');
+
+        if (!name || isNaN(amount) || !startDate) {
+            alert("Por favor, completa los campos obligatorios (Nombre, Monto, Fecha Inicio).");
+            return;
+        }
+        if (endDate && startDate && endDate < startDate) {
+            alert("La fecha de fin no puede ser anterior a la fecha de inicio.");
+            return;
+        }
+
+        const incomeEntry = { name, net_monthly: amount, frequency, start_date: startDate, end_date: endDate };
+
+        if (editingIncomeIndex !== null) { // Actualizando
+            currentBackupData.incomes[editingIncomeIndex] = incomeEntry;
+        } else { // Agregando nuevo
+            currentBackupData.incomes.push(incomeEntry);
+        }
+        
+        renderIncomesTable();
+        renderCashflowTable(); // Recalcular flujo de caja
+        resetIncomeForm();
+    });
+
+    function resetIncomeForm() {
+        incomeForm.reset();
+        incomeOngoingCheckbox.checked = true;
+        incomeEndDateInput.disabled = true;
+        incomeEndDateInput.value = '';
+        incomeFrequencySelect.value = 'Mensual';
+        addIncomeButton.textContent = 'Agregar Ingreso';
+        cancelEditIncomeButton.style.display = 'none';
+        editingIncomeIndex = null;
+    }
+    cancelEditIncomeButton.addEventListener('click', resetIncomeForm);
+
+
+    function renderIncomesTable() {
+        if (!incomesTableView || !currentBackupData || !currentBackupData.incomes) return;
+        incomesTableView.innerHTML = ''; // Limpiar tabla
+        currentBackupData.incomes.forEach((income, index) => {
+            const row = incomesTableView.insertRow();
+            row.insertCell().textContent = income.name;
+            row.insertCell().textContent = formatCurrencyJS(income.net_monthly, currentBackupData.display_currency_symbol || '$');
+            row.insertCell().textContent = income.frequency;
+            row.insertCell().textContent = income.start_date ? getISODate(new Date(income.start_date)).split('T')[0] : 'N/A';
+            row.insertCell().textContent = income.end_date ? getISODate(new Date(income.end_date)).split('T')[0] : (income.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
+
+            const actionsCell = row.insertCell();
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Editar';
+            editButton.classList.add('small-button');
+            editButton.onclick = () => loadIncomeForEdit(index);
+            actionsCell.appendChild(editButton);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Eliminar';
+            deleteButton.classList.add('small-button', 'danger');
+            deleteButton.onclick = () => deleteIncome(index);
+            actionsCell.appendChild(deleteButton);
+        });
     }
 
-    function addMonths(date, months) {
-        const d = new Date(date);
-        d.setMonth(d.getMonth() + months);
-        return d;
+    function loadIncomeForEdit(index) {
+        const income = currentBackupData.incomes[index];
+        incomeNameInput.value = income.name;
+        incomeAmountInput.value = income.net_monthly;
+        incomeFrequencySelect.value = income.frequency;
+        incomeStartDateInput.value = income.start_date ? getISODate(new Date(income.start_date)).split('T')[0] : '';
+        
+        const isUnico = income.frequency === 'Único';
+        incomeOngoingCheckbox.disabled = isUnico;
+
+        if (isUnico) {
+            incomeOngoingCheckbox.checked = false;
+            incomeEndDateInput.value = '';
+            incomeEndDateInput.disabled = true;
+        } else {
+            incomeOngoingCheckbox.checked = !income.end_date;
+            incomeEndDateInput.value = income.end_date ? getISODate(new Date(income.end_date)).split('T')[0] : '';
+            incomeEndDateInput.disabled = !income.end_date;
+        }
+        
+        addIncomeButton.textContent = 'Guardar Cambios';
+        cancelEditIncomeButton.style.display = 'inline-block';
+        editingIncomeIndex = index;
+        document.getElementById('ingresos').scrollIntoView({ behavior: 'smooth' }); // Scroll to form
     }
 
-    function addWeeks(date, weeks) {
-        const d = new Date(date);
-        d.setDate(d.getDate() + (weeks * 7));
-        return d;
+    function deleteIncome(index) {
+        if (confirm(`¿Estás seguro de que quieres eliminar el ingreso "${currentBackupData.incomes[index].name}"?`)) {
+            currentBackupData.incomes.splice(index, 1);
+            renderIncomesTable();
+            renderCashflowTable(); // Recalcular flujo de caja
+            if(editingIncomeIndex === index) resetIncomeForm();
+        }
     }
+
+
+    // --- PESTAÑA GASTOS ---
+    expenseOngoingCheckbox.addEventListener('change', () => {
+        expenseEndDateInput.disabled = expenseOngoingCheckbox.checked;
+        if (expenseOngoingCheckbox.checked) {
+            expenseEndDateInput.value = '';
+        }
+    });
+    expenseFrequencySelect.addEventListener('change', () => {
+        const isUnico = expenseFrequencySelect.value === 'Único';
+        expenseOngoingCheckbox.disabled = isUnico;
+        expenseEndDateInput.disabled = isUnico || expenseOngoingCheckbox.checked;
+        if (isUnico) {
+            expenseOngoingCheckbox.checked = false;
+            expenseEndDateInput.value = '';
+        }
+    });
+
+    function populateExpenseCategoriesDropdown() {
+        if (!expenseCategorySelect || !currentBackupData || !currentBackupData.expense_categories) {
+            if(expenseCategorySelect) expenseCategorySelect.innerHTML = '<option value="">No hay categorías</option>';
+            return;
+        }
+        expenseCategorySelect.innerHTML = '<option value="">-- Selecciona Categoría --</option>';
+        const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
+        sortedCategories.forEach(catName => {
+            const option = document.createElement('option');
+            option.value = catName;
+            option.textContent = catName;
+            expenseCategorySelect.appendChild(option);
+        });
+    }
+
+    expenseForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = expenseNameInput.value.trim();
+        const amount = parseFloat(expenseAmountInput.value);
+        const category = expenseCategorySelect.value;
+        const frequency = expenseFrequencySelect.value;
+        const startDate = expenseStartDateInput.value ? new Date(expenseStartDateInput.value + 'T00:00:00') : null;
+        const isOngoing = expenseOngoingCheckbox.checked;
+        const endDate = (frequency === 'Único' || isOngoing || !expenseEndDateInput.value) ? null : new Date(expenseEndDateInput.value + 'T00:00:00');
+        const isReal = expenseIsRealCheckbox.checked;
+
+        if (!name || isNaN(amount) || !category || !startDate) {
+            alert("Por favor, completa los campos obligatorios (Nombre, Monto, Categoría, Fecha Inicio).");
+            return;
+        }
+        if (endDate && startDate && endDate < startDate) {
+            alert("La fecha de fin no puede ser anterior a la fecha de inicio.");
+            return;
+        }
+
+        const expenseType = currentBackupData.expense_categories[category] || "Variable"; // Obtener tipo de la categoría
+        const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal };
+
+        if (editingExpenseIndex !== null) { // Actualizando
+            currentBackupData.expenses[editingExpenseIndex] = expenseEntry;
+        } else { // Agregando nuevo
+            currentBackupData.expenses.push(expenseEntry);
+        }
+
+        renderExpensesTable();
+        renderCashflowTable(); // Recalcular flujo de caja
+        resetExpenseForm();
+    });
     
-    function getISODate(date) { 
-      return date.getFullYear() + '-' + ('0' + (date.getMonth() + 1)).slice(-2) + '-' + ('0' + date.getDate()).slice(-2);
+    function resetExpenseForm() {
+        expenseForm.reset();
+        expenseOngoingCheckbox.checked = true;
+        expenseEndDateInput.disabled = true;
+        expenseEndDateInput.value = '';
+        expenseFrequencySelect.value = 'Mensual';
+        expenseIsRealCheckbox.checked = false;
+        if (expenseCategorySelect.options.length > 0) expenseCategorySelect.selectedIndex = 0;
+        addExpenseButton.textContent = 'Agregar Gasto';
+        cancelEditExpenseButton.style.display = 'none';
+        editingExpenseIndex = null;
     }
-
-    function getWeekNumber(d) {
-        d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
-        var yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
-        var weekNo = Math.ceil(( ( (d - yearStart) / 86400000) + 1)/7);
-        return [d.getUTCFullYear(), weekNo];
-    }
-    
-    function getMondayOfWeek(year, week) {
-        const simple = new Date(year, 0, 1 + (week - 1) * 7);
-        const dow = simple.getDay();
-        const ISOweekStart = simple;
-        if (dow <= 4)
-            ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-        else
-            ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-        return ISOweekStart;
-    }
+    cancelEditExpenseButton.addEventListener('click', resetExpenseForm);
 
 
+    function renderExpensesTable() {
+        if (!expensesTableView || !currentBackupData || !currentBackupData.expenses) return;
+        expensesTableView.innerHTML = ''; // Limpiar tabla
+        currentBackupData.expenses.forEach((expense, index) => {
+            const row = expensesTableView.insertRow();
+            row.insertCell().textContent = expense.name;
+            row.insertCell().textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$');
+            row.insertCell().textContent = expense.category;
+            row.insertCell().textContent = expense.frequency;
+            row.insertCell().textContent = expense.start_date ? getISODate(new Date(expense.start_date)).split('T')[0] : 'N/A';
+            row.insertCell().textContent = expense.end_date ? getISODate(new Date(expense.end_date)).split('T')[0] : (expense.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
+            row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
+
+            const actionsCell = row.insertCell();
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Editar';
+            editButton.classList.add('small-button');
+            editButton.onclick = () => loadExpenseForEdit(index);
+            actionsCell.appendChild(editButton);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Eliminar';
+            deleteButton.classList.add('small-button', 'danger');
+            deleteButton.onclick = () => deleteExpense(index);
+            actionsCell.appendChild(deleteButton);
+        });
+    }
+
+    function loadExpenseForEdit(index) {
+        const expense = currentBackupData.expenses[index];
+        expenseNameInput.value = expense.name;
+        expenseAmountInput.value = expense.amount;
+        expenseCategorySelect.value = expense.category;
+        expenseFrequencySelect.value = expense.frequency;
+        expenseStartDateInput.value = expense.start_date ? getISODate(new Date(expense.start_date)).split('T')[0] : '';
+        expenseIsRealCheckbox.checked = expense.is_real || false;
+
+        const isUnico = expense.frequency === 'Único';
+        expenseOngoingCheckbox.disabled = isUnico;
+        if (isUnico) {
+            expenseOngoingCheckbox.checked = false;
+            expenseEndDateInput.value = '';
+            expenseEndDateInput.disabled = true;
+        } else {
+            expenseOngoingCheckbox.checked = !expense.end_date;
+            expenseEndDateInput.value = expense.end_date ? getISODate(new Date(expense.end_date)).split('T')[0] : '';
+            expenseEndDateInput.disabled = !expense.end_date;
+        }
+
+        addExpenseButton.textContent = 'Guardar Cambios';
+        cancelEditExpenseButton.style.display = 'inline-block';
+        editingExpenseIndex = index;
+        document.getElementById('gastos').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function deleteExpense(index) {
+        if (confirm(`¿Estás seguro de que quieres eliminar el gasto "${currentBackupData.expenses[index].name}"?`)) {
+            currentBackupData.expenses.splice(index, 1);
+            renderExpensesTable();
+            renderCashflowTable(); // Recalcular flujo de caja
+            if(editingExpenseIndex === index) resetExpenseForm();
+        }
+    }
+
+
+    // --- LÓGICA DE FLUJO DE CAJA (Cálculo y Renderizado) ---
+    function renderCashflowTable() {
+        if (!currentBackupData || !cashflowTableBody || !cashflowTableHead) return; // Asegurarse que todo esté listo
+        
+        // Limpiar tabla antes de renderizar
+        cashflowTableHead.innerHTML = '';
+        cashflowTableBody.innerHTML = '';
+
+        const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(currentBackupData);
+
+        if (!periodDates || periodDates.length === 0) {
+            cashflowTableBody.innerHTML = '<tr><td colspan="2">No hay datos para mostrar. Ajusta los parámetros de análisis.</td></tr>';
+            return;
+        }
+
+        const symbol = currentBackupData.display_currency_symbol || "$";
+        const periodicity = currentBackupData.analysis_periodicity;
+        const initialBalance = parseFloat(currentBackupData.analysis_initial_balance);
+
+        const startQDate = new Date(currentBackupData.analysis_start_date);
+        const startStr = `${('0' + startQDate.getDate()).slice(-2)}/${('0' + (startQDate.getMonth() + 1)).slice(-2)}/${startQDate.getFullYear()}`;
+        const durationUnit = periodicity === "Semanal" ? "Semanas" : "Meses";
+        cashflowTitle.textContent = `Proyección Flujo de Caja (${currentBackupData.analysis_duration} ${durationUnit} desde ${startStr})`;
+
+        const headerRow = cashflowTableHead.insertRow();
+        const thConcept = document.createElement('th');
+        thConcept.textContent = 'Categoría / Concepto';
+        headerRow.appendChild(thConcept);
+
+        periodDates.forEach(d => {
+            const th = document.createElement('th');
+            if (periodicity === "Semanal") {
+                const [year, week] = getWeekNumber(d);
+                const mondayOfWeek = getMondayOfWeek(year, week);
+                th.innerHTML = `Sem ${week} (${DATE_WEEK_START_FORMAT(mondayOfWeek)})<br>${year}`;
+            } else {
+                th.innerHTML = `${MONTH_NAMES_ES[d.getMonth()]}<br>${d.getFullYear()}`;
+            }
+            headerRow.appendChild(th);
+        });
+
+        const cf_row_definitions = [
+            { key: 'START_BALANCE', label: "Saldo Inicial", isBold: true, isHeaderBg: true },
+            { key: 'NET_INCOME', label: "Ingreso Total Neto", isBold: true },
+        ];
+
+        const fixedCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === "Fijo").sort() : [];
+        const variableCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === "Variable").sort() : [];
+
+        fixedCategories.forEach(cat => {
+            cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat });
+        });
+        cf_row_definitions.push({ key: 'FIXED_EXP_TOTAL', label: "Total Gastos Fijos", isBold: true, isHeaderBg: true });
+
+        variableCategories.forEach(cat => {
+            cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat });
+        });
+        cf_row_definitions.push({ key: 'VAR_EXP_TOTAL', label: "Total Gastos Variables", isBold: true, isHeaderBg: true });
+
+        cf_row_definitions.push({ key: 'NET_FLOW', label: "Flujo Neto del Período", isBold: true });
+        cf_row_definitions.push({ key: 'END_BALANCE', label: "Saldo Final Estimado", isBold: true, isHeaderBg: true });
+
+        cf_row_definitions.forEach((def, rowIndex) => {
+            const tr = cashflowTableBody.insertRow();
+            const tdLabel = tr.insertCell();
+            tdLabel.textContent = def.isIndent ? `  ${def.label}` : def.label;
+            if (def.isBold) tdLabel.classList.add('bold');
+            if (def.isHeaderBg) tr.classList.add('bg-header');
+            else if (rowIndex % 2 !== 0 && !def.isHeaderBg) tr.classList.add('bg-alt-row');
+
+
+            for (let i = 0; i < periodDates.length; i++) {
+                const tdValue = tr.insertCell();
+                let value;
+                let colorClass = '';
+
+                switch (def.key) {
+                    case 'START_BALANCE': value = (i === 0) ? initialBalance : end_bal_p[i - 1]; break;
+                    case 'NET_INCOME': value = income_p[i]; break;
+                    case 'FIXED_EXP_TOTAL': value = -fixed_exp_p[i]; break;
+                    case 'VAR_EXP_TOTAL': value = -var_exp_p[i]; break;
+                    case 'NET_FLOW': value = net_flow_p[i]; break;
+                    case 'END_BALANCE':
+                        value = end_bal_p[i];
+                        colorClass = value >= 0 ? 'text-blue' : 'text-red';
+                        break;
+                    default:
+                        if (def.category) {
+                            value = -(expenses_by_cat_p[i][def.category] || 0);
+                        } else {
+                            value = 0;
+                        }
+                }
+                tdValue.textContent = formatCurrencyJS(value, symbol);
+                if (colorClass) tdValue.classList.add(colorClass);
+                if (def.isBold) tdValue.classList.add('bold');
+            }
+        });
+    }
+
+
+    // --- FUNCIONES DE CÁLCULO (Adaptadas de tu script original) ---
     function calculateCashFlowData(data) {
         const startDate = new Date(data.analysis_start_date);
         const duration = parseInt(data.analysis_duration, 10);
@@ -293,7 +684,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-
         for (let i = 0; i < duration; i++) {
             const p_start = new Date(currentDate);
             let p_end;
@@ -310,8 +700,8 @@ document.addEventListener('DOMContentLoaded', () => {
             let p_inc_total = 0.0;
             (data.incomes || []).forEach(inc => {
                 if (!inc.start_date) return;
-                const inc_start = new Date(inc.start_date);
-                const inc_end = inc.end_date ? new Date(inc.end_date) : null;
+                const inc_start = new Date(inc.start_date); // Asegurar que es Date
+                const inc_end = inc.end_date ? new Date(inc.end_date) : null; // Asegurar que es Date
                 const net_amount = parseFloat(inc.net_monthly || 0);
                 const inc_freq = inc.frequency || "Mensual";
 
@@ -350,8 +740,8 @@ document.addEventListener('DOMContentLoaded', () => {
             let p_var_exp_total = 0.0;
             (data.expenses || []).forEach(exp => {
                 if (!exp.start_date) return;
-                const e_start = new Date(exp.start_date);
-                const e_end = exp.end_date ? new Date(exp.end_date) : null;
+                const e_start = new Date(exp.start_date); // Asegurar que es Date
+                const e_end = exp.end_date ? new Date(exp.end_date) : null; // Asegurar que es Date
                 const amt_raw = parseFloat(exp.amount || 0);
                 const freq = exp.frequency || "Mensual";
                 const typ = exp.type || (data.expense_categories && data.expense_categories[exp.category]) || "Variable";
@@ -407,105 +797,55 @@ document.addEventListener('DOMContentLoaded', () => {
         return { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p };
     }
 
-    function renderCashflowTable(periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p, data) {
-        clearCashflowTable();
-        if (!periodDates || periodDates.length === 0) {
-            cashflowTableBody.innerHTML = '<tr><td colspan="2">No hay datos para mostrar.</td></tr>';
-            return;
+    // --- FUNCIONES UTILITARIAS DE FECHA Y MONEDA ---
+    function formatCurrencyJS(value, symbol) {
+        if (value === null || typeof value !== 'number') {
+            return `${symbol}0`;
         }
-
-        const symbol = data.display_currency_symbol || "$";
-        const periodicity = data.analysis_periodicity;
-        const initialBalance = parseFloat(data.analysis_initial_balance);
-
-        const startQDate = new Date(data.analysis_start_date);
-        const startStr = `${('0' + startQDate.getDate()).slice(-2)}/${('0' + (startQDate.getMonth() + 1)).slice(-2)}/${startQDate.getFullYear()}`;
-        const durationUnit = periodicity === "Semanal" ? "Semanas" : "Meses";
-        cashflowTitle.textContent = `Proyección Flujo de Caja (${data.analysis_duration} ${durationUnit} desde ${startStr})`;
-
-
-        const headerRow = document.createElement('tr');
-        const thConcept = document.createElement('th');
-        thConcept.textContent = 'Categoría / Concepto';
-        headerRow.appendChild(thConcept);
-
-        periodDates.forEach(d => {
-            const th = document.createElement('th');
-            if (periodicity === "Semanal") {
-                const [year, week] = getWeekNumber(d);
-                const mondayOfWeek = getMondayOfWeek(year,week);
-                th.innerHTML = `Sem ${week} (${DATE_WEEK_START_FORMAT(mondayOfWeek)})<br>${year}`;
-            } else {
-                th.innerHTML = `${MONTH_NAMES_ES[d.getMonth()]}<br>${d.getFullYear()}`;
-            }
-            headerRow.appendChild(th);
-        });
-        cashflowTableHead.appendChild(headerRow);
-
-        const cf_row_definitions = [ 
-            { key: 'START_BALANCE', label: "Saldo Inicial", isBold: true, isHeaderBg: true },
-            { key: 'NET_INCOME', label: "Ingreso Total Neto", isBold: true },
-        ];
-
-        const fixedCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Fijo").sort() : [];
-        const variableCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Variable").sort() : [];
-        
-        fixedCategories.forEach(cat => {
-            cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat });
-        });
-        cf_row_definitions.push({ key: 'FIXED_EXP_TOTAL', label: "Total Gastos Fijos", isBold: true, isHeaderBg: true });
-        
-        variableCategories.forEach(cat => {
-            cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat });
-        });
-        cf_row_definitions.push({ key: 'VAR_EXP_TOTAL', label: "Total Gastos Variables", isBold: true, isHeaderBg: true });
-        
-        cf_row_definitions.push({ key: 'NET_FLOW', label: "Flujo Neto del Período", isBold: true });
-        cf_row_definitions.push({ key: 'END_BALANCE', label: "Saldo Final Estimado", isBold: true, isHeaderBg: true });
-
-        let currentBalance = initialBalance;
-
-        cf_row_definitions.forEach((def, rowIndex) => {
-            const tr = document.createElement('tr');
-            const tdLabel = document.createElement('td');
-            tdLabel.textContent = def.isIndent ? `  ${def.label}` : def.label;
-            if (def.isBold) tdLabel.classList.add('bold');
-            if (def.isHeaderBg) tr.classList.add('bg-header');
-            else if (rowIndex % 2 !== 0) tr.classList.add('bg-alt-row'); 
-            tr.appendChild(tdLabel);
-
-            for (let i = 0; i < periodDates.length; i++) {
-                const tdValue = document.createElement('td');
-                let value;
-                let colorClass = '';
-
-                switch (def.key) {
-                    case 'START_BALANCE': value = (i === 0) ? initialBalance : end_bal_p[i-1]; break;
-                    case 'NET_INCOME': value = income_p[i]; break;
-                    case 'FIXED_EXP_TOTAL': value = -fixed_exp_p[i]; break;
-                    case 'VAR_EXP_TOTAL': value = -var_exp_p[i]; break;
-                    case 'NET_FLOW': value = net_flow_p[i]; break;
-                    case 'END_BALANCE': 
-                        value = end_bal_p[i];
-                        colorClass = value >= 0 ? 'text-blue' : 'text-red';
-                        break;
-                    default: 
-                        if (def.category) {
-                            value = -(expenses_by_cat_p[i][def.category] || 0);
-                        } else {
-                            value = 0;
-                        }
-                }
-                tdValue.textContent = formatCurrencyJS(value, symbol);
-                if (colorClass) tdValue.classList.add(colorClass);
-                if (def.isBold) tdValue.classList.add('bold');
-                tr.appendChild(tdValue);
-            }
-            cashflowTableBody.appendChild(tr);
-        });
+        return `${symbol}${Math.round(value).toLocaleString('es-CL')}`;
     }
 
-    // Inicializar la vista de login al cargar la página
-    showLoginScreen();
+    function addMonths(date, months) {
+        const d = new Date(date);
+        d.setMonth(d.getMonth() + months);
+        return d;
+    }
+
+    function addWeeks(date, weeks) {
+        const d = new Date(date);
+        d.setDate(d.getDate() + (weeks * 7));
+        return d;
+    }
+
+    function getISODate(date) {
+        return date.getFullYear() + '-' + ('0' + (date.getMonth() + 1)).slice(-2) + '-' + ('0' + date.getDate()).slice(-2);
+    }
+
+    function getWeekNumber(d) {
+        d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+        var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        var weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        return [d.getUTCFullYear(), weekNo];
+    }
+
+    function getMondayOfWeek(year, week) {
+        const simple = new Date(year, 0, 1 + (week - 1) * 7);
+        const dow = simple.getDay();
+        const ISOweekStart = simple;
+        if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+        else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+        return ISOweekStart;
+    }
+
+    // --- INICIALIZACIÓN ---
+    showLoginScreen(); // Empezar en la pantalla de login
+    // Configurar fechas por defecto para formularios
+    const today = new Date();
+    const todayISO = getISODate(today);
+    incomeStartDateInput.value = todayISO;
+    expenseStartDateInput.value = todayISO;
+    incomeEndDateInput.disabled = true; // Por el checkbox "ongoing"
+    expenseEndDateInput.disabled = true; // Por el checkbox "ongoing"
 
 }); // Fin de DOMContentLoaded
