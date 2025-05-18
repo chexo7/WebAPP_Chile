@@ -248,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showMainContentScreen() {
         mainContentContainer.style.display = 'block';
-        activateTab('ajustes'); // Activar 'Ajustes' por defecto o la primera pestaña relevante
+        activateTab('gastos'); // Activar 'gastos' por defecto o la primera pestaña relevante
     }
 
     function clearAllDataViews() {
@@ -1423,9 +1423,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBudgetSummaryTable(); // Actualizar resumen de presupuesto con los datos calculados
     }
 
-    // --- FUNCIÓN DE CÁLCULO DE FLUJO DE CAJA (EXISTENTE, REVISAR CONSISTENCIA CON PYTHON) ---
-    // Esta función es compleja y crucial. Se asume que su lógica interna es correcta y consistente con la versión Python.
-    // Modificaciones principales serían asegurar que usa los parámetros de `currentBackupData` (como `analysis_start_date` como objeto Date).
+    // --- ÚNICA FUNCIÓN CORRECTA DE CÁLCULO DE FLUJO DE CAJA ---
     function calculateCashFlowData(data) { // data ya tiene analysis_start_date como objeto Date
         const startDate = data.analysis_start_date;
         const duration = parseInt(data.analysis_duration, 10);
@@ -1482,6 +1480,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (periodicity === "Mensual") {
                         income_to_add = net_amount;
                     } else if (periodicity === "Semanal") {
+                        // Lógica correcta usando payDay y payDate
                         const payDay = inc_start.getUTCDate(); 
                         const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay));
                         if (p_start <= payDate && payDate <= p_end) {
@@ -1538,6 +1537,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (periodicity === "Mensual") {
                         exp_add_this_period = amt_raw;
                     } else if (periodicity === "Semanal") {
+                        // Lógica correcta usando payDay y payDate
                         const payDay = e_start.getUTCDate();
                         const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay));
                         if (p_start <= payDate && payDate <= p_end) {

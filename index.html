@@ -35,15 +35,15 @@
 
         <div id="main-content-container" style="display:none;">
             <div class="tabs-container">
-                <button class="tab-button" data-tab="ajustes">Ajustes</button>
-                <button class="tab-button" data-tab="ingresos">Ingresos</button>
                 <button class="tab-button" data-tab="gastos">Gastos</button>
-                <button class="tab-button" data-tab="presupuestos">Presupuestos</button>
-                <button class="tab-button" data-tab="registro-pagos">Registro Pagos</button>
+                <button class="tab-button" data-tab="ingresos">Ingresos</button>
                 <button class="tab-button" data-tab="flujo-caja">Flujo de Caja</button>
                 <button class="tab-button" data-tab="grafico">Gráfico</button>
-                <button class="tab-button" data-tab="baby-steps">Baby Steps</button>
+                <button class="tab-button" data-tab="registro-pagos">Registro Pagos</button>
                 <button class="tab-button" data-tab="recordatorios">Recordatorios</button>
+                <button class="tab-button" data-tab="presupuestos">Presupuestos</button>
+                <button class="tab-button" data-tab="baby-steps">Baby Steps</button>
+                <button class="tab-button" data-tab="ajustes">Ajustes</button>
             </div>
 
             <div id="ajustes" class="tab-content">
@@ -176,7 +176,7 @@
                             </div>
 
                             <button type="submit" id="add-expense-button">Agregar Gasto</button>
-                            <button type="button" id="cancel-edit-expense-button" style="display:none;" class.danger>Cancelar Edición</button>
+                            <button type="button" id="cancel-edit-expense-button" style="display:none;" class="danger">Cancelar Edición</button>
                         </form>
                     </div>
                     <div class="table-container-dynamic">
@@ -227,7 +227,7 @@
                                         <th>Categoría</th>
                                         <th>Tipo</th>
                                         <th>Presupuesto Mensual</th>
-                                        </tr>
+                                    </tr>
                                 </thead>
                                 <tbody>
                                     </tbody>
@@ -258,7 +258,9 @@
                 <div class="payments-period-selector">
                     <button id="prev-period-button" title="Periodo Anterior">&lt;</button>
                     <select id="payment-year-select"></select>
-                    <select id="payment-month-select" style="display:none;"></select> <select id="payment-week-select" style="display:none;"></select> <button id="next-period-button" title="Periodo Siguiente">&gt;</button>
+                    <select id="payment-month-select" style="display:none;"></select>
+                    <select id="payment-week-select" style="display:none;"></select>
+                    <button id="next-period-button" title="Periodo Siguiente">&gt;</button>
                 </div>
                 <div class="table-responsive dynamic-table-scroll">
                     <table id="payments-table-view">

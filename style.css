@@ -597,8 +597,14 @@ button.small-button {
 }
 .category-input-group button {
     flex-shrink: 0;
-    padding: 8px; /* Ajustar padding para botones pequeños */
-    min-width: 36px; /* Ancho mínimo para botones de ícono/símbolo */
+    padding: 0;
+    width: 36px;
+    height: 36px;
+    min-width: 0;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     margin-bottom: 0;
 }
 
@@ -612,7 +618,9 @@ button.small-button {
     padding: 25px;   
   }
   .form-and-table-layout {
-      flex-wrap: nowrap; /* Evitar que se envuelvan en escritorio */
+      flex-direction: column; /* Fuerza disposición vertical en escritorio */
+      flex-wrap: nowrap;
+      gap: 20px;
   }
   .form-container {
       flex-basis: 380px; /* Ancho fijo para formulario en escritorio */
@@ -623,6 +631,27 @@ button.small-button {
   }
   .reminders-columns {
       flex-wrap: nowrap;
+  }
+  .category-input-group {
+    gap: 6px;
+  }
+  .category-input-group select {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-bottom: 0;
+    height: 38px; /* igual que los inputs */
+    font-size: 1rem;
+  }
+  .category-input-group button {
+    padding: 0;
+    width: 36px;
+    height: 36px;
+    min-width: 0;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0;
   }
 }
 
