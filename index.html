@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visor y Editor de Flujo de Caja</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
@@ -34,10 +35,47 @@
 
         <div id="main-content-container" style="display:none;">
             <div class="tabs-container">
+                <button class="tab-button" data-tab="ajustes">Ajustes</button>
                 <button class="tab-button" data-tab="ingresos">Ingresos</button>
                 <button class="tab-button" data-tab="gastos">Gastos</button>
-                <button class="tab-button" data-tab="flujo-caja">Flujo de Caja</button> 
+                <button class="tab-button" data-tab="presupuestos">Presupuestos</button>
+                <button class="tab-button" data-tab="registro-pagos">Registro Pagos</button>
+                <button class="tab-button" data-tab="flujo-caja">Flujo de Caja</button>
+                <button class="tab-button" data-tab="grafico">Gráfico</button>
+                <button class="tab-button" data-tab="baby-steps">Baby Steps</button>
+                <button class="tab-button" data-tab="recordatorios">Recordatorios</button>
+            </div>
+
+            <div id="ajustes" class="tab-content">
+                <h2>Ajustes del Análisis</h2>
+                <div class="form-container settings-form-container"> <form id="settings-form">
+                        <label for="analysis-periodicity-select">Periodicidad del Análisis:</label>
+                        <select id="analysis-periodicity-select">
+                            <option value="Mensual">Mensual</option>
+                            <option value="Semanal">Semanal</option>
+                        </select>
+
+                        <label for="analysis-duration-input" id="analysis-duration-label">Duración (Meses):</label>
+                        <input type="number" id="analysis-duration-input" value="12" min="1">
+
+                        <label for="analysis-start-date-input">Fecha Inicio Análisis:</label>
+                        <input type="date" id="analysis-start-date-input">
+
+                        <label for="analysis-initial-balance-input">Saldo Inicial:</label>
+                        <input type="number" id="analysis-initial-balance-input" step="any" value="0">
+
+                        <label for="display-currency-symbol-input">Símbolo Moneda:</label>
+                        <input type="text" id="display-currency-symbol-input" value="$" maxlength="5">
+                        
+                        <label for="usd-clp-rate-input">Tasa USD a CLP (Opcional, para info):</label>
+                        <input type="number" id="usd-clp-rate-input" step="any" placeholder="Ej: 950.50">
+                        <p id="usd-clp-info-label" class="small-text">1 USD = $CLP (No se usa en cálculos aún)</p>
+
+
+                        <button type="button" id="apply-settings-button" class="accent">Aplicar Ajustes y Recalcular</button>
+                    </form>
                 </div>
+            </div>
 
             <div id="ingresos" class="tab-content">
                 <h2>Gestión de Ingresos</h2>
@@ -108,9 +146,12 @@
                             <input type="number" id="expense-amount" step="any" required>
 
                             <label for="expense-category">Categoría:</label>
-                            <select id="expense-category" required>
-                                </select>
-
+                            <div class="category-input-group">
+                                <select id="expense-category" required></select>
+                                <button type="button" id="add-category-button" class="small-button" title="Nueva Categoría">+</button>
+                                <button type="button" id="remove-category-button" class="small-button danger" title="Eliminar Categoría Seleccionada">-</button>
+                            </div>
+                            
                             <label for="expense-frequency">Frecuencia:</label>
                             <select id="expense-frequency">
                                 <option value="Mensual">Mensual</option>
@@ -135,7 +176,7 @@
                             </div>
 
                             <button type="submit" id="add-expense-button">Agregar Gasto</button>
-                            <button type="button" id="cancel-edit-expense-button" style="display:none;" class="danger">Cancelar Edición</button>
+                            <button type="button" id="cancel-edit-expense-button" style="display:none;" class.danger>Cancelar Edición</button>
                         </form>
                     </div>
                     <div class="table-container-dynamic">
@@ -162,7 +203,83 @@
                 </div>
             </div>
 
-            <div id="flujo-caja" class="tab-content"> <div id="cashflow-container">
+            <div id="presupuestos" class="tab-content">
+                <h2>Gestión de Presupuestos Mensuales</h2>
+                <div class="form-and-table-layout">
+                    <div class="form-container">
+                        <h3>Definir Presupuesto</h3>
+                        <form id="budget-form">
+                            <label for="budget-category-select">Categoría:</label>
+                            <select id="budget-category-select" required></select>
+
+                            <label for="budget-amount-input">Monto Presupuestado Mensual:</label>
+                            <input type="number" id="budget-amount-input" step="any" required placeholder="0">
+
+                            <button type="submit" id="save-budget-button">Guardar Presupuesto</button>
+                        </form>
+                    </div>
+                    <div class="table-container-dynamic">
+                        <h3>Presupuestos por Categoría</h3>
+                        <div class="table-responsive dynamic-table-scroll">
+                            <table id="budgets-table-view">
+                                <thead>
+                                    <tr>
+                                        <th>Categoría</th>
+                                        <th>Tipo</th>
+                                        <th>Presupuesto Mensual</th>
+                                        </tr>
+                                </thead>
+                                <tbody>
+                                    </tbody>
+                            </table>
+                        </div>
+                         <h3>Resumen Gasto vs Presupuesto (Mes Actual/Seleccionado)</h3>
+                        <div class="table-responsive dynamic-table-scroll" id="budget-summary-table-container">
+                            <table id="budget-summary-table">
+                                <thead>
+                                    <tr>
+                                        <th>Categoría</th>
+                                        <th>Presupuesto</th>
+                                        <th>Gasto Real</th>
+                                        <th>Diferencia</th>
+                                        <th>% Gastado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="registro-pagos" class="tab-content">
+                <h2 id="payments-tab-title">Registro de Pagos</h2>
+                <div class="payments-period-selector">
+                    <button id="prev-period-button" title="Periodo Anterior">&lt;</button>
+                    <select id="payment-year-select"></select>
+                    <select id="payment-month-select" style="display:none;"></select> <select id="payment-week-select" style="display:none;"></select> <button id="next-period-button" title="Periodo Siguiente">&gt;</button>
+                </div>
+                <div class="table-responsive dynamic-table-scroll">
+                    <table id="payments-table-view">
+                        <thead>
+                            <tr>
+                                <th>Gasto</th>
+                                <th>Monto</th>
+                                <th>Categoría</th>
+                                <th>Tipo</th>
+                                <th>Real?</th>
+                                <th>Pagado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="flujo-caja" class="tab-content">
+                <div id="cashflow-container">
                     <h2 id="cashflow-title">Flujo de Caja</h2>
                     <div class="table-responsive">
                         <table id="cashflow-table">
@@ -172,6 +289,44 @@
                     </div>
                 </div>
             </div>
+
+            <div id="grafico" class="tab-content">
+                <h2>Gráfico de Flujo de Caja</h2>
+                <div class="chart-container">
+                    <canvas id="cashflow-chart"></canvas>
+                </div>
+                 <p id="chart-message" class="centered-text">El gráfico se generará después de calcular el flujo de caja.</p>
+            </div>
+
+            <div id="baby-steps" class="tab-content">
+                <h2>Baby Steps de Dave Ramsey</h2>
+                <div id="baby-steps-container" class="baby-steps-layout">
+                    </div>
+            </div>
+
+            <div id="recordatorios" class="tab-content">
+                <h2>Recordatorios y Tareas</h2>
+                <div class="reminders-layout">
+                    <div class="form-container">
+                        <h3>Nueva Tarea</h3>
+                        <form id="reminder-form">
+                            <input type="text" id="reminder-text-input" placeholder="Descripción de la tarea..." required>
+                            <button type="submit" id="add-reminder-button">Agregar Tarea</button>
+                        </form>
+                    </div>
+                    <div class="reminders-columns">
+                        <div class="reminders-column">
+                            <h3>Pendientes</h3>
+                            <ul id="pending-reminders-list"></ul>
+                        </div>
+                        <div class="reminders-column">
+                            <h3>Completadas</h3>
+                            <ul id="completed-reminders-list"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="save-changes-container">
                  <button id="save-changes-button" class="accent">Guardar Cambios (como nueva versión)</button>
             </div>
