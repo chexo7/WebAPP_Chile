@@ -1597,15 +1597,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!periodDates || periodDates.length === 0) {
-             if(chartMessage) chartMessage.textContent = "No hay datos para graficar. Ajusta los parámetros en la pestaña 'Ajustes'.";
+            if(chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja.";
             return;
         }
-        if(chartMessage) chartMessage.textContent = ""; // Limpiar mensaje si hay datos
+        if(chartMessage) chartMessage.textContent = "";
 
         const labels = periodDates.map(date => {
             if (currentBackupData.analysis_periodicity === "Semanal") {
                 const [year, week] = getWeekNumber(date);
-                return `S${week} ${year}`;
+                return `Sem ${week} ${year}`;
             } else {
                 return `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
             }
@@ -1619,37 +1619,47 @@ document.addEventListener('DOMContentLoaded', () => {
                     {
                         label: 'Saldo Final Estimado',
                         data: endBalances,
-                        borderColor: 'rgba(54, 162, 235, 1)', // Azul
+                        borderColor: 'rgba(54, 162, 235, 1)',
                         backgroundColor: 'rgba(54, 162, 235, 0.2)',
                         tension: 0.1,
-                        yAxisID: 'y',
                         fill: false,
+                        pointRadius: 4,
+                        pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 2,
+                        order: 1,
                     },
                     {
                         label: 'Ingreso Total Neto',
                         data: incomes,
-                        borderColor: 'rgba(75, 192, 192, 1)', // Verde azulado
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        type: 'bar', // Puede ser 'line' o 'bar'
-                        yAxisID: 'y1',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 1)',
+                        type: 'scatter',
+                        showLine: false,
+                        pointRadius: 6,
+                        pointStyle: 'circle',
+                        order: 2,
                     },
                     {
                         label: 'Gasto Total',
-                        data: totalExpenses.map(e => -e), // Mostrar como positivo para el gráfico de barras, o negativo en línea
-                        borderColor: 'rgba(255, 99, 132, 1)', // Rojo
-                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                        type: 'bar',
-                        yAxisID: 'y1',
+                        data: totalExpenses.map(e => -e), // Mostrar como positivo si prefieres
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 1)',
+                        type: 'scatter',
+                        showLine: false,
+                        pointRadius: 6,
+                        pointStyle: 'rectRot',
+                        order: 2,
                     },
                     {
                         label: 'Flujo Neto del Período',
                         data: netFlows,
-                        borderColor: 'rgba(255, 206, 86, 1)', // Amarillo
-                        backgroundColor: 'rgba(255, 206, 86, 0.2)',
-                        type: 'line', // O 'bar'
-                        yAxisID: 'y1',
-                        fill: false,
-                        borderDash: [5, 5], // Línea punteada
+                        borderColor: 'rgba(255, 206, 86, 1)',
+                        backgroundColor: 'rgba(255, 206, 86, 1)',
+                        type: 'scatter',
+                        showLine: false,
+                        pointRadius: 6,
+                        pointStyle: 'triangle',
+                        order: 2,
                     }
                 ]
             },
@@ -1657,18 +1667,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    y: { // Eje para Saldo Final
+                    y: {
                         type: 'linear',
                         display: true,
                         position: 'left',
-                        title: { display: true, text: `Saldo (${currentBackupData.display_currency_symbol || '$'})` }
-                    },
-                    y1: { // Eje para Ingresos, Gastos, Flujo Neto
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: { display: true, text: `Flujos (${currentBackupData.display_currency_symbol || '$'})` },
-                        grid: { drawOnChartArea: false } // No dibujar cuadrícula para este eje
+                        title: { display: true, text: `Saldo / Flujos (${currentBackupData.display_currency_symbol || '$'})` }
                     }
                 },
                 plugins: {
@@ -1676,15 +1679,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         callbacks: {
                             label: function(context) {
                                 let label = context.dataset.label || '';
-                                if (label) {
-                                    label += ': ';
-                                }
+                                if (label) label += ': ';
                                 if (context.parsed.y !== null) {
                                     label += formatCurrencyJS(context.parsed.y, currentBackupData.display_currency_symbol || '$');
                                 }
                                 return label;
                             }
                         }
+                    },
+                    legend: {
+                        position: 'top'
                     }
                 }
             }
