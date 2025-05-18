@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function isFirebaseKeySafe(text) {
         if (typeof text !== 'string' || !text.trim()) { // Un nombre vacío o solo espacios no es ideal.
-            return false; 
+            return false;
         }
         return !FIREBASE_FORBIDDEN_KEY_CHARS.some(char => text.includes(char));
     }
@@ -235,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return key;
     }
-    
+
     // --- GUARDAR CAMBIOS (COMO NUEVA VERSIÓN) ---
     saveChangesButton.addEventListener('click', () => {
         if (!currentBackupData) {
@@ -281,8 +281,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // *** FIN: Componente de seguridad y validación antes de guardar ***
 
-        const dataToSave = JSON.parse(JSON.stringify(currentBackupData)); 
-        
+        const dataToSave = JSON.parse(JSON.stringify(currentBackupData));
+
         const defaultsFromPython = {
             version: "1.0_web",
             analysis_start_date: getISODateString(new Date()), // Usar función para string
@@ -291,12 +291,12 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
             incomes: [],
-            expense_categories: {}, 
+            expense_categories: {},
             expenses: [],
-            payments: {},       
-            budgets: {},        
-            baby_steps_status: [], 
-            reminders_todos: []    
+            payments: {},
+            budgets: {},
+            baby_steps_status: [],
+            reminders_todos: []
         };
 
         for (const key in defaultsFromPython) {
@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
-        
+
         dataToSave.analysis_start_date = getISODateString(new Date(dataToSave.analysis_start_date));
         (dataToSave.incomes || []).forEach(inc => {
             if (inc.start_date) inc.start_date = getISODateString(new Date(inc.start_date));
@@ -322,10 +322,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (exp.category && dataToSave.expense_categories && dataToSave.expense_categories[exp.category]) {
                 exp.type = dataToSave.expense_categories[exp.category];
             } else {
-                exp.type = "Variable"; 
+                exp.type = "Variable";
             }
             if (typeof exp.is_real === 'undefined') {
-                exp.is_real = false; 
+                exp.is_real = false;
             }
         });
 
@@ -339,9 +339,9 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(() => {
                 loadingMessage.style.display = 'none';
                 alert(`Cambios guardados exitosamente como nueva versión: ${formatBackupKey(newBackupKey)}`);
-                fetchBackups(); 
-                backupSelector.value = newBackupKey; 
-                currentBackupKey = newBackupKey; 
+                fetchBackups();
+                backupSelector.value = newBackupKey;
+                currentBackupKey = newBackupKey;
             })
             .catch(error => {
                 loadingMessage.style.display = 'none';
@@ -422,9 +422,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const incomeEntry = { name, net_monthly: amount, frequency, start_date: startDate, end_date: endDate };
 
-        if (editingIncomeIndex !== null) { 
+        if (editingIncomeIndex !== null) {
             currentBackupData.incomes[editingIncomeIndex] = incomeEntry;
-        } else { 
+        } else {
             const existingIncome = (currentBackupData.incomes || []).find(inc => inc.name.toLowerCase() === name.toLowerCase());
             if (existingIncome) {
                 alert(`Ya existe un ingreso con el nombre "${name}". Por favor, usa un nombre diferente.`);
@@ -433,9 +433,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!currentBackupData.incomes) currentBackupData.incomes = [];
             currentBackupData.incomes.push(incomeEntry);
         }
-        
+
         renderIncomesTable();
-        renderCashflowTable(); 
+        renderCashflowTable();
         resetIncomeForm();
     });
 
@@ -456,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderIncomesTable() {
         if (!incomesTableView || !currentBackupData || !currentBackupData.incomes) return;
-        incomesTableView.innerHTML = ''; 
+        incomesTableView.innerHTML = '';
         currentBackupData.incomes.forEach((income, index) => {
             const row = incomesTableView.insertRow();
             row.insertCell().textContent = income.name;
@@ -486,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
         incomeAmountInput.value = income.net_monthly;
         incomeFrequencySelect.value = income.frequency;
         incomeStartDateInput.value = income.start_date ? getISODateString(new Date(income.start_date)) : '';
-        
+
         const isUnico = income.frequency === 'Único';
         incomeOngoingCheckbox.disabled = isUnico;
 
@@ -499,18 +499,18 @@ document.addEventListener('DOMContentLoaded', () => {
             incomeEndDateInput.value = income.end_date ? getISODateString(new Date(income.end_date)) : '';
             incomeEndDateInput.disabled = incomeOngoingCheckbox.checked; // Corregido
         }
-        
+
         addIncomeButton.textContent = 'Guardar Cambios';
         cancelEditIncomeButton.style.display = 'inline-block';
         editingIncomeIndex = index;
-        document.getElementById('ingresos').scrollIntoView({ behavior: 'smooth' }); 
+        document.getElementById('ingresos').scrollIntoView({ behavior: 'smooth' });
     }
 
     function deleteIncome(index) {
         if (confirm(`¿Estás seguro de que quieres eliminar el ingreso "${currentBackupData.incomes[index].name}"?`)) {
             currentBackupData.incomes.splice(index, 1);
             renderIncomesTable();
-            renderCashflowTable(); 
+            renderCashflowTable();
             if(editingIncomeIndex === index) resetIncomeForm();
             else if (editingIncomeIndex !== null && editingIncomeIndex > index) {
                 editingIncomeIndex--; // Ajustar índice si se eliminó un elemento anterior
@@ -570,9 +570,9 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("El nombre del gasto no puede estar vacío.");
             return;
         }
-        if (!isFirebaseKeySafe(category)) { 
+        if (!isFirebaseKeySafe(category)) {
             alert(`El nombre de la categoría "${category}" contiene caracteres no permitidos: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}. Esta categoría no es válida.`);
-            return; 
+            return;
         }
 
 
@@ -590,12 +590,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const expenseType = currentBackupData.expense_categories[category] || "Variable"; 
+        const expenseType = currentBackupData.expense_categories[category] || "Variable";
         const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal };
 
-        if (editingExpenseIndex !== null) { 
+        if (editingExpenseIndex !== null) {
             currentBackupData.expenses[editingExpenseIndex] = expenseEntry;
-        } else { 
+        } else {
             const existingExpense = (currentBackupData.expenses || []).find(exp => exp.name.toLowerCase() === name.toLowerCase());
             if (existingExpense) {
                 alert(`Ya existe un gasto con el nombre "${name}". Por favor, usa un nombre diferente.`);
@@ -606,10 +606,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         renderExpensesTable();
-        renderCashflowTable(); 
+        renderCashflowTable();
         resetExpenseForm();
     });
-    
+
     function resetExpenseForm() {
         expenseForm.reset();
         expenseOngoingCheckbox.checked = true;
@@ -633,7 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderExpensesTable() {
         if (!expensesTableView || !currentBackupData || !currentBackupData.expenses) return;
-        expensesTableView.innerHTML = ''; 
+        expensesTableView.innerHTML = '';
         currentBackupData.expenses.forEach((expense, index) => {
             const row = expensesTableView.insertRow();
             row.insertCell().textContent = expense.name;
@@ -690,10 +690,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirm(`¿Estás seguro de que quieres eliminar el gasto "${currentBackupData.expenses[index].name}"?`)) {
             currentBackupData.expenses.splice(index, 1);
             renderExpensesTable();
-            renderCashflowTable(); 
+            renderCashflowTable();
             if(editingExpenseIndex === index) resetExpenseForm();
             else if (editingExpenseIndex !== null && editingExpenseIndex > index) {
-                editingExpenseIndex--; 
+                editingExpenseIndex--;
             }
         }
     }
@@ -701,8 +701,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- LÓGICA DE FLUJO DE CAJA (Cálculo y Renderizado) ---
     function renderCashflowTable() {
-        if (!currentBackupData || !cashflowTableBody || !cashflowTableHead) return; 
-        
+        if (!currentBackupData || !cashflowTableBody || !cashflowTableHead) return;
+
         cashflowTableHead.innerHTML = '';
         cashflowTableBody.innerHTML = '';
 
@@ -716,7 +716,7 @@ document.addEventListener('DOMContentLoaded', () => {
              cashflowTableBody.innerHTML = '<tr><td colspan="2">Error: Fecha de inicio de análisis inválida.</td></tr>';
              return;
         }
-        
+
         const tempCalcData = { // Crear un objeto temporal para el cálculo con fechas como Date
             ...currentBackupData,
             analysis_start_date: analysisStartDateObj, // Usar el objeto Date
@@ -847,7 +847,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fixedCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Fijo").sort() : [];
         const variableCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Variable").sort() : [];
         const orderedCategories = [...fixedCategories, ...variableCategories];
-        
+
         orderedCategories.forEach(cat => {
             for (let i = 0; i < duration; i++) {
                 expenses_by_cat_p[i][cat] = 0.0;
@@ -880,13 +880,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 let income_to_add = 0.0;
                 if (inc_freq === "Mensual") {
-                    if (periodicity === "Mensual") income_to_add = net_amount;
-                    else if (periodicity === "Semanal" && p_start.getUTCDate() <= 7) income_to_add = net_amount; 
+                    // --- MODIFICACIÓN INICIO ---
+                    if (periodicity === "Mensual") {
+                        income_to_add = net_amount;
+                    } else if (periodicity === "Semanal") {
+                        const payDay = inc_start.getUTCDate(); // día real del ingreso
+                        const payDate = new Date(p_start.getTime());
+                        payDate.setUTCFullYear(p_start.getUTCFullYear()); // Asegurar año
+                        payDate.setUTCMonth(p_start.getUTCMonth());   // Asegurar mes del periodo actual
+                        payDate.setUTCDate(payDay); // fecha real de pago dentro del mes/semana
+                        if (p_start <= payDate && payDate <= p_end) {
+                            income_to_add = net_amount;
+                        }
+                    }
+                    // --- MODIFICACIÓN FIN ---
                 } else if (inc_freq === "Único") {
                     if (p_start <= inc_start && inc_start <= p_end) income_to_add = net_amount;
                 } else if (inc_freq === "Semanal") {
                     if (periodicity === "Semanal") income_to_add = net_amount;
-                    else if (periodicity === "Mensual") income_to_add = net_amount * (52 / 12); 
+                    else if (periodicity === "Mensual") income_to_add = net_amount * (52 / 12);
                 } else if (inc_freq === "Bi-semanal") {
                     if (periodicity === "Semanal") {
                         const days_diff = (p_start.getTime() - inc_start.getTime()) / (1000 * 60 * 60 * 24);
@@ -921,16 +933,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const isActiveRange = (e_start <= p_end && (e_end === null || e_end >= p_start));
                 if (!isActiveRange) return;
-                
+
                 let exp_add_this_period = 0.0;
                 if (freq === "Mensual") {
-                    if (periodicity === "Mensual") exp_add_this_period = amt_raw;
-                    else if (periodicity === "Semanal" && p_start.getUTCDate() <= 7) exp_add_this_period = amt_raw;
+                    // --- MODIFICACIÓN INICIO ---
+                    if (periodicity === "Mensual") {
+                        exp_add_this_period = amt_raw;
+                    } else if (periodicity === "Semanal") {
+                        const payDay = e_start.getUTCDate(); // día real del gasto
+                        const payDate = new Date(p_start.getTime());
+                        payDate.setUTCFullYear(p_start.getUTCFullYear()); // Asegurar año
+                        payDate.setUTCMonth(p_start.getUTCMonth());   // Asegurar mes del periodo actual
+                        payDate.setUTCDate(payDay); // fecha real de pago dentro del mes/semana
+                        if (p_start <= payDate && payDate <= p_end) {
+                            exp_add_this_period = amt_raw;
+                        }
+                    }
+                    // --- MODIFICACIÓN FIN ---
                 } else if (freq === "Único") {
                     if (p_start <= e_start && e_start <= p_end) exp_add_this_period = amt_raw;
                 } else if (freq === "Semanal") {
                     if (periodicity === "Semanal") exp_add_this_period = amt_raw;
-                    else if (periodicity === "Mensual") exp_add_this_period = amt_raw * (52/12); 
+                    else if (periodicity === "Mensual") exp_add_this_period = amt_raw * (52/12);
                 } else if (freq === "Bi-semanal") {
                      if (periodicity === "Semanal") {
                         const days_diff = (p_start.getTime() - e_start.getTime()) / (1000 * 60 * 60 * 24);
@@ -946,7 +970,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         exp_add_this_period = amt_raw * paydays_in_month;
                     }
                 }
-                
+
                 if (exp_add_this_period > 0) {
                     expenses_by_cat_p[i][cat] = (expenses_by_cat_p[i][cat] || 0) + exp_add_this_period;
                     if (typ === "Fijo") p_fix_exp_total += exp_add_this_period;
@@ -1011,19 +1035,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const firstDayOfYear = new Date(Date.UTC(year, 0, 4)); // 4 de enero siempre está en la semana 1
         const daysToMondayOfWeek1 = 1 - (firstDayOfYear.getUTCDay() || 7); // Días para llegar al lunes de la semana 1
         const mondayOfWeek1 = new Date(Date.UTC(year, 0, 4 + daysToMondayOfWeek1));
-        
+
         const targetMonday = new Date(mondayOfWeek1.getTime());
         targetMonday.setUTCDate(targetMonday.getUTCDate() + (week - 1) * 7);
         return targetMonday;
     }
 
     // --- INICIALIZACIÓN ---
-    showLoginScreen(); 
+    showLoginScreen();
     const today = new Date();
     const todayISO = getISODateString(today); // Usar la nueva función
     incomeStartDateInput.value = todayISO;
     expenseStartDateInput.value = todayISO;
-    incomeEndDateInput.disabled = true; 
-    expenseEndDateInput.disabled = true; 
+    incomeEndDateInput.disabled = true;
+    expenseEndDateInput.disabled = true;
 
 }); // Fin de DOMContentLoaded
