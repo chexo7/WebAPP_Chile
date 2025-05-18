@@ -26,10 +26,15 @@
 
         <div id="data-selection-container" style="display:none;">
             <h2>Seleccionar Versión de Datos</h2>
-            <select id="backup-selector">
-                <option value="">-- Selecciona una versión --</option>
-            </select>
-            <button id="load-backup-button">Cargar Versión</button>
+            <div class="version-loader">
+                <button id="load-latest-version-button" class="button-large accent">Cargar Última Versión</button>
+                <div class="version-selector-group">
+                    <select id="backup-selector">
+                        <option value="">-- Selecciona una versión --</option>
+                    </select>
+                    <button id="load-backup-button">Cargar Versión Seleccionada</button>
+                </div>
+            </div>
             <p id="loading-message" style="display:none;"></p>
         </div>
 
@@ -44,7 +49,7 @@
                 <button class="tab-button" data-tab="presupuestos">Presupuestos</button>
                 <button class="tab-button" data-tab="baby-steps">Baby Steps</button>
                 <button class="tab-button" data-tab="ajustes">Ajustes</button>
-            </div>
+                <button class="tab-button" data-tab="log">Log</button> </div>
 
             <div id="ajustes" class="tab-content">
                 <h2>Ajustes del Análisis</h2>
@@ -330,6 +335,14 @@
                             <ul id="completed-reminders-list"></ul>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div id="log" class="tab-content">
+                <h2>Log de Cambios de Versión</h2>
+                <div class="log-container">
+                    <ul id="change-log-list">
+                        </ul>
                 </div>
             </div>
 
