@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addIncomeButton = document.getElementById('add-income-button');
     const cancelEditIncomeButton = document.getElementById('cancel-edit-income-button');
     const incomesTableView = document.querySelector('#incomes-table-view tbody');
+    const searchIncomeInput = document.getElementById('search-income-input'); // NUEVO
     let editingIncomeIndex = null;
 
     // --- ELEMENTOS PESTAÑA GASTOS ---
@@ -58,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addExpenseButton = document.getElementById('add-expense-button');
     const cancelEditExpenseButton = document.getElementById('cancel-edit-expense-button');
     const expensesTableView = document.querySelector('#expenses-table-view tbody');
+    const searchExpenseInput = document.getElementById('search-expense-input'); // NUEVO
     let editingExpenseIndex = null;
 
     // --- ELEMENTOS PESTAÑA PRESUPUESTOS ---
@@ -693,7 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 
-    // --- LÓGICA PESTAÑA INGRESOS (Existente, sin cambios mayores) ---
+    // --- LÓGICA PESTAÑA INGRESOS ---
     incomeOngoingCheckbox.addEventListener('change', () => {
         incomeEndDateInput.disabled = incomeOngoingCheckbox.checked;
         if (incomeOngoingCheckbox.checked) incomeEndDateInput.value = '';
@@ -751,10 +753,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     cancelEditIncomeButton.addEventListener('click', resetIncomeForm);
 
+    // MODIFICADO para incluir filtrado
     function renderIncomesTable() {
         if (!incomesTableView || !currentBackupData || !currentBackupData.incomes) return;
-        incomesTableView.innerHTML = ''; 
-        currentBackupData.incomes.forEach((income, index) => {
+        incomesTableView.innerHTML = '';
+        const searchTerm = searchIncomeInput.value.toLowerCase(); // NUEVO
+
+        const filteredIncomes = currentBackupData.incomes.filter(income => { // NUEVO
+            return income.name.toLowerCase().includes(searchTerm) ||
+                   formatCurrencyJS(income.net_monthly, currentBackupData.display_currency_symbol || '$').toLowerCase().includes(searchTerm) ||
+                   income.frequency.toLowerCase().includes(searchTerm);
+        });
+
+        filteredIncomes.forEach((income, index) => { // Modificado para usar filteredIncomes
+            // Necesitamos encontrar el índice original para editar/eliminar
+            const originalIndex = currentBackupData.incomes.findIndex(inc => inc === income);
+
             const row = incomesTableView.insertRow();
             row.insertCell().textContent = income.name;
             row.insertCell().textContent = formatCurrencyJS(income.net_monthly, currentBackupData.display_currency_symbol || '$');
@@ -763,11 +777,15 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = income.end_date ? getISODateString(new Date(income.end_date)) : (income.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
             const actionsCell = row.insertCell();
             const editButton = document.createElement('button'); editButton.textContent = 'Editar'; editButton.classList.add('small-button');
-            editButton.onclick = () => loadIncomeForEdit(index); actionsCell.appendChild(editButton);
+            editButton.onclick = () => loadIncomeForEdit(originalIndex); actionsCell.appendChild(editButton); // Usar originalIndex
             const deleteButton = document.createElement('button'); deleteButton.textContent = 'Eliminar'; deleteButton.classList.add('small-button', 'danger');
-            deleteButton.onclick = () => deleteIncome(index); actionsCell.appendChild(deleteButton);
+            deleteButton.onclick = () => deleteIncome(originalIndex); actionsCell.appendChild(deleteButton); // Usar originalIndex
         });
     }
+
+    // NUEVO: Event listener para el campo de búsqueda de ingresos
+    searchIncomeInput.addEventListener('input', renderIncomesTable);
+
 
     function loadIncomeForEdit(index) {
         const income = currentBackupData.incomes[index];
@@ -797,7 +815,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- LÓGICA PESTAÑA GASTOS (Existente, con manejo de categorías) ---
+    // --- LÓGICA PESTAÑA GASTOS ---
     expenseOngoingCheckbox.addEventListener('change', () => {
         expenseEndDateInput.disabled = expenseOngoingCheckbox.checked;
         if (expenseOngoingCheckbox.checked) expenseEndDateInput.value = '';
@@ -946,10 +964,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     cancelEditExpenseButton.addEventListener('click', resetExpenseForm);
 
+    // MODIFICADO para incluir filtrado
     function renderExpensesTable() {
         if (!expensesTableView || !currentBackupData || !currentBackupData.expenses) return;
-        expensesTableView.innerHTML = ''; 
-        currentBackupData.expenses.forEach((expense, index) => {
+        expensesTableView.innerHTML = '';
+        const searchTerm = searchExpenseInput.value.toLowerCase(); // NUEVO
+
+        const filteredExpenses = currentBackupData.expenses.filter(expense => { // NUEVO
+            return expense.name.toLowerCase().includes(searchTerm) ||
+                   formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$').toLowerCase().includes(searchTerm) ||
+                   expense.category.toLowerCase().includes(searchTerm) ||
+                   expense.frequency.toLowerCase().includes(searchTerm);
+        });
+
+        filteredExpenses.forEach((expense, index) => { // Modificado para usar filteredExpenses
+            // Necesitamos encontrar el índice original para editar/eliminar
+            const originalIndex = currentBackupData.expenses.findIndex(exp => exp === expense);
+
             const row = expensesTableView.insertRow();
             row.insertCell().textContent = expense.name;
             row.insertCell().textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$');
@@ -960,11 +991,15 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
             const actionsCell = row.insertCell();
             const editButton = document.createElement('button'); editButton.textContent = 'Editar'; editButton.classList.add('small-button');
-            editButton.onclick = () => loadExpenseForEdit(index); actionsCell.appendChild(editButton);
+            editButton.onclick = () => loadExpenseForEdit(originalIndex); actionsCell.appendChild(editButton); // Usar originalIndex
             const deleteButton = document.createElement('button'); deleteButton.textContent = 'Eliminar'; deleteButton.classList.add('small-button', 'danger');
-            deleteButton.onclick = () => deleteExpense(index); actionsCell.appendChild(deleteButton);
+            deleteButton.onclick = () => deleteExpense(originalIndex); actionsCell.appendChild(deleteButton); // Usar originalIndex
         });
     }
+
+    // NUEVO: Event listener para el campo de búsqueda de gastos
+    searchExpenseInput.addEventListener('input', renderExpensesTable);
+
 
     function loadExpenseForEdit(index) {
         const expense = currentBackupData.expenses[index];
