@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- CONSTANTES Y ESTADO ---
     const MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-    const DATE_WEEK_START_FORMAT = (date) => `${date.getUTCDate()}-${MONTH_NAMES_ES[date.getUTCMonth()]}`; // Usar getUTCDate y getUTCMonth
+    const DATE_WEEK_START_FORMAT = (date) => `${date.getUTCDate()}-${MONTH_NAMES_ES[date.getUTCMonth()]}`;
     let currentBackupData = null;
     let currentBackupKey = null;
 
@@ -707,11 +707,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         income_to_add = net_amount;
                     } else if (periodicity === "Semanal") {
                         // Lógica corregida: El ingreso mensual impacta la semana si su "día de pago" cae en esa semana.
-                        const payDayOfMonth = inc_start.getUTCDate(); // Día del mes en que ocurre el ingreso
-                        // Construir la fecha de pago para el mes y año del período actual
-                        const payDateInPeriod = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDayOfMonth));
-                        if (p_start <= payDateInPeriod && payDateInPeriod <= p_end) {
-                            income_to_add = net_amount;
+                        const payDay = inc_start.getUTCDate(); // día del mes
+                        const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay));
+                        if (p_start <= payDate && payDate <= p_end) {
+                             income_to_add = net_amount;
                         }
                     }
                 } else if (inc_freq === "Único") {
@@ -763,9 +762,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         exp_add_this_period = amt_raw;
                     } else if (periodicity === "Semanal") {
                         // Lógica corregida: El gasto mensual impacta la semana si su "día de pago" cae en esa semana.
-                        const payDayOfMonth = e_start.getUTCDate(); // Día del mes en que ocurre el gasto
-                        const payDateInPeriod = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDayOfMonth));
-                        if (p_start <= payDateInPeriod && payDateInPeriod <= p_end) {
+                        const payDay = e_start.getUTCDate(); // día del mes
+                        const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay));
+                        if (p_start <= payDate && payDate <= p_end) {
                             exp_add_this_period = amt_raw;
                         }
                     }
