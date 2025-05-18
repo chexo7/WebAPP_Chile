@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- CONSTANTES Y ESTADO ---
     const MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-    const DATE_WEEK_START_FORMAT = (date) => `${date.getDate()}-${MONTH_NAMES_ES[date.getMonth()]}`;
+    const DATE_WEEK_START_FORMAT = (date) => `${date.getUTCDate()}-${MONTH_NAMES_ES[date.getUTCMonth()]}`; // Usar getUTCDate y getUTCMonth
     let currentBackupData = null;
     let currentBackupKey = null;
 
@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const FIREBASE_FORBIDDEN_CHARS_DISPLAY = FIREBASE_FORBIDDEN_KEY_CHARS.join(" ");
 
     function isFirebaseKeySafe(text) {
-        if (typeof text !== 'string' || !text.trim()) { // Un nombre vacío o solo espacios no es ideal.
+        if (typeof text !== 'string' || !text.trim()) {
             return false;
         }
         return !FIREBASE_FORBIDDEN_KEY_CHARS.some(char => text.includes(char));
@@ -119,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
         auth.signInWithEmailAndPassword(email, password)
             .catch(error => {
                 authStatus.textContent = `Error: ${error.message}`;
-                // No ocultar loginForm aquí, permitir reintentos.
             });
     });
 
@@ -181,16 +180,12 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(snapshot => {
                 if (snapshot.exists()) {
                     currentBackupData = snapshot.val();
-                    // Asegurar estructuras básicas si faltan en el backup
                     if (!currentBackupData.incomes) currentBackupData.incomes = [];
                     if (!currentBackupData.expenses) currentBackupData.expenses = [];
                     if (!currentBackupData.expense_categories) currentBackupData.expense_categories = {};
-                    // Los campos como payments, budgets, etc., se añadirán con valores por defecto
-                    // al guardar si no existen, para compatibilidad con Python.
-
-                    // Parsear fechas
+                    
                     if (currentBackupData.analysis_start_date) {
-                        currentBackupData.analysis_start_date = new Date(currentBackupData.analysis_start_date + 'T00:00:00Z'); // Asumir UTC para consistencia
+                        currentBackupData.analysis_start_date = new Date(currentBackupData.analysis_start_date + 'T00:00:00Z');
                     }
                     (currentBackupData.incomes || []).forEach(inc => {
                         if (inc.start_date) inc.start_date = new Date(inc.start_date + 'T00:00:00Z');
@@ -224,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formatBackupKey(key) {
         const ts = key.replace("backup_", "");
-        if (ts.length === 15) { // YYYYMMDDTHHMMSS
+        if (ts.length === 15) { 
             const year = ts.substring(0, 4);
             const month = ts.substring(4, 6);
             const day = ts.substring(6, 8);
@@ -235,15 +230,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return key;
     }
-
-    // --- GUARDAR CAMBIOS (COMO NUEVA VERSIÓN) ---
+    
     saveChangesButton.addEventListener('click', () => {
         if (!currentBackupData) {
             alert("No hay datos cargados para guardar.");
             return;
         }
 
-        // *** INICIO: Componente de seguridad y validación antes de guardar ***
         let dataIsValidForSaving = true;
         const validationIssues = [];
 
@@ -279,38 +272,35 @@ document.addEventListener('DOMContentLoaded', () => {
                   `\n\nLos caracteres no permitidos son: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}. Por favor, corrige estos elementos.`);
             return;
         }
-        // *** FIN: Componente de seguridad y validación antes de guardar ***
 
-        const dataToSave = JSON.parse(JSON.stringify(currentBackupData));
-
+        const dataToSave = JSON.parse(JSON.stringify(currentBackupData)); 
+        
         const defaultsFromPython = {
             version: "1.0_web",
-            analysis_start_date: getISODateString(new Date()), // Usar función para string
+            analysis_start_date: getISODateString(new Date()),
             analysis_duration: 12,
             analysis_periodicity: "Mensual",
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
             incomes: [],
-            expense_categories: {},
+            expense_categories: {}, 
             expenses: [],
-            payments: {},
-            budgets: {},
-            baby_steps_status: [],
-            reminders_todos: []
+            payments: {},       
+            budgets: {},        
+            baby_steps_status: [], 
+            reminders_todos: []    
         };
 
         for (const key in defaultsFromPython) {
             if (dataToSave[key] === undefined || dataToSave[key] === null) {
                 if (key === 'expense_categories' && currentBackupData.expense_categories && Object.keys(currentBackupData.expense_categories).length > 0) {
-                    // No sobrescribir si ya existe, incluso si está vacío por filtrado.
                 } else if (key === 'budgets' && currentBackupData.budgets && Object.keys(currentBackupData.budgets).length > 0) {
-                    // No sobrescribir si ya existe.
                 } else {
                     dataToSave[key] = defaultsFromPython[key];
                 }
             }
         }
-
+        
         dataToSave.analysis_start_date = getISODateString(new Date(dataToSave.analysis_start_date));
         (dataToSave.incomes || []).forEach(inc => {
             if (inc.start_date) inc.start_date = getISODateString(new Date(inc.start_date));
@@ -322,10 +312,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (exp.category && dataToSave.expense_categories && dataToSave.expense_categories[exp.category]) {
                 exp.type = dataToSave.expense_categories[exp.category];
             } else {
-                exp.type = "Variable";
+                exp.type = "Variable"; 
             }
             if (typeof exp.is_real === 'undefined') {
-                exp.is_real = false;
+                exp.is_real = false; 
             }
         });
 
@@ -339,9 +329,9 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(() => {
                 loadingMessage.style.display = 'none';
                 alert(`Cambios guardados exitosamente como nueva versión: ${formatBackupKey(newBackupKey)}`);
-                fetchBackups();
-                backupSelector.value = newBackupKey;
-                currentBackupKey = newBackupKey;
+                fetchBackups(); 
+                backupSelector.value = newBackupKey; 
+                currentBackupKey = newBackupKey; 
             })
             .catch(error => {
                 loadingMessage.style.display = 'none';
@@ -350,113 +340,81 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     });
 
-
-    // --- LÓGICA DE PESTAÑAS ---
     function activateTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
         document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
-
         const activeContent = document.getElementById(tabId);
         const activeButton = document.querySelector(`.tab-button[data-tab="${tabId}"]`);
-
         if (activeContent) activeContent.classList.add('active');
         if (activeButton) activeButton.classList.add('active');
     }
 
     tabsContainer.addEventListener('click', (event) => {
         if (event.target.classList.contains('tab-button')) {
-            const tabId = event.target.dataset.tab;
-            activateTab(tabId);
+            activateTab(event.target.dataset.tab);
         }
     });
 
-
-    // --- PESTAÑA INGRESOS ---
     incomeOngoingCheckbox.addEventListener('change', () => {
         incomeEndDateInput.disabled = incomeOngoingCheckbox.checked;
-        if (incomeOngoingCheckbox.checked) {
-            incomeEndDateInput.value = '';
-        }
+        if (incomeOngoingCheckbox.checked) incomeEndDateInput.value = '';
     });
     incomeFrequencySelect.addEventListener('change', () => {
         const isUnico = incomeFrequencySelect.value === 'Único';
         incomeOngoingCheckbox.disabled = isUnico;
         incomeEndDateInput.disabled = isUnico || incomeOngoingCheckbox.checked;
-        if (isUnico) {
-            incomeOngoingCheckbox.checked = false;
-            incomeEndDateInput.value = '';
-        }
+        if (isUnico) { incomeOngoingCheckbox.checked = false; incomeEndDateInput.value = ''; }
     });
-
 
     incomeForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const name = incomeNameInput.value.trim();
         const amount = parseFloat(incomeAmountInput.value);
         const frequency = incomeFrequencySelect.value;
-        // Fechas: asegurar que se creen como UTC para evitar problemas de zona horaria al convertir a string
-        const startDateValue = incomeStartDateInput.value; // YYYY-MM-DD
-        const endDateValue = incomeEndDateInput.value; // YYYY-MM-DD
+        const startDateValue = incomeStartDateInput.value;
+        const endDateValue = incomeEndDateInput.value;
 
         if (!isFirebaseKeySafe(name)) {
             alert(`El nombre del ingreso "${name}" contiene caracteres no permitidos: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}. Por favor, corrígelo.`);
             return;
         }
-        if (!name) { // Adicionalmente, no permitir nombre vacío
-            alert("El nombre del ingreso no puede estar vacío.");
-            return;
-        }
+        if (!name) { alert("El nombre del ingreso no puede estar vacío."); return; }
 
-        const startDate = startDateValue ? new Date(startDateValue + 'T00:00:00Z') : null; // Asumir UTC
+        const startDate = startDateValue ? new Date(startDateValue + 'T00:00:00Z') : null;
         const isOngoing = incomeOngoingCheckbox.checked;
-        const endDate = (frequency === 'Único' || isOngoing || !endDateValue) ? null : new Date(endDateValue + 'T00:00:00Z'); // Asumir UTC
+        const endDate = (frequency === 'Único' || isOngoing || !endDateValue) ? null : new Date(endDateValue + 'T00:00:00Z');
 
-        if (isNaN(amount) || !startDate) {
-            alert("Por favor, completa los campos obligatorios (Nombre, Monto, Fecha Inicio).");
-            return;
-        }
-        if (endDate && startDate && endDate < startDate) {
-            alert("La fecha de fin no puede ser anterior a la fecha de inicio.");
-            return;
-        }
+        if (isNaN(amount) || !startDate) { alert("Por favor, completa los campos obligatorios (Nombre, Monto, Fecha Inicio)."); return; }
+        if (endDate && startDate && endDate < startDate) { alert("La fecha de fin no puede ser anterior a la fecha de inicio."); return; }
 
         const incomeEntry = { name, net_monthly: amount, frequency, start_date: startDate, end_date: endDate };
 
-        if (editingIncomeIndex !== null) {
+        if (editingIncomeIndex !== null) { 
             currentBackupData.incomes[editingIncomeIndex] = incomeEntry;
-        } else {
+        } else { 
             const existingIncome = (currentBackupData.incomes || []).find(inc => inc.name.toLowerCase() === name.toLowerCase());
-            if (existingIncome) {
-                alert(`Ya existe un ingreso con el nombre "${name}". Por favor, usa un nombre diferente.`);
-                return;
-            }
+            if (existingIncome) { alert(`Ya existe un ingreso con el nombre "${name}". Por favor, usa un nombre diferente.`); return; }
             if (!currentBackupData.incomes) currentBackupData.incomes = [];
             currentBackupData.incomes.push(incomeEntry);
         }
-
-        renderIncomesTable();
-        renderCashflowTable();
-        resetIncomeForm();
+        renderIncomesTable(); renderCashflowTable(); resetIncomeForm();
     });
 
     function resetIncomeForm() {
         incomeForm.reset();
         incomeOngoingCheckbox.checked = true;
-        incomeEndDateInput.disabled = true;
-        incomeEndDateInput.value = '';
+        incomeEndDateInput.disabled = true; incomeEndDateInput.value = '';
         incomeFrequencySelect.value = 'Mensual';
         addIncomeButton.textContent = 'Agregar Ingreso';
         cancelEditIncomeButton.style.display = 'none';
         editingIncomeIndex = null;
-        // Re-establecer fecha de inicio por defecto si es necesario
         incomeStartDateInput.value = getISODateString(new Date());
     }
     cancelEditIncomeButton.addEventListener('click', resetIncomeForm);
 
-
     function renderIncomesTable() {
         if (!incomesTableView || !currentBackupData || !currentBackupData.incomes) return;
-        incomesTableView.innerHTML = '';
+        incomesTableView.innerHTML = ''; 
         currentBackupData.incomes.forEach((income, index) => {
             const row = incomesTableView.insertRow();
             row.insertCell().textContent = income.name;
@@ -464,19 +422,11 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = income.frequency;
             row.insertCell().textContent = income.start_date ? getISODateString(new Date(income.start_date)) : 'N/A';
             row.insertCell().textContent = income.end_date ? getISODateString(new Date(income.end_date)) : (income.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
-
             const actionsCell = row.insertCell();
-            const editButton = document.createElement('button');
-            editButton.textContent = 'Editar';
-            editButton.classList.add('small-button');
-            editButton.onclick = () => loadIncomeForEdit(index);
-            actionsCell.appendChild(editButton);
-
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Eliminar';
-            deleteButton.classList.add('small-button', 'danger');
-            deleteButton.onclick = () => deleteIncome(index);
-            actionsCell.appendChild(deleteButton);
+            const editButton = document.createElement('button'); editButton.textContent = 'Editar'; editButton.classList.add('small-button');
+            editButton.onclick = () => loadIncomeForEdit(index); actionsCell.appendChild(editButton);
+            const deleteButton = document.createElement('button'); deleteButton.textContent = 'Eliminar'; deleteButton.classList.add('small-button', 'danger');
+            deleteButton.onclick = () => deleteIncome(index); actionsCell.appendChild(deleteButton);
         });
     }
 
@@ -486,68 +436,48 @@ document.addEventListener('DOMContentLoaded', () => {
         incomeAmountInput.value = income.net_monthly;
         incomeFrequencySelect.value = income.frequency;
         incomeStartDateInput.value = income.start_date ? getISODateString(new Date(income.start_date)) : '';
-
         const isUnico = income.frequency === 'Único';
         incomeOngoingCheckbox.disabled = isUnico;
-
         if (isUnico) {
-            incomeOngoingCheckbox.checked = false;
-            incomeEndDateInput.value = '';
-            incomeEndDateInput.disabled = true;
+            incomeOngoingCheckbox.checked = false; incomeEndDateInput.value = ''; incomeEndDateInput.disabled = true;
         } else {
             incomeOngoingCheckbox.checked = !income.end_date;
             incomeEndDateInput.value = income.end_date ? getISODateString(new Date(income.end_date)) : '';
-            incomeEndDateInput.disabled = incomeOngoingCheckbox.checked; // Corregido
+            incomeEndDateInput.disabled = incomeOngoingCheckbox.checked;
         }
-
-        addIncomeButton.textContent = 'Guardar Cambios';
-        cancelEditIncomeButton.style.display = 'inline-block';
-        editingIncomeIndex = index;
-        document.getElementById('ingresos').scrollIntoView({ behavior: 'smooth' });
+        addIncomeButton.textContent = 'Guardar Cambios'; cancelEditIncomeButton.style.display = 'inline-block';
+        editingIncomeIndex = index; document.getElementById('ingresos').scrollIntoView({ behavior: 'smooth' }); 
     }
 
     function deleteIncome(index) {
         if (confirm(`¿Estás seguro de que quieres eliminar el ingreso "${currentBackupData.incomes[index].name}"?`)) {
             currentBackupData.incomes.splice(index, 1);
-            renderIncomesTable();
-            renderCashflowTable();
+            renderIncomesTable(); renderCashflowTable(); 
             if(editingIncomeIndex === index) resetIncomeForm();
-            else if (editingIncomeIndex !== null && editingIncomeIndex > index) {
-                editingIncomeIndex--; // Ajustar índice si se eliminó un elemento anterior
-            }
+            else if (editingIncomeIndex !== null && editingIncomeIndex > index) editingIncomeIndex--;
         }
     }
 
-
-    // --- PESTAÑA GASTOS ---
     expenseOngoingCheckbox.addEventListener('change', () => {
         expenseEndDateInput.disabled = expenseOngoingCheckbox.checked;
-        if (expenseOngoingCheckbox.checked) {
-            expenseEndDateInput.value = '';
-        }
+        if (expenseOngoingCheckbox.checked) expenseEndDateInput.value = '';
     });
     expenseFrequencySelect.addEventListener('change', () => {
         const isUnico = expenseFrequencySelect.value === 'Único';
         expenseOngoingCheckbox.disabled = isUnico;
         expenseEndDateInput.disabled = isUnico || expenseOngoingCheckbox.checked;
-        if (isUnico) {
-            expenseOngoingCheckbox.checked = false;
-            expenseEndDateInput.value = '';
-        }
+        if (isUnico) { expenseOngoingCheckbox.checked = false; expenseEndDateInput.value = ''; }
     });
 
     function populateExpenseCategoriesDropdown() {
         if (!expenseCategorySelect || !currentBackupData || !currentBackupData.expense_categories) {
-            if(expenseCategorySelect) expenseCategorySelect.innerHTML = '<option value="">No hay categorías</option>';
-            return;
+            if(expenseCategorySelect) expenseCategorySelect.innerHTML = '<option value="">No hay categorías</option>'; return;
         }
         expenseCategorySelect.innerHTML = '<option value="">-- Selecciona Categoría --</option>';
         const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
         sortedCategories.forEach(catName => {
-            if (isFirebaseKeySafe(catName)) { // Solo agregar categorías seguras al dropdown
-                const option = document.createElement('option');
-                option.value = catName;
-                option.textContent = catName;
+            if (isFirebaseKeySafe(catName)) {
+                const option = document.createElement('option'); option.value = catName; option.textContent = catName;
                 expenseCategorySelect.appendChild(option);
             }
         });
@@ -562,78 +492,48 @@ document.addEventListener('DOMContentLoaded', () => {
         const startDateValue = expenseStartDateInput.value;
         const endDateValue = expenseEndDateInput.value;
 
-        if (!isFirebaseKeySafe(name)) {
-            alert(`El nombre del gasto "${name}" contiene caracteres no permitidos: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}. Por favor, corrígelo.`);
-            return;
-        }
-        if (!name) {
-            alert("El nombre del gasto no puede estar vacío.");
-            return;
-        }
-        if (!isFirebaseKeySafe(category)) {
-            alert(`El nombre de la categoría "${category}" contiene caracteres no permitidos: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}. Esta categoría no es válida.`);
-            return;
-        }
+        if (!isFirebaseKeySafe(name)) { alert(`El nombre del gasto "${name}" contiene caracteres no permitidos: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}. Por favor, corrígelo.`); return; }
+        if (!name) { alert("El nombre del gasto no puede estar vacío."); return; }
+        if (!isFirebaseKeySafe(category)) { alert(`El nombre de la categoría "${category}" contiene caracteres no permitidos: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}. Esta categoría no es válida.`); return; }
 
-
-        const startDate = startDateValue ? new Date(startDateValue + 'T00:00:00Z') : null; // Asumir UTC
+        const startDate = startDateValue ? new Date(startDateValue + 'T00:00:00Z') : null;
         const isOngoing = expenseOngoingCheckbox.checked;
-        const endDate = (frequency === 'Único' || isOngoing || !endDateValue) ? null : new Date(endDateValue + 'T00:00:00Z'); // Asumir UTC
+        const endDate = (frequency === 'Único' || isOngoing || !endDateValue) ? null : new Date(endDateValue + 'T00:00:00Z');
         const isReal = expenseIsRealCheckbox.checked;
 
-        if (isNaN(amount) || !category || !startDate) {
-            alert("Por favor, completa los campos obligatorios (Nombre, Monto, Categoría, Fecha Inicio).");
-            return;
-        }
-        if (endDate && startDate && endDate < startDate) {
-            alert("La fecha de fin no puede ser anterior a la fecha de inicio.");
-            return;
-        }
+        if (isNaN(amount) || !category || !startDate) { alert("Por favor, completa los campos obligatorios (Nombre, Monto, Categoría, Fecha Inicio)."); return; }
+        if (endDate && startDate && endDate < startDate) { alert("La fecha de fin no puede ser anterior a la fecha de inicio."); return; }
 
-        const expenseType = currentBackupData.expense_categories[category] || "Variable";
+        const expenseType = currentBackupData.expense_categories[category] || "Variable"; 
         const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal };
 
-        if (editingExpenseIndex !== null) {
+        if (editingExpenseIndex !== null) { 
             currentBackupData.expenses[editingExpenseIndex] = expenseEntry;
-        } else {
+        } else { 
             const existingExpense = (currentBackupData.expenses || []).find(exp => exp.name.toLowerCase() === name.toLowerCase());
-            if (existingExpense) {
-                alert(`Ya existe un gasto con el nombre "${name}". Por favor, usa un nombre diferente.`);
-                return;
-            }
+            if (existingExpense) { alert(`Ya existe un gasto con el nombre "${name}". Por favor, usa un nombre diferente.`); return; }
             if (!currentBackupData.expenses) currentBackupData.expenses = [];
             currentBackupData.expenses.push(expenseEntry);
         }
-
-        renderExpensesTable();
-        renderCashflowTable();
-        resetExpenseForm();
+        renderExpensesTable(); renderCashflowTable(); resetExpenseForm();
     });
-
+    
     function resetExpenseForm() {
         expenseForm.reset();
-        expenseOngoingCheckbox.checked = true;
-        expenseEndDateInput.disabled = true;
-        expenseEndDateInput.value = '';
-        expenseFrequencySelect.value = 'Mensual';
-        expenseIsRealCheckbox.checked = false;
-        if (expenseCategorySelect.options.length > 0 && expenseCategorySelect.value === "") { // Si hay opciones y ninguna seleccionada
-             if (expenseCategorySelect.options[0].value !== "") expenseCategorySelect.selectedIndex = 0; // Seleccionar la primera real
+        expenseOngoingCheckbox.checked = true; expenseEndDateInput.disabled = true; expenseEndDateInput.value = '';
+        expenseFrequencySelect.value = 'Mensual'; expenseIsRealCheckbox.checked = false;
+        if (expenseCategorySelect.options.length > 0 && expenseCategorySelect.value === "") {
+             if (expenseCategorySelect.options[0].value !== "") expenseCategorySelect.selectedIndex = 0;
              else if (expenseCategorySelect.options.length > 1) expenseCategorySelect.selectedIndex = 1;
-        } else if (expenseCategorySelect.options.length === 0) {
-            // No hay categorías, el dropdown está vacío.
         }
-        addExpenseButton.textContent = 'Agregar Gasto';
-        cancelEditExpenseButton.style.display = 'none';
-        editingExpenseIndex = null;
-        expenseStartDateInput.value = getISODateString(new Date());
+        addExpenseButton.textContent = 'Agregar Gasto'; cancelEditExpenseButton.style.display = 'none';
+        editingExpenseIndex = null; expenseStartDateInput.value = getISODateString(new Date());
     }
     cancelEditExpenseButton.addEventListener('click', resetExpenseForm);
 
-
     function renderExpensesTable() {
         if (!expensesTableView || !currentBackupData || !currentBackupData.expenses) return;
-        expensesTableView.innerHTML = '';
+        expensesTableView.innerHTML = ''; 
         currentBackupData.expenses.forEach((expense, index) => {
             const row = expensesTableView.insertRow();
             row.insertCell().textContent = expense.name;
@@ -643,180 +543,105 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A';
             row.insertCell().textContent = expense.end_date ? getISODateString(new Date(expense.end_date)) : (expense.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
             row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
-
             const actionsCell = row.insertCell();
-            const editButton = document.createElement('button');
-            editButton.textContent = 'Editar';
-            editButton.classList.add('small-button');
-            editButton.onclick = () => loadExpenseForEdit(index);
-            actionsCell.appendChild(editButton);
-
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Eliminar';
-            deleteButton.classList.add('small-button', 'danger');
-            deleteButton.onclick = () => deleteExpense(index);
-            actionsCell.appendChild(deleteButton);
+            const editButton = document.createElement('button'); editButton.textContent = 'Editar'; editButton.classList.add('small-button');
+            editButton.onclick = () => loadExpenseForEdit(index); actionsCell.appendChild(editButton);
+            const deleteButton = document.createElement('button'); deleteButton.textContent = 'Eliminar'; deleteButton.classList.add('small-button', 'danger');
+            deleteButton.onclick = () => deleteExpense(index); actionsCell.appendChild(deleteButton);
         });
     }
 
     function loadExpenseForEdit(index) {
         const expense = currentBackupData.expenses[index];
-        expenseNameInput.value = expense.name;
-        expenseAmountInput.value = expense.amount;
-        expenseCategorySelect.value = expense.category; // Asume que la categoría existe en el dropdown
-        expenseFrequencySelect.value = expense.frequency;
+        expenseNameInput.value = expense.name; expenseAmountInput.value = expense.amount;
+        expenseCategorySelect.value = expense.category; expenseFrequencySelect.value = expense.frequency;
         expenseStartDateInput.value = expense.start_date ? getISODateString(new Date(expense.start_date)) : '';
         expenseIsRealCheckbox.checked = expense.is_real || false;
-
         const isUnico = expense.frequency === 'Único';
         expenseOngoingCheckbox.disabled = isUnico;
         if (isUnico) {
-            expenseOngoingCheckbox.checked = false;
-            expenseEndDateInput.value = '';
-            expenseEndDateInput.disabled = true;
+            expenseOngoingCheckbox.checked = false; expenseEndDateInput.value = ''; expenseEndDateInput.disabled = true;
         } else {
             expenseOngoingCheckbox.checked = !expense.end_date;
             expenseEndDateInput.value = expense.end_date ? getISODateString(new Date(expense.end_date)) : '';
-            expenseEndDateInput.disabled = expenseOngoingCheckbox.checked; // Corregido
+            expenseEndDateInput.disabled = expenseOngoingCheckbox.checked;
         }
-
-        addExpenseButton.textContent = 'Guardar Cambios';
-        cancelEditExpenseButton.style.display = 'inline-block';
-        editingExpenseIndex = index;
-        document.getElementById('gastos').scrollIntoView({ behavior: 'smooth' });
+        addExpenseButton.textContent = 'Guardar Cambios'; cancelEditExpenseButton.style.display = 'inline-block';
+        editingExpenseIndex = index; document.getElementById('gastos').scrollIntoView({ behavior: 'smooth' });
     }
 
     function deleteExpense(index) {
         if (confirm(`¿Estás seguro de que quieres eliminar el gasto "${currentBackupData.expenses[index].name}"?`)) {
             currentBackupData.expenses.splice(index, 1);
-            renderExpensesTable();
-            renderCashflowTable();
+            renderExpensesTable(); renderCashflowTable(); 
             if(editingExpenseIndex === index) resetExpenseForm();
-            else if (editingExpenseIndex !== null && editingExpenseIndex > index) {
-                editingExpenseIndex--;
-            }
+            else if (editingExpenseIndex !== null && editingExpenseIndex > index) editingExpenseIndex--; 
         }
     }
 
-
-    // --- LÓGICA DE FLUJO DE CAJA (Cálculo y Renderizado) ---
     function renderCashflowTable() {
-        if (!currentBackupData || !cashflowTableBody || !cashflowTableHead) return;
-
-        cashflowTableHead.innerHTML = '';
-        cashflowTableBody.innerHTML = '';
-
-        // Asegurar que analysis_start_date sea un objeto Date antes de calcular
+        if (!currentBackupData || !cashflowTableBody || !cashflowTableHead) return; 
+        cashflowTableHead.innerHTML = ''; cashflowTableBody.innerHTML = '';
         let analysisStartDateObj = currentBackupData.analysis_start_date;
-        if (typeof analysisStartDateObj === 'string') {
-            analysisStartDateObj = new Date(analysisStartDateObj + 'T00:00:00Z'); // Asumir UTC
-        }
+        if (typeof analysisStartDateObj === 'string') analysisStartDateObj = new Date(analysisStartDateObj + 'T00:00:00Z');
         if (!(analysisStartDateObj instanceof Date) || isNaN(analysisStartDateObj)) {
-             console.error("Fecha de inicio de análisis inválida para renderCashflowTable:", currentBackupData.analysis_start_date);
-             cashflowTableBody.innerHTML = '<tr><td colspan="2">Error: Fecha de inicio de análisis inválida.</td></tr>';
-             return;
+             console.error("Fecha de inicio de análisis inválida:", currentBackupData.analysis_start_date);
+             cashflowTableBody.innerHTML = '<tr><td colspan="2">Error: Fecha de inicio de análisis inválida.</td></tr>'; return;
         }
-
-        const tempCalcData = { // Crear un objeto temporal para el cálculo con fechas como Date
-            ...currentBackupData,
-            analysis_start_date: analysisStartDateObj, // Usar el objeto Date
-            incomes: (currentBackupData.incomes || []).map(inc => ({
-                ...inc,
-                start_date: inc.start_date ? new Date(inc.start_date) : null,
-                end_date: inc.end_date ? new Date(inc.end_date) : null,
-            })),
-            expenses: (currentBackupData.expenses || []).map(exp => ({
-                ...exp,
-                start_date: exp.start_date ? new Date(exp.start_date) : null,
-                end_date: exp.end_date ? new Date(exp.end_date) : null,
-            })),
+        const tempCalcData = {
+            ...currentBackupData, analysis_start_date: analysisStartDateObj,
+            incomes: (currentBackupData.incomes || []).map(inc => ({ ...inc, start_date: inc.start_date ? new Date(inc.start_date) : null, end_date: inc.end_date ? new Date(inc.end_date) : null })),
+            expenses: (currentBackupData.expenses || []).map(exp => ({ ...exp, start_date: exp.start_date ? new Date(exp.start_date) : null, end_date: exp.end_date ? new Date(exp.end_date) : null })),
         };
-
-
-        const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData);
-
-        if (!periodDates || periodDates.length === 0) {
-            cashflowTableBody.innerHTML = '<tr><td colspan="2">No hay datos para mostrar. Ajusta los parámetros de análisis.</td></tr>';
-            return;
-        }
-
+        const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData); // ÚNICA LLAMADA A CALCULATE
+        if (!periodDates || periodDates.length === 0) { cashflowTableBody.innerHTML = '<tr><td colspan="2">No hay datos. Ajusta parámetros.</td></tr>'; return; }
         const symbol = currentBackupData.display_currency_symbol || "$";
-        const periodicity = currentBackupData.analysis_periodicity; // Ya debería ser string
+        const periodicity = currentBackupData.analysis_periodicity;
         const initialBalance = parseFloat(currentBackupData.analysis_initial_balance);
-
-        const startQDate = analysisStartDateObj; // Usar el objeto Date
+        const startQDate = analysisStartDateObj;
         const startStr = `${('0' + startQDate.getUTCDate()).slice(-2)}/${('0' + (startQDate.getUTCMonth() + 1)).slice(-2)}/${startQDate.getUTCFullYear()}`;
         const durationUnit = periodicity === "Semanal" ? "Semanas" : "Meses";
         cashflowTitle.textContent = `Proyección Flujo de Caja (${currentBackupData.analysis_duration} ${durationUnit} desde ${startStr})`;
-
         const headerRow = cashflowTableHead.insertRow();
-        const thConcept = document.createElement('th');
-        thConcept.textContent = 'Categoría / Concepto';
-        headerRow.appendChild(thConcept);
-
-        periodDates.forEach(d => { // d aquí es un objeto Date de calculateCashFlowData
+        const thConcept = document.createElement('th'); thConcept.textContent = 'Categoría / Concepto'; headerRow.appendChild(thConcept);
+        periodDates.forEach(d => {
             const th = document.createElement('th');
             if (periodicity === "Semanal") {
-                const [year, week] = getWeekNumber(d);
-                const mondayOfWeek = getMondayOfWeek(year, week); // d ya es Date
+                const [year, week] = getWeekNumber(d); const mondayOfWeek = getMondayOfWeek(year, week);
                 th.innerHTML = `Sem ${week} (${DATE_WEEK_START_FORMAT(mondayOfWeek)})<br>${year}`;
             } else {
                 th.innerHTML = `${MONTH_NAMES_ES[d.getUTCMonth()]}<br>${d.getUTCFullYear()}`;
             }
             headerRow.appendChild(th);
         });
-
         const cf_row_definitions = [
             { key: 'START_BALANCE', label: "Saldo Inicial", isBold: true, isHeaderBg: true },
             { key: 'NET_INCOME', label: "Ingreso Total Neto", isBold: true },
         ];
-
         const fixedCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === "Fijo").sort() : [];
         const variableCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === "Variable").sort() : [];
-
-        fixedCategories.forEach(cat => {
-            cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat });
-        });
+        fixedCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat }));
         cf_row_definitions.push({ key: 'FIXED_EXP_TOTAL', label: "Total Gastos Fijos", isBold: true, isHeaderBg: true });
-
-        variableCategories.forEach(cat => {
-            cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat });
-        });
+        variableCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat }));
         cf_row_definitions.push({ key: 'VAR_EXP_TOTAL', label: "Total Gastos Variables", isBold: true, isHeaderBg: true });
-
         cf_row_definitions.push({ key: 'NET_FLOW', label: "Flujo Neto del Período", isBold: true });
         cf_row_definitions.push({ key: 'END_BALANCE', label: "Saldo Final Estimado", isBold: true, isHeaderBg: true });
-
         cf_row_definitions.forEach((def, rowIndex) => {
-            const tr = cashflowTableBody.insertRow();
-            const tdLabel = tr.insertCell();
+            const tr = cashflowTableBody.insertRow(); const tdLabel = tr.insertCell();
             tdLabel.textContent = def.isIndent ? `  ${def.label}` : def.label;
             if (def.isBold) tdLabel.classList.add('bold');
             if (def.isHeaderBg) tr.classList.add('bg-header');
             else if (rowIndex % 2 !== 0 && !def.isHeaderBg) tr.classList.add('bg-alt-row');
-
-
             for (let i = 0; i < periodDates.length; i++) {
-                const tdValue = tr.insertCell();
-                let value;
-                let colorClass = '';
-
+                const tdValue = tr.insertCell(); let value; let colorClass = '';
                 switch (def.key) {
                     case 'START_BALANCE': value = (i === 0) ? initialBalance : end_bal_p[i - 1]; break;
                     case 'NET_INCOME': value = income_p[i]; break;
                     case 'FIXED_EXP_TOTAL': value = -fixed_exp_p[i]; break;
                     case 'VAR_EXP_TOTAL': value = -var_exp_p[i]; break;
                     case 'NET_FLOW': value = net_flow_p[i]; break;
-                    case 'END_BALANCE':
-                        value = end_bal_p[i];
-                        colorClass = value >= 0 ? 'text-blue' : 'text-red';
-                        break;
-                    default:
-                        if (def.category && expenses_by_cat_p[i]) { // Asegurar que expenses_by_cat_p[i] exista
-                            value = -(expenses_by_cat_p[i][def.category] || 0);
-                        } else {
-                            value = 0;
-                        }
+                    case 'END_BALANCE': value = end_bal_p[i]; colorClass = value >= 0 ? 'text-blue' : 'text-red'; break;
+                    default: value = (def.category && expenses_by_cat_p[i]) ? -(expenses_by_cat_p[i][def.category] || 0) : 0;
                 }
                 tdValue.textContent = formatCurrencyJS(value, symbol);
                 if (colorClass) tdValue.classList.add(colorClass);
@@ -825,10 +650,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-
-    // --- FUNCIONES DE CÁLCULO (Adaptadas de tu script original) ---
-    function calculateCashFlowData(data) { // data aquí ya tiene fechas como objetos Date
-        const startDate = data.analysis_start_date; // Ya es Date
+    // --- ÚNICA FUNCIÓN CORRECTA DE CÁLCULO DE FLUJO DE CAJA ---
+    function calculateCashFlowData(data) {
+        const startDate = data.analysis_start_date;
         const duration = parseInt(data.analysis_duration, 10);
         const periodicity = data.analysis_periodicity;
         const initialBalance = parseFloat(data.analysis_initial_balance);
@@ -841,12 +665,12 @@ document.addEventListener('DOMContentLoaded', () => {
         let end_bal_p = Array(duration).fill(0.0);
         let expenses_by_cat_p = Array(duration).fill(null).map(() => ({}));
 
-        let currentDate = new Date(startDate.getTime()); // Clonar para no modificar el original
+        let currentDate = new Date(startDate.getTime());
         let currentBalance = initialBalance;
 
         const fixedCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Fijo").sort() : [];
         const variableCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Variable").sort() : [];
-        const orderedCategories = [...fixedCategories, ...variableCategories];
+        const orderedCategories = [...fixedCategories, ...variableCategories]; // CORREGIDO: Spread operator
 
         orderedCategories.forEach(cat => {
             for (let i = 0; i < duration; i++) {
@@ -855,12 +679,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         for (let i = 0; i < duration; i++) {
-            const p_start = new Date(currentDate.getTime()); // Clonar
+            const p_start = new Date(currentDate.getTime());
             let p_end;
 
             if (periodicity === "Mensual") {
                 p_end = addMonths(new Date(p_start.getTime()), 1);
-                p_end.setUTCDate(p_end.getUTCDate() - 1); // Usar UTC para consistencia con fechas
+                p_end.setUTCDate(p_end.getUTCDate() - 1);
             } else { // Semanal
                 p_end = addWeeks(new Date(p_start.getTime()), 1);
                 p_end.setUTCDate(p_end.getUTCDate() - 1);
@@ -870,30 +694,26 @@ document.addEventListener('DOMContentLoaded', () => {
             let p_inc_total = 0.0;
             (data.incomes || []).forEach(inc => {
                 if (!inc.start_date) return;
-                const inc_start = inc.start_date; // Ya es Date
-                const inc_end = inc.end_date;   // Ya es Date o null
+                const inc_start = inc.start_date;
+                const inc_end = inc.end_date;
                 const net_amount = parseFloat(inc.net_monthly || 0);
                 const inc_freq = inc.frequency || "Mensual";
-
                 const isActiveRange = (inc_start <= p_end && (inc_end === null || inc_end >= p_start));
                 if (!isActiveRange) return;
 
                 let income_to_add = 0.0;
                 if (inc_freq === "Mensual") {
-                    // --- MODIFICACIÓN INICIO ---
                     if (periodicity === "Mensual") {
                         income_to_add = net_amount;
                     } else if (periodicity === "Semanal") {
-                        const payDay = inc_start.getUTCDate(); // día real del ingreso
-                        const payDate = new Date(p_start.getTime());
-                        payDate.setUTCFullYear(p_start.getUTCFullYear()); // Asegurar año
-                        payDate.setUTCMonth(p_start.getUTCMonth());   // Asegurar mes del periodo actual
-                        payDate.setUTCDate(payDay); // fecha real de pago dentro del mes/semana
-                        if (p_start <= payDate && payDate <= p_end) {
+                        // Lógica corregida: El ingreso mensual impacta la semana si su "día de pago" cae en esa semana.
+                        const payDayOfMonth = inc_start.getUTCDate(); // Día del mes en que ocurre el ingreso
+                        // Construir la fecha de pago para el mes y año del período actual
+                        const payDateInPeriod = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDayOfMonth));
+                        if (p_start <= payDateInPeriod && payDateInPeriod <= p_end) {
                             income_to_add = net_amount;
                         }
                     }
-                    // --- MODIFICACIÓN FIN ---
                 } else if (inc_freq === "Único") {
                     if (p_start <= inc_start && inc_start <= p_end) income_to_add = net_amount;
                 } else if (inc_freq === "Semanal") {
@@ -901,9 +721,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (periodicity === "Mensual") income_to_add = net_amount * (52 / 12);
                 } else if (inc_freq === "Bi-semanal") {
                     if (periodicity === "Semanal") {
-                        const days_diff = (p_start.getTime() - inc_start.getTime()) / (1000 * 60 * 60 * 24);
-                        const weeks_diff = Math.floor(days_diff / 7);
-                        if (days_diff >= 0 && weeks_diff % 2 === 0) income_to_add = net_amount;
+                        let paymentDate = new Date(inc_start.getTime());
+                        while(paymentDate <= p_end) {
+                            if (paymentDate >= p_start) {
+                                income_to_add = net_amount;
+                                break; 
+                            }
+                            paymentDate = addWeeks(paymentDate, 2);
+                        }
                     } else if (periodicity === "Mensual") {
                         let paydays_in_month = 0;
                         let current_pay_date = new Date(inc_start.getTime());
@@ -922,34 +747,28 @@ document.addEventListener('DOMContentLoaded', () => {
             let p_var_exp_total = 0.0;
             (data.expenses || []).forEach(exp => {
                 if (!exp.start_date) return;
-                const e_start = exp.start_date; // Ya es Date
-                const e_end = exp.end_date;   // Ya es Date o null
+                const e_start = exp.start_date;
+                const e_end = exp.end_date;
                 const amt_raw = parseFloat(exp.amount || 0);
                 const freq = exp.frequency || "Mensual";
                 const typ = exp.type || (data.expense_categories && data.expense_categories[exp.category]) || "Variable";
                 const cat = exp.category;
-
                 if (amt_raw < 0 || !cat || !orderedCategories.includes(cat)) return;
-
                 const isActiveRange = (e_start <= p_end && (e_end === null || e_end >= p_start));
                 if (!isActiveRange) return;
 
                 let exp_add_this_period = 0.0;
                 if (freq === "Mensual") {
-                    // --- MODIFICACIÓN INICIO ---
                     if (periodicity === "Mensual") {
                         exp_add_this_period = amt_raw;
                     } else if (periodicity === "Semanal") {
-                        const payDay = e_start.getUTCDate(); // día real del gasto
-                        const payDate = new Date(p_start.getTime());
-                        payDate.setUTCFullYear(p_start.getUTCFullYear()); // Asegurar año
-                        payDate.setUTCMonth(p_start.getUTCMonth());   // Asegurar mes del periodo actual
-                        payDate.setUTCDate(payDay); // fecha real de pago dentro del mes/semana
-                        if (p_start <= payDate && payDate <= p_end) {
+                        // Lógica corregida: El gasto mensual impacta la semana si su "día de pago" cae en esa semana.
+                        const payDayOfMonth = e_start.getUTCDate(); // Día del mes en que ocurre el gasto
+                        const payDateInPeriod = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDayOfMonth));
+                        if (p_start <= payDateInPeriod && payDateInPeriod <= p_end) {
                             exp_add_this_period = amt_raw;
                         }
                     }
-                    // --- MODIFICACIÓN FIN ---
                 } else if (freq === "Único") {
                     if (p_start <= e_start && e_start <= p_end) exp_add_this_period = amt_raw;
                 } else if (freq === "Semanal") {
@@ -957,9 +776,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (periodicity === "Mensual") exp_add_this_period = amt_raw * (52/12);
                 } else if (freq === "Bi-semanal") {
                      if (periodicity === "Semanal") {
-                        const days_diff = (p_start.getTime() - e_start.getTime()) / (1000 * 60 * 60 * 24);
-                        const weeks_diff = Math.floor(days_diff / 7);
-                        if (days_diff >=0 && weeks_diff % 2 === 0) exp_add_this_period = amt_raw;
+                        let paymentDate = new Date(e_start.getTime());
+                        while(paymentDate <= p_end) {
+                            if (paymentDate >= p_start) {
+                                exp_add_this_period = amt_raw;
+                                break;
+                            }
+                            paymentDate = addWeeks(paymentDate, 2);
+                        }
                     } else if (periodicity === "Mensual") {
                         let paydays_in_month = 0;
                         let current_pay_date = new Date(e_start.getTime());
@@ -970,7 +794,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         exp_add_this_period = amt_raw * paydays_in_month;
                     }
                 }
-
                 if (exp_add_this_period > 0) {
                     expenses_by_cat_p[i][cat] = (expenses_by_cat_p[i][cat] || 0) + exp_add_this_period;
                     if (typ === "Fijo") p_fix_exp_total += exp_add_this_period;
@@ -991,63 +814,51 @@ document.addEventListener('DOMContentLoaded', () => {
         return { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p };
     }
 
-    // --- FUNCIONES UTILITARIAS DE FECHA Y MONEDA ---
     function formatCurrencyJS(value, symbol) {
-        if (value === null || typeof value !== 'number') {
-            return `${symbol}0`;
-        }
+        if (value === null || typeof value !== 'number') return `${symbol}0`;
         return `${symbol}${Math.round(value).toLocaleString('es-CL')}`;
     }
 
-    function addMonths(date, months) { // date es objeto Date
-        const d = new Date(date.getTime()); // Clonar
+    function addMonths(date, months) {
+        const d = new Date(date.getTime());
         d.setUTCMonth(d.getUTCMonth() + months);
         return d;
     }
 
-    function addWeeks(date, weeks) { // date es objeto Date
-        const d = new Date(date.getTime()); // Clonar
+    function addWeeks(date, weeks) {
+        const d = new Date(date.getTime());
         d.setUTCDate(d.getUTCDate() + (weeks * 7));
         return d;
     }
 
-    // Devuelve YYYY-MM-DD desde un objeto Date, usando UTC para evitar problemas de zona horaria
-    function getISODateString(date) { // Renombrado para claridad
-        if (!(date instanceof Date) || isNaN(date)) return ''; // Manejar entrada inválida
+    function getISODateString(date) {
+        if (!(date instanceof Date) || isNaN(date)) return '';
         return date.getUTCFullYear() + '-' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date.getUTCDate()).slice(-2);
     }
 
-
-    function getWeekNumber(d) { // d es objeto Date
-        // Copia la fecha para no modificar la original y trabaja con UTC
+    function getWeekNumber(d) {
         const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-        date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7)); // Mover al jueves de la semana actual
+        date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
         const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
         const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
         return [date.getUTCFullYear(), weekNo];
     }
 
-    function getMondayOfWeek(year, week) { // year y week son números
-        // Crea una fecha para el primer día del año y luego añade las semanas.
-        // El día 1 de la semana 1 es el lunes de esa semana.
-        // Enero 1 puede ser semana 52 o 53 del año anterior.
-        // Enero 4 siempre está en la semana 1.
-        const firstDayOfYear = new Date(Date.UTC(year, 0, 4)); // 4 de enero siempre está en la semana 1
-        const daysToMondayOfWeek1 = 1 - (firstDayOfYear.getUTCDay() || 7); // Días para llegar al lunes de la semana 1
+    function getMondayOfWeek(year, week) {
+        const firstDayOfYear = new Date(Date.UTC(year, 0, 4));
+        const daysToMondayOfWeek1 = 1 - (firstDayOfYear.getUTCDay() || 7);
         const mondayOfWeek1 = new Date(Date.UTC(year, 0, 4 + daysToMondayOfWeek1));
-
         const targetMonday = new Date(mondayOfWeek1.getTime());
         targetMonday.setUTCDate(targetMonday.getUTCDate() + (week - 1) * 7);
         return targetMonday;
     }
 
-    // --- INICIALIZACIÓN ---
     showLoginScreen();
     const today = new Date();
-    const todayISO = getISODateString(today); // Usar la nueva función
+    const todayISO = getISODateString(today);
     incomeStartDateInput.value = todayISO;
     expenseStartDateInput.value = todayISO;
-    incomeEndDateInput.disabled = true;
-    expenseEndDateInput.disabled = true;
+    incomeEndDateInput.disabled = true; 
+    expenseEndDateInput.disabled = true; 
 
-}); // Fin de DOMContentLoaded
+});
