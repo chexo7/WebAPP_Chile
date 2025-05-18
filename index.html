@@ -11,40 +11,50 @@
         <h1>Visor de Flujo de Caja</h1>
 
         <div id="auth-container">
-            <h2>Iniciar Sesión</h2>
-            <input type="email" id="email" placeholder="Correo electrónico">
-            <input type="password" id="password" placeholder="Contraseña">
-            <button id="login-button">Ingresar</button>
-            <button id="logout-button" style="display:none;">Cerrar Sesión</button>
-            <p id="auth-status"></p>
+            <div id="login-form">
+                <h2>Iniciar Sesión</h2>
+                <input type="email" id="email" placeholder="Correo electrónico">
+                <input type="password" id="password" placeholder="Contraseña">
+                <button id="login-button">Ingresar</button>
+            </div>
+            <div id="logout-area" style="display:none;">
+                <p id="auth-status"></p>
+                <button id="logout-button">Cerrar Sesión</button>
+            </div>
         </div>
 
-        <div id="data-container" style="display:none;">
-            <h2>Seleccionar Backup</h2>
+        <div id="data-selection-container" style="display:none;">
+            <h2>Seleccionar Versión a Cargar</h2>
             <select id="backup-selector">
                 <option value="">-- Selecciona un backup --</option>
             </select>
-            <button id="load-backup-button">Cargar Backup</button>
+            <button id="load-backup-button">Cargar Versión</button>
+            <p id="loading-message" style="display:none;"></p>
         </div>
 
-        <div id="cashflow-container">
-            <h2 id="cashflow-title">Flujo de Caja</h2>
-            <div class="table-responsive">
-                <table id="cashflow-table">
-                    <thead></thead>
-                    <tbody></tbody>
-                </table>
+        <div id="main-content-container" style="display:none;">
+            <div class="tabs-container">
+                <button class="tab-button active" data-tab="flujo-caja">Flujo de Caja</button>
+                </div>
+
+            <div id="flujo-caja" class="tab-content active">
+                <div id="cashflow-container"> <h2 id="cashflow-title">Flujo de Caja</h2>
+                    <div class="table-responsive">
+                        <table id="cashflow-table">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-             <p id="loading-message"></p>
-        </div>
+            </div>
     </div>
 
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-    <script src="config.js"></script> <!-- Tu configuración de Firebase irá aquí -->
+    <script src="config.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

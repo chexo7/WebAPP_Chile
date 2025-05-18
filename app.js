@@ -1,124 +1,155 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Elementos de Autenticación
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const loginButton = document.getElementById('login-button');
     const logoutButton = document.getElementById('logout-button');
     const authStatus = document.getElementById('auth-status');
     const authContainer = document.getElementById('auth-container');
-    const dataContainer = document.getElementById('data-container');
+    const loginForm = document.getElementById('login-form');
+    const logoutArea = document.getElementById('logout-area');
+
+    // Elementos de Selección de Datos
+    const dataSelectionContainer = document.getElementById('data-selection-container');
     const backupSelector = document.getElementById('backup-selector');
     const loadBackupButton = document.getElementById('load-backup-button');
+    const loadingMessage = document.getElementById('loading-message');
+
+    // Elementos de Contenido Principal y Pestañas
+    const mainContentContainer = document.getElementById('main-content-container');
+    const tabsContainer = document.querySelector('.tabs-container');
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    // Elementos del Flujo de Caja (dentro de su pestaña)
+    const cashflowContainer = document.getElementById('cashflow-container'); // Este ya existe
     const cashflowTableBody = document.querySelector('#cashflow-table tbody');
     const cashflowTableHead = document.querySelector('#cashflow-table thead');
-    const cashflowContainer = document.getElementById('cashflow-container');
     const cashflowTitle = document.getElementById('cashflow-title');
-    const loadingMessage = document.getElementById('loading-message');
 
     const MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     const DATE_WEEK_START_FORMAT = (date) => `${date.getDate()}-${MONTH_NAMES_ES[date.getMonth()]}`;
 
-    let currentBackupData = null; // Para almacenar los datos del backup cargado
+    let currentBackupData = null;
+
+    // --- Lógica de UI ---
+    function showLoginScreen() {
+        authContainer.style.display = 'block';
+        loginForm.style.display = 'block';
+        logoutArea.style.display = 'none';
+        dataSelectionContainer.style.display = 'none';
+        mainContentContainer.style.display = 'none';
+        clearCashflowTable(); // Limpiar tabla al cerrar sesión o volver a login
+        currentBackupData = null; // Resetear datos
+        backupSelector.innerHTML = '<option value="">-- Selecciona un backup --</option>'; // Reset selector
+    }
+
+    function showDataSelectionScreen(user) {
+        authContainer.style.display = 'block';
+        loginForm.style.display = 'none';
+        logoutArea.style.display = 'block';
+        authStatus.textContent = `Conectado como: ${user.email}`;
+        dataSelectionContainer.style.display = 'block';
+        mainContentContainer.style.display = 'none';
+        fetchBackups(); // Cargar backups disponibles
+    }
+
+    function showMainContentScreen() {
+        // authContainer sigue visible con el área de logout
+        // dataSelectionContainer sigue visible para cambiar de backup
+        mainContentContainer.style.display = 'block';
+        // Activar la primera pestaña por defecto (Flujo de Caja)
+        activateTab('flujo-caja');
+    }
+
 
     // --- Autenticación ---
     loginButton.addEventListener('click', () => {
         const email = emailInput.value;
         const password = passwordInput.value;
+        authStatus.textContent = "Ingresando..."; // Mensaje temporal
         auth.signInWithEmailAndPassword(email, password)
             .then(userCredential => {
-                authStatus.textContent = `Conectado como: ${userCredential.user.email}`;
+                // No se muestra el status aquí, se maneja en onAuthStateChanged
             })
             .catch(error => {
                 authStatus.textContent = `Error: ${error.message}`;
+                logoutArea.style.display = 'block'; // Mostrar área de status/logout para el mensaje de error
+                loginForm.style.display = 'block'; // Mantener formulario de login visible
             });
     });
 
     logoutButton.addEventListener('click', () => {
         auth.signOut().then(() => {
-            authStatus.textContent = 'Sesión cerrada.';
+            // El cambio de UI se maneja en onAuthStateChanged
         });
     });
 
     auth.onAuthStateChanged(user => {
         if (user) {
-            authContainer.style.display = 'block'; // Mantener visible para logout
-            loginButton.style.display = 'none';
-            emailInput.style.display = 'none';
-            passwordInput.style.display = 'none';
-            logoutButton.style.display = 'inline-block';
-            authStatus.textContent = `Conectado como: ${user.email}`;
-
-            dataContainer.style.display = 'block';
-            cashflowContainer.style.display = 'block';
-            fetchBackups();
+            showDataSelectionScreen(user);
         } else {
-            authContainer.style.display = 'block';
-            loginButton.style.display = 'inline-block';
-            emailInput.style.display = 'inline-block';
-            passwordInput.style.display = 'inline-block';
-            logoutButton.style.display = 'none';
-            authStatus.textContent = 'No has iniciado sesión.';
-            
-            dataContainer.style.display = 'none';
-            clearCashflowTable();
-            currentBackupData = null;
-            backupSelector.innerHTML = '<option value="">-- Selecciona un backup --</option>';
+            showLoginScreen();
         }
     });
 
     // --- Carga de Backups ---
     function fetchBackups() {
-        loadingMessage.textContent = "Cargando lista de backups...";
+        loadingMessage.textContent = "Cargando lista de versiones...";
+        loadingMessage.style.display = 'block';
         database.ref('backups').once('value')
             .then(snapshot => {
-                backupSelector.innerHTML = '<option value="">-- Selecciona un backup --</option>'; // Reset
+                backupSelector.innerHTML = '<option value="">-- Selecciona una versión --</option>';
                 if (snapshot.exists()) {
                     const backups = snapshot.val();
-                    const sortedKeys = Object.keys(backups).sort().reverse(); // Más recientes primero
+                    const sortedKeys = Object.keys(backups).sort().reverse();
                     sortedKeys.forEach(key => {
                         const option = document.createElement('option');
                         option.value = key;
                         option.textContent = formatBackupKey(key);
                         backupSelector.appendChild(option);
                     });
-                    loadingMessage.textContent = "";
                 } else {
-                    backupSelector.innerHTML = '<option value="">No hay backups disponibles</option>';
-                    loadingMessage.textContent = "No se encontraron backups.";
+                    backupSelector.innerHTML = '<option value="">No hay versiones disponibles</option>';
                 }
+                loadingMessage.style.display = 'none';
             })
             .catch(error => {
                 console.error("Error fetching backups:", error);
-                authStatus.textContent = `Error cargando backups: ${error.message}`;
-                loadingMessage.textContent = "Error al cargar backups.";
+                authStatus.textContent = `Error cargando versiones: ${error.message}`; // Mostrar error en authStatus
+                loadingMessage.textContent = "Error al cargar versiones.";
+                loadingMessage.style.display = 'block';
             });
     }
-    
+
     loadBackupButton.addEventListener('click', () => {
         const selectedKey = backupSelector.value;
         if (selectedKey) {
             loadSpecificBackup(selectedKey);
         } else {
-            alert("Por favor, selecciona un backup.");
+            alert("Por favor, selecciona una versión.");
         }
     });
 
     function loadSpecificBackup(key) {
-        loadingMessage.textContent = `Cargando datos del backup: ${formatBackupKey(key)}...`;
+        loadingMessage.textContent = `Cargando datos de la versión: ${formatBackupKey(key)}...`;
+        loadingMessage.style.display = 'block';
+        mainContentContainer.style.display = 'none'; // Ocultar contenido anterior mientras carga
         clearCashflowTable();
+
         database.ref(`backups/${key}`).once('value')
             .then(snapshot => {
                 if (snapshot.exists()) {
                     currentBackupData = snapshot.val();
-                    // Parsear fechas de strings ISO a objetos Date
-                    currentBackupData.analysis_start_date = new Date(currentBackupData.analysis_start_date + 'T00:00:00'); // Asegurar que sea local
-                    
+                    // Parsear fechas (sin cambios aquí)
+                    currentBackupData.analysis_start_date = new Date(currentBackupData.analysis_start_date + 'T00:00:00');
                     if (currentBackupData.incomes) {
                         currentBackupData.incomes.forEach(inc => {
                             if (inc.start_date) inc.start_date = new Date(inc.start_date + 'T00:00:00');
                             if (inc.end_date) inc.end_date = new Date(inc.end_date + 'T00:00:00');
                         });
                     }
-                     if (currentBackupData.expenses) {
+                    if (currentBackupData.expenses) {
                         currentBackupData.expenses.forEach(exp => {
                             if (exp.start_date) exp.start_date = new Date(exp.start_date + 'T00:00:00');
                             if (exp.end_date) exp.end_date = new Date(exp.end_date + 'T00:00:00');
@@ -127,25 +158,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(currentBackupData);
                     renderCashflowTable(periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p, currentBackupData);
-                    loadingMessage.textContent = "";
+                    
+                    showMainContentScreen(); // Mostrar el contenedor con pestañas
                 } else {
-                    alert("El backup seleccionado no contiene datos.");
-                    loadingMessage.textContent = "Backup vacío o no encontrado.";
+                    alert("La versión seleccionada no contiene datos.");
                     currentBackupData = null;
                 }
+                loadingMessage.style.display = 'none';
             })
             .catch(error => {
                 console.error("Error loading backup data:", error);
-                alert(`Error al cargar datos del backup: ${error.message}`);
-                loadingMessage.textContent = "Error al cargar datos del backup.";
+                alert(`Error al cargar datos de la versión: ${error.message}`);
+                loadingMessage.textContent = "Error al cargar datos de la versión.";
+                loadingMessage.style.display = 'block';
                 currentBackupData = null;
             });
     }
-    
+
     function formatBackupKey(key) {
-        // 'backup_YYYYMMDDTHHMMSS' -> 'DD/MM/YYYY HH:MM:SS'
         const ts = key.replace("backup_", "");
-        if (ts.length === 15) { // YYYYMMDDTHHMMSS
+        if (ts.length === 15) {
             const year = ts.substring(0, 4);
             const month = ts.substring(4, 6);
             const day = ts.substring(6, 8);
@@ -160,15 +192,42 @@ document.addEventListener('DOMContentLoaded', () => {
     function clearCashflowTable() {
         cashflowTableHead.innerHTML = '';
         cashflowTableBody.innerHTML = '';
-        cashflowTitle.textContent = 'Flujo de Caja';
+        cashflowTitle.textContent = 'Flujo de Caja'; // Resetear título
     }
 
-    // --- Lógica de Flujo de Caja (adaptada de Python) ---
+    // --- Lógica de Pestañas ---
+    function activateTab(tabId) {
+        tabContents.forEach(content => {
+            content.classList.remove('active');
+            if (content.id === tabId) {
+                content.classList.add('active');
+            }
+        });
+        tabButtons.forEach(button => {
+            button.classList.remove('active');
+            if (button.dataset.tab === tabId) {
+                button.classList.add('active');
+            }
+        });
+    }
+
+    tabsContainer.addEventListener('click', (event) => {
+        if (event.target.classList.contains('tab-button')) {
+            const tabId = event.target.dataset.tab;
+            activateTab(tabId);
+        }
+    });
+
+    // --- Lógica de Flujo de Caja (sin cambios, adaptada de tu original) ---
+    // ... (TODA TU LÓGICA EXISTENTE PARA calculateCashFlowData, renderCashflowTable, formatCurrencyJS, addMonths, etc. VA AQUÍ) ...
+    // PEGA AQUÍ TU CÓDIGO ORIGINAL DESDE: function formatCurrencyJS(value, symbol) { ... HASTA EL FINAL DE renderCashflowTable(...) }
+    // ES IMPORTANTE QUE TODO ESE BLOQUE ESTÉ PRESENTE.
+
     function formatCurrencyJS(value, symbol) {
         if (value === null || typeof value !== 'number') {
             return `${symbol}0`;
         }
-        return `${symbol}${Math.round(value).toLocaleString('es-CL')}`; // es-CL usa . como separador de miles y , para decimales. toLocaleString maneja esto.
+        return `${symbol}${Math.round(value).toLocaleString('es-CL')}`;
     }
 
     function addMonths(date, months) {
@@ -183,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return d;
     }
     
-    function getISODate(date) { // YYYY-MM-DD
+    function getISODate(date) { 
       return date.getFullYear() + '-' + ('0' + (date.getMonth() + 1)).slice(-2) + '-' + ('0' + date.getDate()).slice(-2);
     }
 
@@ -262,12 +321,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 let income_to_add = 0.0;
                 if (inc_freq === "Mensual") {
                     if (periodicity === "Mensual") income_to_add = net_amount;
-                    else if (periodicity === "Semanal" && p_start.getDate() <= 7) income_to_add = net_amount; // Python: p_start.day <= 7
+                    else if (periodicity === "Semanal" && p_start.getDate() <= 7) income_to_add = net_amount; 
                 } else if (inc_freq === "Único") {
                     if (p_start <= inc_start && inc_start <= p_end) income_to_add = net_amount;
                 } else if (inc_freq === "Semanal") {
                     if (periodicity === "Semanal") income_to_add = net_amount;
-                    else if (periodicity === "Mensual") income_to_add = net_amount * (52 / 12); // Approx
+                    else if (periodicity === "Mensual") income_to_add = net_amount * (52 / 12); 
                 } else if (inc_freq === "Bi-semanal") {
                     if (periodicity === "Semanal") {
                         const days_diff = (p_start - inc_start) / (1000 * 60 * 60 * 24);
@@ -311,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (p_start <= e_start && e_start <= p_end) exp_add_this_period = amt_raw;
                 } else if (freq === "Semanal") {
                     if (periodicity === "Semanal") exp_add_this_period = amt_raw;
-                    else if (periodicity === "Mensual") exp_add_this_period = amt_raw * (52/12); // Approx
+                    else if (periodicity === "Mensual") exp_add_this_period = amt_raw * (52/12); 
                 } else if (freq === "Bi-semanal") {
                      if (periodicity === "Semanal") {
                         const days_diff = (p_start - e_start) / (1000 * 60 * 60 * 24);
@@ -359,14 +418,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const periodicity = data.analysis_periodicity;
         const initialBalance = parseFloat(data.analysis_initial_balance);
 
-        // Update title
         const startQDate = new Date(data.analysis_start_date);
         const startStr = `${('0' + startQDate.getDate()).slice(-2)}/${('0' + (startQDate.getMonth() + 1)).slice(-2)}/${startQDate.getFullYear()}`;
         const durationUnit = periodicity === "Semanal" ? "Semanas" : "Meses";
         cashflowTitle.textContent = `Proyección Flujo de Caja (${data.analysis_duration} ${durationUnit} desde ${startStr})`;
 
 
-        // Headers
         const headerRow = document.createElement('tr');
         const thConcept = document.createElement('th');
         thConcept.textContent = 'Categoría / Concepto';
@@ -384,13 +441,8 @@ document.addEventListener('DOMContentLoaded', () => {
             headerRow.appendChild(th);
         });
         cashflowTableHead.appendChild(headerRow);
-        
-        // 1️⃣  Guardamos la etiqueta de la primera columna + todas las del período
-        const headerLabels = Array.from(headerRow.children).map(th => th.innerHTML.replace(/<br\s*\/?>/gi, ' ').trim());
 
-
-        // Data Rows
-        const cf_row_definitions = [ // Simplified cf_row_indices
+        const cf_row_definitions = [ 
             { key: 'START_BALANCE', label: "Saldo Inicial", isBold: true, isHeaderBg: true },
             { key: 'NET_INCOME', label: "Ingreso Total Neto", isBold: true },
         ];
@@ -411,17 +463,16 @@ document.addEventListener('DOMContentLoaded', () => {
         cf_row_definitions.push({ key: 'NET_FLOW', label: "Flujo Neto del Período", isBold: true });
         cf_row_definitions.push({ key: 'END_BALANCE', label: "Saldo Final Estimado", isBold: true, isHeaderBg: true });
 
+        let currentBalance = initialBalance;
+
         cf_row_definitions.forEach((def, rowIndex) => {
             const tr = document.createElement('tr');
             const tdLabel = document.createElement('td');
             tdLabel.textContent = def.isIndent ? `  ${def.label}` : def.label;
             if (def.isBold) tdLabel.classList.add('bold');
             if (def.isHeaderBg) tr.classList.add('bg-header');
-            else if (rowIndex % 2 !== 0) tr.classList.add('bg-alt-row'); // Alt row for non-header bg
-            
-            tdLabel.setAttribute('data-label', headerLabels[0]); // ‘Categoría / Concepto’
+            else if (rowIndex % 2 !== 0) tr.classList.add('bg-alt-row'); 
             tr.appendChild(tdLabel);
-
 
             for (let i = 0; i < periodDates.length; i++) {
                 const tdValue = document.createElement('td');
@@ -438,7 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         value = end_bal_p[i];
                         colorClass = value >= 0 ? 'text-blue' : 'text-red';
                         break;
-                    default: // Category expenses
+                    default: 
                         if (def.category) {
                             value = -(expenses_by_cat_p[i][def.category] || 0);
                         } else {
@@ -446,7 +497,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                 }
                 tdValue.textContent = formatCurrencyJS(value, symbol);
-                tdValue.setAttribute('data-label', headerLabels[i + 1]); // ‘+1’ porque la 0 es la de categoría
                 if (colorClass) tdValue.classList.add(colorClass);
                 if (def.isBold) tdValue.classList.add('bold');
                 tr.appendChild(tdValue);
@@ -454,4 +504,8 @@ document.addEventListener('DOMContentLoaded', () => {
             cashflowTableBody.appendChild(tr);
         });
     }
-});
+
+    // Inicializar la vista de login al cargar la página
+    showLoginScreen();
+
+}); // Fin de DOMContentLoaded

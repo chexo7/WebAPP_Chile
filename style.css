@@ -1,258 +1,398 @@
+/* Variables globales */
+:root {
+  --primary-color: #3867d6;
+  --primary-hover: #2d56bf;
+  --accent-color: #20bf6b;
+  --danger-color: #eb3b5a;
+  --danger-hover: #d63151;
+  --text-color: #2d3436;
+  --light-text: #636e72;
+  --background: #f7f9fc;
+  --card-bg: #ffffff;
+  --border-color: #dfe6e9;
+  --header-bg: #f1f6fb;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --transition: all 0.3s ease;
+  --radius: 8px;
+  /* Nuevas variables opacas para filas especiales */
+  --alt-row-bg: #f8f9fa;
+  --row-hover-bg: #e9ecef;
+  --body-header-row-bg: #eef3f8;
+}
+
+/* Reseteo y estilos base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 20px;
-    background-color: #f4f7f6;
-    color: #333;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background-color: var(--background);
+  color: var(--text-color);
+  line-height: 1.6;
 }
 
 .container {
-    max-width: 1200px;
-    margin: auto;
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+  max-width: 1200px;
+  margin: 20px auto;
+  background-color: var(--card-bg);
+  padding: 30px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
+/* Encabezados */
 h1, h2 {
-    color: #2c3e50;
-    text-align: center;
+  color: var(--primary-color);
+  margin-bottom: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
-#auth-container, #data-container {
-    margin-bottom: 20px;
-    padding: 15px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    background-color: #f9f9f9;
+h1 {
+  font-size: 2.2rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  position: relative;
+  padding-bottom: 15px;
 }
 
+h1::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 3px;
+  background: var(--primary-color);
+  border-radius: 2px;
+}
+
+h2 {
+  font-size: 1.5rem;
+  margin-top: 1.5rem;
+  border-left: 4px solid var(--primary-color);
+  padding-left: 12px;
+}
+
+/* Contenedores de autenticación y datos */
+#auth-container, #data-selection-container, #main-content-container {
+  margin-bottom: 24px;
+  padding: 24px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background-color: var(--card-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: var(--transition);
+}
+
+#auth-container:hover, #data-selection-container:hover, #main-content-container:hover {
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.07);
+}
+
+/* Formularios e inputs */
 input[type="email"], input[type="password"], select {
-    width: calc(100% - 22px);
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    box-sizing: border-box;
+  width: 100%;
+  padding: 12px 15px;
+  margin-bottom: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  transition: var(--transition);
+  background-color: #f9fafc;
 }
 
+input[type="email"]:focus, input[type="password"]:focus, select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(56, 103, 214, 0.15);
+}
+
+/* Botones */
 button {
-    background-color: #3498db;
-    color: white;
-    padding: 10px 15px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1em;
-    margin-right: 5px;
+  background-color: var(--primary-color);
+  color: white;
+  padding: 12px 20px;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-right: 8px;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 button:hover {
-    background-color: #2980b9;
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+button:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 #logout-button {
-    background-color: #e74c3c;
+  background-color: var(--danger-color);
 }
+
 #logout-button:hover {
-    background-color: #c0392b;
+  background-color: var(--danger-hover);
 }
 
+#load-backup-button {
+  background-color: var(--accent-color);
+}
+
+#load-backup-button:hover {
+  background-color: #1ca65c;
+}
+
+/* Estado de autenticación */
 #auth-status {
-    margin-top: 10px;
-    font-style: italic;
+  margin-top: 15px;
+  font-style: italic;
+  color: var(--light-text);
+  background-color: rgba(0, 0, 0, 0.03);
+  padding: 10px;
+  border-radius: var(--radius);
+  text-align: center;
 }
 
+/* Contenedor de flujo de caja */
+#cashflow-container {
+  margin-top: 30px;
+  padding: 5px;
+}
+
+#cashflow-title {
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--text-color);
+  font-size: 1.7rem;
+}
+
+/* Tabla responsive */
 .table-responsive {
-    overflow-x: auto;
-    margin-top: 20px;
+  overflow: auto; /* Permite el desplazamiento horizontal y vertical */
+  width: 100%;
+  margin-top: 20px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
-
-/* Scroll horizontal suave en escritorio/tablet */
-.table-responsive::-webkit-scrollbar { 
-    height: 8px; /* Un poco más grueso para mejor agarre */
-    background-color: #f0f0f0; /* Fondo de la barra de scroll */
-}
-.table-responsive::-webkit-scrollbar-thumb { 
-    background: #ccc; /* Color del "pulgar" */
-    border-radius: 4px; 
-}
-.table-responsive::-webkit-scrollbar-thumb:hover {
-    background: #bbb; /* Color del "pulgar" al pasar el mouse */
-}
-
 
 #cashflow-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9em;
+  width: 100%;
+  min-width: 600px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.76rem; /* 80% del tamaño anterior */
 }
 
-#cashflow-table th, #cashflow-table td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: left;
-    white-space: nowrap;
+/* --- Estilos para celdas de la tabla (th y td) --- */
+#cashflow-table th,
+#cashflow-table td {
+  padding: 10px 12px; /* Reducido para acompañar el tamaño de fuente menor */
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+  background-color: var(--card-bg);
 }
 
-#cashflow-table th {
-    background-color: #ecf0f1;
-    color: #2c3e50;
-    font-weight: bold;
-    text-align: center;
+/* Encabezados sticky */
+#cashflow-table thead th {
+  background-color: var(--header-bg);
+  color: var(--primary-color);
+  font-weight: 600;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 2px solid var(--primary-color);
 }
 
-#cashflow-table tbody tr:nth-child(even) {
-    background-color: #f9f9f9; /* Para filas pares si no son bg-header o bg-alt-row */
+/* Primera columna sticky (incluyendo esquina superior izquierda) y ancho automático */
+#cashflow-table th:first-child,
+#cashflow-table td:first-child {
+  position: sticky;
+  left: 0;
+  width: max-content;
+}
+
+/* Celda de la esquina superior izquierda */
+#cashflow-table th:first-child {
+  border-top-left-radius: var(--radius);
+  text-align: left;
+  z-index: 11;
+  background-color: var(--header-bg);
+}
+
+/* Primera columna de datos */
+#cashflow-table td:first-child {
+  font-weight: 500;
+  background-color: var(--card-bg);
+  z-index: 9;
+}
+
+/* Fondo opaco para filas alternas */
+#cashflow-table tbody tr.bg-alt-row td,
+#cashflow-table tbody tr.bg-alt-row td:first-child {
+  background-color: var(--alt-row-bg) !important;
+}
+
+/* Fondo opaco para filas tipo encabezado en tbody */
+#cashflow-table tbody tr.bg-header td,
+#cashflow-table tbody tr.bg-header td:first-child {
+  background-color: var(--body-header-row-bg) !important;
+}
+
+/* Hover opaco en filas del tbody (excepto .bg-header) */
+#cashflow-table tbody tr:not(.bg-header):hover td,
+#cashflow-table tbody tr:not(.bg-header):hover td:first-child {
+  background-color: var(--row-hover-bg) !important;
 }
 
 #cashflow-table td:not(:first-child) {
-    text-align: right;
-}
-
-#cashflow-table td.text-left {
-    text-align: left;
-}
-#cashflow-table td.text-center {
-    text-align: center;
+  text-align: right;
+  font-family: 'Consolas', monospace;
 }
 
 .bold {
-    font-weight: bold;
+  font-weight: 700 !important;
 }
 
 .text-red {
-    color: #c0392b;
+  color: var(--danger-color);
 }
+
 .text-blue {
-    color: #2980b9;
+  color: var(--primary-color);
 }
+
 .bg-header {
-    background-color: #f0f0f0 !important; /* Un poco más oscuro que th para destacar */
+  background-color: var(--body-header-row-bg) !important;
 }
+
 .bg-alt-row {
-    background-color: #fdfdfd !important; /* Muy sutil para filas impares */
+  background-color: var(--alt-row-bg) !important;
 }
 
+/* Mensaje de carga */
 #loading-message {
-    text-align: center;
-    font-style: italic;
-    margin-top: 15px;
+  text-align: center;
+  font-style: italic;
+  margin: 20px 0;
+  color: var(--light-text);
+  background-color: rgba(56, 103, 214, 0.05);
+  padding: 10px;
+  border-radius: var(--radius);
+  animation: pulse 1.5s infinite;
 }
 
-/* Sticky header para pantallas ≥ 768 px */
-@media (min-width: 768px) {
-    #cashflow-table thead th { 
-        position: sticky; 
-        top: 0; 
-        z-index: 2;
-        background-color: #ecf0f1; /* Asegurar que el fondo del sticky header sea el mismo que el normal */
-        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-    }
-    /* Ajuste para que el primer th de la primera fila sticky no tenga sombra a la izquierda si se scrollea */
-    #cashflow-table thead tr:first-child th:first-child {
-        /* box-shadow: none; /* Opcional, si se quiere un look más plano */
-    }
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
 }
 
+/* Tabs Styling */
+.tabs-container {
+  display: flex;
+  justify-content: center; /* Or flex-start */
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border-color);
+}
 
-/* --- MOBILE LAYOUT (<768 px) ------------------------------ */
-@media (max-width: 767.98px) { /* Usar .98px para evitar solapamientos con min-width: 768px */
+.tab-button {
+  padding: 10px 20px;
+  cursor: pointer;
+  border: none;
+  background-color: transparent;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--light-text);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px; /* Align with container border */
+  transition: color 0.3s ease, border-bottom-color 0.3s ease;
+}
 
-  body           { padding: 10px; font-size:1rem; } /* Aumentar ligeramente el tamaño base en móvil */
-  h1             { font-size: 1.5rem; }
-  h2             { font-size: 1.2rem; }
+.tab-button.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  font-weight: 600;
+}
 
+.tab-button:hover:not(.active) {
+  color: var(--primary-color);
+}
 
-  .container     { max-width: 100%; box-shadow: none; padding: 10px; border-radius: 0; }
+.tab-content {
+  display: none; /* Hidden by default */
+}
 
-  #auth-container, #data-container {
+.tab-content.active {
+  display: block; /* Shown when tab is active */
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* General Mobile Layout Adjustments (excluding table stacking) */
+@media (max-width: 768px) {
+  body {
     padding: 10px;
   }
-  input[type="email"], input[type="password"], select, button {
-    font-size: 1rem; /* Mejorar legibilidad de inputs */
-  }
-  
-  .table-responsive {
-    overflow-x: visible; /* En móvil no queremos scroll horizontal de la tabla "apilada" */
+
+  .container {
+    padding: 20px 15px;
+    margin: 10px auto;
   }
 
-  #cashflow-table,
-  #cashflow-table thead,
-  #cashflow-table tbody,
-  #cashflow-table th,
-  #cashflow-table td,
-  #cashflow-table tr {
-      display: block;
-      width: 100% !important; 
-      box-sizing: border-box;
+  h1 {
+    font-size: 1.8rem;
   }
 
-  #cashflow-table thead tr {
-      position: absolute;
-      top: -9999px;
-      left: -9999px;
+  h2 {
+    font-size: 1.3rem;
   }
 
-  #cashflow-table tr { 
-      margin-bottom: 1rem; 
-      border: 1px solid #ccc; /* Borde alrededor de cada "bloque" de fila */
-      border-radius: 4px; /* Bordes redondeados para los bloques */
-      overflow: hidden; /* Para que los bordes redondeados afecten a los hijos */
-  }
-  
-  #cashflow-table td {
-      border: none; 
-      border-bottom: 1px solid #eee; 
-      padding: 10px; /* Más padding en móvil */
-      padding-left: 45% !important; /* Espacio para el label. Ajustar según necesidad */
-      position: relative;
-      white-space: normal;
-      text-align: right !important; 
-      min-height: 1.5em; /* Asegurar altura mínima para celdas con poco contenido */
-      display: flex; /* Usar flex para mejor alineación vertical */
-      align-items: center; /* Centrar verticalmente el contenido */
-      justify-content: flex-end; /* Alinear el valor a la derecha */
-  }
-   #cashflow-table td:last-child {
-      border-bottom: none; /* No borde en la última celda del bloque */
+  #auth-container, #data-selection-container, #main-content-container {
+    padding: 15px;
   }
 
-
-  #cashflow-table td::before {
-      content: attr(data-label);
-      position: absolute;
-      left: 10px;
-      /* top: 10px;  Ya no es necesario con flex */
-      width: calc(45% - 20px); /* Ancho del label, restando los paddings */
-      font-weight: 600;
-      white-space: normal; 
-      text-align: left !important; 
-      color: #555;
-      display: flex; /* Para alinear con el valor si es necesario */
-      align-items: center;
+  button {
+    width: 100%;
+    margin-bottom: 10px;
+    margin-right: 0;
   }
 
-  #cashflow-table td:first-child {
-      background: #ecf0f1;
-      font-weight: 700;
-      padding-left: 10px !important;     
-      text-align: left !important; 
-      justify-content: flex-start; /* Alinear el texto de categoría a la izquierda */
+  .tabs-container {
+    overflow-x: auto; /* Allow scrolling for many tabs */
+    justify-content: flex-start;
   }
-
-  #cashflow-table td:first-child::before {
-    content: ""; /* No mostrar pseudo-label para la celda de categoría */
-    display: none;
+  .tab-button {
+    white-space: nowrap;
   }
+}
 
-  #cashflow-table td,
-  #cashflow-table td::before { 
-      font-size: 0.9rem; 
-  }
+/* Animaciones sutiles */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
-  /* Aplicar colores de texto también al pseudo-label si es necesario */
-  #cashflow-table td.text-red::before { color: #c0392b; }
-  #cashflow-table td.text-blue::before { color: #2980b9; }
+.container {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Ensure login elements are shown/hidden correctly by JS */
+#login-form, #logout-area {
+  width: 100%; /* Ensure they take full width within their container */
 }
