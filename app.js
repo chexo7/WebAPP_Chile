@@ -401,9 +401,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     changeLogEntries.forEach(entry => {
                         if (!entry.user) {
-                            // Intentar obtener el usuario si es una versión muy antigua sin él
-                            // Esto es una heurística, podría no ser preciso para logs muy viejos
-                            // donde el usuario no se guardaba.
                             entry.user = "Desconocido (Versión Antigua)";
                         }
                     });
@@ -620,7 +617,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!email) return 'Desconocido';
         if (email.toLowerCase() === "sergio.acevedo.santic@gmail.com") return "Sergio";
         if (email.toLowerCase() === "scarlett.real.e@gmail.com") return "Scarlett";
-        // Lógica genérica si no es uno de los correos específicos
         const namePart = email.split('@')[0];
         const names = namePart.split('.');
         return names.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
@@ -755,7 +751,7 @@ document.addEventListener('DOMContentLoaded', () => {
             logMessage += ` Creada desde un estado inicial o datos por defecto.`;
         }
 
-        const user = firebase.auth().currentUser; // Paso 2: Asegura el campo user
+        const user = firebase.auth().currentUser;
         const userName = user && user.email ? mapEmailToName(user.email) : 'Desconocido';
 
 
@@ -765,10 +761,10 @@ document.addEventListener('DOMContentLoaded', () => {
             details: detailedChanges,
             newVersionKey: newBackupKey,
             previousVersionKey: currentBackupKey || null,
-            user: userName // Paso 2: Asegura el campo user
+            user: userName
         };
 
-        if (!Array.isArray(changeLogEntries)) { // Paso 3: Ajusta el esquema existente
+        if (!Array.isArray(changeLogEntries)) {
             changeLogEntries = [];
         }
         changeLogEntries.unshift(logEntry);
@@ -805,7 +801,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadingMessage.style.display = 'none';
                 console.error("Error saving new version:", error);
                 alert(`Error al guardar la nueva versión: ${error.message}`);
-                changeLogEntries.shift(); // Revertir el log si falla el guardado
+                changeLogEntries.shift();
             });
     });
 
@@ -958,8 +954,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (editingIncomeIndex !== null) {
             currentBackupData.incomes[editingIncomeIndex] = incomeEntry;
         } else {
-            const existingIncome = (currentBackupData.incomes || []).find(inc => inc.name.toLowerCase() === name.toLowerCase());
-            if (existingIncome) { alert(`Ya existe un ingreso con el nombre "${name}".`); return; }
+            // const existingIncome = (currentBackupData.incomes || []).find(inc => inc.name.toLowerCase() === name.toLowerCase());
+            // if (existingIncome) { alert(`Ya existe un ingreso con el nombre "${name}".`); return; } // Permite nombres duplicados
             if (!currentBackupData.incomes) currentBackupData.incomes = [];
             currentBackupData.incomes.push(incomeEntry);
         }
@@ -1162,8 +1158,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (editingExpenseIndex !== null) {
             currentBackupData.expenses[editingExpenseIndex] = expenseEntry;
         } else {
-            const existingExpense = (currentBackupData.expenses || []).find(exp => exp.name.toLowerCase() === name.toLowerCase());
-            if (existingExpense) { alert(`Ya existe un gasto con el nombre "${name}".`); return; }
+            // const existingExpense = (currentBackupData.expenses || []).find(exp => exp.name.toLowerCase() === name.toLowerCase());
+            // if (existingExpense) { alert(`Ya existe un gasto con el nombre "${name}".`); return; } // Permite nombres duplicados
             if (!currentBackupData.expenses) currentBackupData.expenses = [];
             currentBackupData.expenses.push(expenseEntry);
         }
@@ -1551,7 +1547,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (reimb_freq === "Semanal") {
                     if (periodicity === "Semanal") { amount_of_reimbursement_in_this_period = reimb_amount_raw; }
                     else if (periodicity === "Mensual") {
-                        amount_of_reimbursement_in_this_period = reimb_amount_raw * (52 / 12); 
+                        amount_of_reimbursement_in_this_period = reimb_amount_raw * (52 / 12);
                     }
                 } else if (reimb_freq === "Bi-semanal") {
                     if (periodicity === "Semanal") {
@@ -1682,19 +1678,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const timestampSpan = document.createElement('span');
             timestampSpan.classList.add('log-timestamp');
             const date = new Date(entry.timestamp);
-            timestampSpan.textContent = `[${date.toLocaleDateString('es-CL')} ${date.toLocaleTimeString('es-CL')}]`; // Formato con corchetes
+            timestampSpan.textContent = `[${date.toLocaleDateString('es-CL')} ${date.toLocaleTimeString('es-CL')}]`;
 
-            // Paso 4: Muestra el usuario en la UI
             const userSpan = document.createElement('span');
             userSpan.classList.add('log-user');
-            userSpan.textContent = entry.user || "Desconocido"; // Mostrar "Desconocido" si no hay usuario
+            userSpan.textContent = entry.user || "Desconocido";
 
             const messageSpan = document.createElement('span');
             messageSpan.classList.add('log-message');
             messageSpan.textContent = entry.message;
 
             headerDiv.appendChild(timestampSpan);
-            headerDiv.appendChild(userSpan); // Añadir userSpan después del timestamp
+            headerDiv.appendChild(userSpan);
             headerDiv.appendChild(messageSpan);
             li.appendChild(headerDiv);
 
