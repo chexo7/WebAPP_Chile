@@ -27,8 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const analysisStartDateInput = document.getElementById('analysis-start-date-input');
     const analysisInitialBalanceInput = document.getElementById('analysis-initial-balance-input');
     const displayCurrencySymbolInput = document.getElementById('display-currency-symbol-input');
-    const usdClpRateInput = document.getElementById('usd-clp-rate-input');
-    const usdClpInfoLabel = document.getElementById('usd-clp-info-label');
+    const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
 
     // --- ELEMENTOS PESTAÑA INGRESOS ---
@@ -252,7 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
         authContainer.style.display = 'block';
         loginForm.style.display = 'none';
         logoutArea.style.display = 'block';
-        authStatus.textContent = `Conectado como: ${user.email}`; // Usar user.email directamente
+        authStatus.textContent = `Conectado como: ${user.email}`; 
         dataSelectionContainer.style.display = 'block';
         mainContentContainer.style.display = 'none';
         fetchBackups();
@@ -260,7 +259,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showMainContentScreen() {
         mainContentContainer.style.display = 'block';
-        activateTab('gastos');
+        activateTab('gastos'); // Activate a default tab
+        fetchAndUpdateUSDCLPRate(); // Fetch USD/CLP rate when main content is shown
     }
 
     function clearAllDataViews() {
@@ -291,6 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cashflowChartInstance = null;
         }
         if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja.";
+        if (usdClpInfoLabel) usdClpInfoLabel.textContent = "1 USD = $CLP (Obteniendo...)";
     }
 
     // --- AUTENTICACIÓN ---
@@ -394,9 +395,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     if (!currentBackupData.reminders_todos) currentBackupData.reminders_todos = [];
 
-                    // Normalizar changeLogEntries antiguas
                     changeLogEntries = currentBackupData.change_log || [];
-                    if (!Array.isArray(changeLogEntries)) { // Asegurar que es un array
+                    if (!Array.isArray(changeLogEntries)) { 
                         changeLogEntries = [];
                     }
                     changeLogEntries.forEach(entry => {
@@ -412,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentBackupData.analysis_periodicity = currentBackupData.analysis_periodicity || "Mensual";
                     currentBackupData.analysis_initial_balance = parseFloat(currentBackupData.analysis_initial_balance) || 0;
                     currentBackupData.display_currency_symbol = currentBackupData.display_currency_symbol || "$";
-                    currentBackupData.usd_clp_rate = parseFloat(currentBackupData.usd_clp_rate) || null;
+                    // currentBackupData.usd_clp_rate = parseFloat(currentBackupData.usd_clp_rate) || null; // No longer stored
 
                     (currentBackupData.incomes || []).forEach(inc => {
                         if (inc.start_date) inc.start_date = new Date(inc.start_date + 'T00:00:00Z');
@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderPaymentsTableForCurrentPeriod();
                     renderCashflowTable();
 
-                    showMainContentScreen();
+                    showMainContentScreen(); // This will also call fetchAndUpdateUSDCLPRate
                 } else {
                     alert("La versión seleccionada no contiene datos válidos o está vacía.");
                     currentBackupData = null;
@@ -490,12 +490,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (getISODateString(new Date(prevData.analysis_start_date)) !== getISODateString(new Date(currentData.analysis_start_date))) details.push(`Ajuste: Fecha de inicio cambiada de ${getISODateString(new Date(prevData.analysis_start_date))} a ${getISODateString(new Date(currentData.analysis_start_date))}.`);
         if (prevData.analysis_initial_balance !== currentData.analysis_initial_balance) details.push(`Ajuste: Saldo inicial cambiado de ${formatCurrencyJS(prevData.analysis_initial_balance, symbol)} a ${formatCurrencyJS(currentData.analysis_initial_balance, symbol)}.`);
         if (prevData.display_currency_symbol !== currentData.display_currency_symbol) details.push(`Ajuste: Símbolo de moneda cambiado de '${prevData.display_currency_symbol}' a '${currentData.display_currency_symbol}'.`);
-        if (prevData.usd_clp_rate !== currentData.usd_clp_rate) details.push(`Ajuste: Tasa USD/CLP cambiada de ${prevData.usd_clp_rate || 'N/A'} a ${currentData.usd_clp_rate || 'N/A'}.`);
+        // No longer tracking usd_clp_rate in data model
+        // if (prevData.usd_clp_rate !== currentData.usd_clp_rate) details.push(`Ajuste: Tasa USD/CLP cambiada de ${prevData.usd_clp_rate || 'N/A'} a ${currentData.usd_clp_rate || 'N/A'}.`);
+
 
         const prevIncomes = prevData.incomes || [];
         const currentIncomes = currentData.incomes || [];
         currentIncomes.forEach(currentInc => {
-            const prevInc = prevIncomes.find(pInc => pInc.name === currentInc.name);
+            const prevInc = prevIncomes.find(pInc => pInc.name === currentInc.name); // Simple find by name for now
             if (!prevInc) {
                 details.push(`Ingreso agregado: ${currentInc.name} (${formatCurrencyJS(currentInc.net_monthly, symbol)}, ${currentInc.frequency}, Inicio: ${getISODateString(new Date(currentInc.start_date))}${currentInc.end_date ? ', Fin: ' + getISODateString(new Date(currentInc.end_date)) : ''})${currentInc.is_reimbursement ? ` (Reembolso de ${currentInc.reimbursement_category || 'N/A'})` : ''}.`);
             } else {
@@ -524,7 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const prevExpenses = prevData.expenses || [];
         const currentExpenses = currentData.expenses || [];
         currentExpenses.forEach(currentExp => {
-            const prevExp = prevExpenses.find(pExp => pExp.name === currentExp.name);
+            const prevExp = prevExpenses.find(pExp => pExp.name === currentExp.name); // Simple find by name
             if (!prevExp) {
                 details.push(`Gasto agregado: ${currentExp.name} (${formatCurrencyJS(currentExp.amount, symbol)}, Cat: ${currentExp.category}, ${currentExp.frequency}, Inicio: ${getISODateString(new Date(currentExp.start_date))}).`);
             } else {
@@ -676,15 +678,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const dataToSave = JSON.parse(JSON.stringify(currentBackupData));
+        delete dataToSave.usd_clp_rate; // No guardar la tasa USD/CLP en Firebase
 
         const defaultsFromPython = {
-            version: "1.0_web_v2_detailed_log_reimbursement_polished",
+            version: "1.0_web_v3_usd_clp_auto", // Updated version
             analysis_start_date: getISODateString(new Date()),
             analysis_duration: 12,
             analysis_periodicity: "Mensual",
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
-            usd_clp_rate: null,
+            // usd_clp_rate: null, // No longer stored
             incomes: [],
             expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
             expenses: [],
@@ -820,7 +823,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabId === 'flujo-caja' || tabId === 'grafico') renderCashflowTable();
         if (tabId === 'presupuestos') { renderBudgetsTable(); renderBudgetSummaryTable(); }
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); renderPaymentsTableForCurrentPeriod(); }
-        if (tabId === 'ajustes') populateSettingsForm();
+        if (tabId === 'ajustes') {
+            populateSettingsForm();
+            fetchAndUpdateUSDCLPRate(); // Fetch rate when adjustments tab is activated
+        }
         if (tabId === 'log') renderLogTab();
     }
     tabsContainer.addEventListener('click', (event) => {
@@ -828,6 +834,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- LÓGICA PESTAÑA AJUSTES ---
+    async function fetchAndUpdateUSDCLPRate() {
+        if (!usdClpInfoLabel) return;
+        usdClpInfoLabel.innerHTML = `1 USD = $CLP (Obteniendo...) <span class="loading-dots"></span>`;
+        const API_URL = "https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=clp";
+        try {
+            const response = await fetch(API_URL);
+            if (!response.ok) {
+                throw new Error(`Error de red: ${response.status}`);
+            }
+            const data = await response.json();
+            const clpRate = data.usd && data.usd.clp;
+            if (clpRate === undefined || clpRate === null) {
+                throw new Error("Tasa CLP no encontrada en la respuesta de la API.");
+            }
+            usdClpInfoLabel.textContent = `1 USD = ${clpRate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Fuente: CoinGecko)`;
+        } catch (error) {
+            console.warn("No se pudo actualizar el USD/CLP:", error);
+            usdClpInfoLabel.innerHTML = `<b>1 USD = N/D</b> <small>(Error al obtener tasa)</small>`;
+        }
+    }
+
+
     function populateSettingsForm() {
         if (!currentBackupData) return;
         analysisPeriodicitySelect.value = currentBackupData.analysis_periodicity || "Mensual";
@@ -835,19 +863,19 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisStartDateInput.value = getISODateString(currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
         analysisInitialBalanceInput.value = currentBackupData.analysis_initial_balance || 0;
         displayCurrencySymbolInput.value = currentBackupData.display_currency_symbol || "$";
-        usdClpRateInput.value = currentBackupData.usd_clp_rate || '';
-        updateUsdClpInfoLabel();
+        // usdClpRateInput.value = currentBackupData.usd_clp_rate || ''; // No longer used
+        // updateUsdClpInfoLabel(); // This will be handled by fetchAndUpdateUSDCLPRate
         updateAnalysisDurationLabel();
     }
     analysisPeriodicitySelect.addEventListener('change', updateAnalysisDurationLabel);
     function updateAnalysisDurationLabel() {
         analysisDurationLabel.textContent = analysisPeriodicitySelect.value === "Semanal" ? "Duración (Semanas):" : "Duración (Meses):";
     }
-    usdClpRateInput.addEventListener('input', updateUsdClpInfoLabel);
-    function updateUsdClpInfoLabel() {
-        const rate = parseFloat(usdClpRateInput.value);
-        usdClpInfoLabel.textContent = (rate && rate > 0) ? `1 USD = ${rate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "1 USD = $CLP (No se usa en cálculos aún)";
-    }
+    // usdClpRateInput.addEventListener('input', updateUsdClpInfoLabel); // No longer used
+    // function updateUsdClpInfoLabel() { // No longer used, handled by fetchAndUpdateUSDCLPRate
+    //     const rate = parseFloat(usdClpRateInput.value);
+    //     usdClpInfoLabel.textContent = (rate && rate > 0) ? `1 USD = ${rate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "1 USD = $CLP (No se usa en cálculos aún)";
+    // }
     applySettingsButton.addEventListener('click', () => {
         if (!currentBackupData) { alert("No hay datos cargados para aplicar ajustes."); return; }
         const prevPeriodicity = currentBackupData.analysis_periodicity;
@@ -858,7 +886,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentBackupData.analysis_start_date = new Date(analysisStartDateInput.value + 'T00:00:00Z');
         currentBackupData.analysis_initial_balance = parseFloat(analysisInitialBalanceInput.value);
         currentBackupData.display_currency_symbol = displayCurrencySymbolInput.value.trim() || "$";
-        currentBackupData.usd_clp_rate = parseFloat(usdClpRateInput.value) || null;
+        // currentBackupData.usd_clp_rate = parseFloat(usdClpRateInput.value) || null; // No longer stored
 
         if (prevPeriodicity !== newPeriodicity) {
             const prevDefaultDuration = (prevPeriodicity === "Mensual") ? 12 : 52;
@@ -954,8 +982,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (editingIncomeIndex !== null) {
             currentBackupData.incomes[editingIncomeIndex] = incomeEntry;
         } else {
-            // const existingIncome = (currentBackupData.incomes || []).find(inc => inc.name.toLowerCase() === name.toLowerCase());
-            // if (existingIncome) { alert(`Ya existe un ingreso con el nombre "${name}".`); return; } // Permite nombres duplicados
             if (!currentBackupData.incomes) currentBackupData.incomes = [];
             currentBackupData.incomes.push(incomeEntry);
         }
@@ -1158,8 +1184,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (editingExpenseIndex !== null) {
             currentBackupData.expenses[editingExpenseIndex] = expenseEntry;
         } else {
-            // const existingExpense = (currentBackupData.expenses || []).find(exp => exp.name.toLowerCase() === name.toLowerCase());
-            // if (existingExpense) { alert(`Ya existe un gasto con el nombre "${name}".`); return; } // Permite nombres duplicados
             if (!currentBackupData.expenses) currentBackupData.expenses = [];
             currentBackupData.expenses.push(expenseEntry);
         }
@@ -1289,8 +1313,8 @@ document.addEventListener('DOMContentLoaded', () => {
             let amountForSummary = 0;
             if (exp.frequency === "Único") { if (expStartDate.getUTCFullYear() === currentYear && expStartDate.getUTCMonth() === currentMonth) amountForSummary = exp.amount; }
             else if (exp.frequency === "Mensual") { if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) amountForSummary = exp.amount; }
-            else if (exp.frequency === "Semanal") { if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) amountForSummary = exp.amount * (52 / 12); } // Using average for weekly
-            else if (exp.frequency === "Bi-semanal") { // Using occurrence count for bi-weekly
+            else if (exp.frequency === "Semanal") { if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) amountForSummary = exp.amount * (52 / 12); } 
+            else if (exp.frequency === "Bi-semanal") { 
                 let paydays_in_month = 0;
                 let current_pay_date = new Date(expStartDate.getTime());
                 const month_start_date = new Date(Date.UTC(currentYear, currentMonth, 1));
@@ -1416,7 +1440,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let occursInPeriod = false;
             if (expense.frequency === "Único") { if (expStartDate >= periodStart && expStartDate <= periodEnd) occursInPeriod = true; }
             else if (expense.frequency === "Mensual") { if (isWeeklyView) { const payDay = expStartDate.getUTCDate(); const payDateThisMonth = new Date(Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth(), payDay)); if (payDateThisMonth >= periodStart && payDateThisMonth <= periodEnd) occursInPeriod = true; } else { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true; } }
-            else if (expense.frequency === "Semanal") { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true; } // Simplified check for weekly in period
+            else if (expense.frequency === "Semanal") { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true; } 
             else if (expense.frequency === "Bi-semanal") { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) { let paymentDate = new Date(expStartDate.getTime()); while (paymentDate <= periodEnd) { if (paymentDate >= periodStart) { occursInPeriod = true; break; } paymentDate = addWeeks(paymentDate, 2); } } }
             if (occursInPeriod) {
                 expensesInPeriodFound = true; const row = paymentsTableView.insertRow();
@@ -1488,7 +1512,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             (data.incomes || []).forEach(inc => {
                 if (!inc.start_date) return;
-                if (inc.is_reimbursement) return;
+                if (inc.is_reimbursement) return; // Exclude reimbursements from direct income calculation here
 
                 const inc_start = inc.start_date; const inc_end = inc.end_date; const net_amount = parseFloat(inc.net_monthly || 0); const inc_freq = inc.frequency || "Mensual";
                 const isActiveRange = (inc_start <= p_end && (inc_end === null || inc_end >= p_start)); if (!isActiveRange) return;
@@ -1515,11 +1539,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 else if (freq === "Bi-semanal") { if (periodicity === "Semanal") { let paymentDate = new Date(e_start.getTime()); while (paymentDate <= p_end && (!e_end || paymentDate <= e_end)) { if (paymentDate >= p_start) { exp_add_this_period = amt_raw; break; } paymentDate = addWeeks(paymentDate, 2); } } else if (periodicity === "Mensual") { let paydays_in_month = 0; let current_pay_date = new Date(e_start.getTime()); while (current_pay_date <= p_end && (!e_end || current_pay_date <= e_end)) { if (current_pay_date >= p_start) paydays_in_month++; current_pay_date = addWeeks(current_pay_date, 2); } exp_add_this_period = amt_raw * paydays_in_month; } }
                 if (exp_add_this_period > 0) {
                     expenses_by_cat_p[i][cat] = (expenses_by_cat_p[i][cat] || 0) + exp_add_this_period;
-                    if (typ === "Fijo") p_fix_exp_total_for_period += exp_add_this_period;
-                    else p_var_exp_total_for_period += exp_add_this_period;
+                    // Totals will be recalculated after reimbursements
                 }
             });
 
+            // Apply reimbursements to expenses of this period
             (data.incomes || []).forEach(reimbInc => {
                 if (!reimbInc.is_reimbursement || !reimbInc.reimbursement_category || !reimbInc.start_date) return;
 
@@ -1567,21 +1591,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (amount_of_reimbursement_in_this_period > 0 && expenses_by_cat_p[i][reimb_cat] !== undefined) {
-                    const expense_in_category_before_this_reimb = expenses_by_cat_p[i][reimb_cat];
-                    expenses_by_cat_p[i][reimb_cat] = Math.max(0, expense_in_category_before_this_reimb - amount_of_reimbursement_in_this_period);
-                    const actual_reduction_in_category = expense_in_category_before_this_reimb - expenses_by_cat_p[i][reimb_cat];
-
-                    const expenseType = data.expense_categories[reimb_cat] || "Variable";
-                    if (expenseType === "Fijo") {
-                        p_fix_exp_total_for_period -= actual_reduction_in_category;
-                    } else {
-                        p_var_exp_total_for_period -= actual_reduction_in_category;
-                    }
+                    expenses_by_cat_p[i][reimb_cat] = Math.max(0, expenses_by_cat_p[i][reimb_cat] - amount_of_reimbursement_in_this_period);
                 }
             });
-
-            p_fix_exp_total_for_period = Math.max(0, p_fix_exp_total_for_period);
-            p_var_exp_total_for_period = Math.max(0, p_var_exp_total_for_period);
+            
+            // Recalculate total fixed/variable expenses after reimbursements
+            p_fix_exp_total_for_period = 0;
+            p_var_exp_total_for_period = 0;
+            for (const cat_name_final in expenses_by_cat_p[i]) {
+                const cat_expense_final = expenses_by_cat_p[i][cat_name_final];
+                const expenseTypeFinal = data.expense_categories[cat_name_final] || "Variable";
+                if (expenseTypeFinal === "Fijo") {
+                    p_fix_exp_total_for_period += cat_expense_final;
+                } else {
+                    p_var_exp_total_for_period += cat_expense_final;
+                }
+            }
 
             fixed_exp_p[i] = p_fix_exp_total_for_period;
             var_exp_p[i] = p_var_exp_total_for_period;
@@ -1728,6 +1753,6 @@ document.addEventListener('DOMContentLoaded', () => {
     incomeEndDateInput.disabled = true;
     expenseEndDateInput.disabled = true;
     updateAnalysisDurationLabel();
-    updateUsdClpInfoLabel();
+    // updateUsdClpInfoLabel(); // No longer needed here, called by activateTab or showMainContentScreen
     incomeReimbursementCategoryContainer.style.display = 'none';
 });
