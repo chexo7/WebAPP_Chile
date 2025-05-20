@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dataSelectionContainer = document.getElementById('data-selection-container');
     const backupSelector = document.getElementById('backup-selector');
     const loadBackupButton = document.getElementById('load-backup-button');
-    const loadLatestVersionButton = document.getElementById('load-latest-version-button'); 
+    const loadLatestVersionButton = document.getElementById('load-latest-version-button');
     const loadingMessage = document.getElementById('loading-message');
 
     const mainContentContainer = document.getElementById('main-content-container');
@@ -39,6 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const incomeStartDateInput = document.getElementById('income-start-date');
     const incomeEndDateInput = document.getElementById('income-end-date');
     const incomeOngoingCheckbox = document.getElementById('income-ongoing');
+    const incomeIsReimbursementCheckbox = document.getElementById('income-is-reimbursement');
+    const incomeReimbursementCategoryContainer = document.getElementById('income-reimbursement-category-container');
+    const incomeReimbursementCategorySelect = document.getElementById('income-reimbursement-category');
     const addIncomeButton = document.getElementById('add-income-button');
     const cancelEditIncomeButton = document.getElementById('cancel-edit-income-button');
     const incomesTableView = document.querySelector('#incomes-table-view tbody');
@@ -109,14 +112,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     const MONTH_NAMES_FULL_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const DATE_WEEK_START_FORMAT = (date) => `${date.getUTCDate()}-${MONTH_NAMES_ES[date.getUTCMonth()]}`;
-    let currentBackupData = null; 
-    let originalLoadedData = null; 
-    let currentBackupKey = null; 
-    let changeLogEntries = []; 
+    let currentBackupData = null;
+    let originalLoadedData = null;
+    let currentBackupKey = null;
+    let changeLogEntries = [];
     const FIREBASE_FORBIDDEN_KEY_CHARS = ['.', '$', '#', '[', ']', '/'];
     const FIREBASE_FORBIDDEN_CHARS_DISPLAY = FIREBASE_FORBIDDEN_KEY_CHARS.join(" ");
 
-    const BABY_STEPS_DATA_JS = [ 
+    const BABY_STEPS_DATA_JS = [
         {
             "title": "Paso 1: Ahorrar $1.000 (o equivalente) para tu fondo de emergencia inicial",
             "description": "El objetivo inmediato es crear un pequeño colchón financiero para imprevistos menores sin descarrilar tu plan. El monto exacto (ej: $1.000) puede variar según tu país y situación, adáptalo a un monto significativo pero alcanzable rápidamente.",
@@ -216,8 +219,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ]
         }
     ];
-    
-    const DEFAULT_EXPENSE_CATEGORIES_JS = { 
+
+    const DEFAULT_EXPENSE_CATEGORIES_JS = {
         "Arriendo": "Fijo", "Gastos Comunes": "Fijo", "Cuentas": "Fijo", "Suscripciones": "Fijo", "Ahorros": "Fijo", "Créditos": "Fijo", "Inversiones": "Fijo",
         "Supermercado": "Variable", "Auto": "Variable", "Delivery": "Variable", "Salidas a comer": "Variable", "Minimarket": "Variable", "Uber": "Variable", "Regalos para alguien": "Variable", "Otros": "Variable", "Cosas de Casa": "Variable", "Salud": "Variable", "Panoramas": "Variable", "Ropa": "Variable", "Deporte": "Variable", "Vega": "Variable", "Transporte Publico": "Variable"
     };
@@ -239,17 +242,17 @@ document.addEventListener('DOMContentLoaded', () => {
         mainContentContainer.style.display = 'none';
         clearAllDataViews();
         currentBackupData = null;
-        originalLoadedData = null; 
+        originalLoadedData = null;
         currentBackupKey = null;
         backupSelector.innerHTML = '<option value="">-- Selecciona una versión --</option>';
-        loadLatestVersionButton.disabled = true; 
+        loadLatestVersionButton.disabled = true;
     }
 
     function showDataSelectionScreen(user) {
         authContainer.style.display = 'block';
         loginForm.style.display = 'none';
         logoutArea.style.display = 'block';
-        authStatus.textContent = `Conectado como: ${user.email}`;
+        authStatus.textContent = `Conectado como: ${user.email}`; // Usar user.email directamente
         dataSelectionContainer.style.display = 'block';
         mainContentContainer.style.display = 'none';
         fetchBackups();
@@ -257,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showMainContentScreen() {
         mainContentContainer.style.display = 'block';
-        activateTab('gastos'); 
+        activateTab('gastos');
     }
 
     function clearAllDataViews() {
@@ -272,10 +275,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (babyStepsContainer) babyStepsContainer.innerHTML = '';
         if (pendingRemindersList) pendingRemindersList.innerHTML = '';
         if (completedRemindersList) completedRemindersList.innerHTML = '';
-        if (changeLogList) changeLogList.innerHTML = ''; 
-        
+        if (changeLogList) changeLogList.innerHTML = '';
+
         if (expenseCategorySelect) expenseCategorySelect.innerHTML = '<option value="">Cargando...</option>';
         if (budgetCategorySelect) budgetCategorySelect.innerHTML = '<option value="">Cargando...</option>';
+        if (incomeReimbursementCategorySelect) incomeReimbursementCategorySelect.innerHTML = '<option value="">Cargando...</option>';
+
 
         resetIncomeForm();
         resetExpenseForm();
@@ -285,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cashflowChartInstance.destroy();
             cashflowChartInstance = null;
         }
-        if(chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja.";
+        if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja.";
     }
 
     // --- AUTENTICACIÓN ---
@@ -311,14 +316,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 backupSelector.innerHTML = '<option value="">-- Selecciona una versión --</option>';
                 if (snapshot.exists()) {
                     const backups = snapshot.val();
-                    const sortedKeys = Object.keys(backups).sort().reverse(); 
+                    const sortedKeys = Object.keys(backups).sort().reverse();
                     sortedKeys.forEach(key => {
                         const option = document.createElement('option');
                         option.value = key;
                         option.textContent = formatBackupKey(key);
                         backupSelector.appendChild(option);
                     });
-                    loadLatestVersionButton.disabled = sortedKeys.length === 0; 
+                    loadLatestVersionButton.disabled = sortedKeys.length === 0;
                 } else {
                     backupSelector.innerHTML = '<option value="">No hay versiones disponibles</option>';
                     loadLatestVersionButton.disabled = true;
@@ -332,12 +337,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadLatestVersionButton.disabled = true;
             });
     }
-    
+
     loadLatestVersionButton.addEventListener('click', () => {
-        if (backupSelector.options.length > 1) { 
-            const latestKey = backupSelector.options[1].value; 
+        if (backupSelector.options.length > 1) {
+            const latestKey = backupSelector.options[1].value;
             if (latestKey) {
-                backupSelector.value = latestKey; 
+                backupSelector.value = latestKey;
                 loadSpecificBackup(latestKey);
             } else {
                 alert("No se encontró la última versión.");
@@ -361,15 +366,20 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingMessage.style.display = 'block';
         mainContentContainer.style.display = 'none';
         clearAllDataViews();
-        originalLoadedData = null; 
+        originalLoadedData = null;
 
         database.ref(`backups/${key}`).once('value')
             .then(snapshot => {
                 if (snapshot.exists()) {
                     currentBackupData = snapshot.val();
-                    currentBackupKey = key; 
-                    
+                    currentBackupKey = key;
+
                     if (!currentBackupData.incomes) currentBackupData.incomes = [];
+                    currentBackupData.incomes.forEach(inc => {
+                        if (typeof inc.is_reimbursement === 'undefined') inc.is_reimbursement = false;
+                        if (typeof inc.reimbursement_category === 'undefined') inc.reimbursement_category = null;
+                    });
+
                     if (!currentBackupData.expenses) currentBackupData.expenses = [];
                     if (!currentBackupData.expense_categories || Object.keys(currentBackupData.expense_categories).length === 0) {
                         currentBackupData.expense_categories = JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS));
@@ -377,14 +387,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!currentBackupData.budgets) currentBackupData.budgets = {};
                     if (!currentBackupData.payments) currentBackupData.payments = {};
                     if (!currentBackupData.baby_steps_status || currentBackupData.baby_steps_status.length === 0) {
-                         currentBackupData.baby_steps_status = BABY_STEPS_DATA_JS.map(step => ({
+                        currentBackupData.baby_steps_status = BABY_STEPS_DATA_JS.map(step => ({
                             dos: new Array(step.dos.length).fill(false),
                             donts: new Array(step.donts.length).fill(false)
                         }));
                     }
                     if (!currentBackupData.reminders_todos) currentBackupData.reminders_todos = [];
-                    
-                    changeLogEntries = currentBackupData.change_log || changeLogEntries || [];
+
+                    // Normalizar changeLogEntries antiguas
+                    changeLogEntries = currentBackupData.change_log || [];
+                    if (!Array.isArray(changeLogEntries)) { // Asegurar que es un array
+                        changeLogEntries = [];
+                    }
+                    changeLogEntries.forEach(entry => {
+                        if (!entry.user) {
+                            // Intentar obtener el usuario si es una versión muy antigua sin él
+                            // Esto es una heurística, podría no ser preciso para logs muy viejos
+                            // donde el usuario no se guardaba.
+                            entry.user = "Desconocido (Versión Antigua)";
+                        }
+                    });
+                    currentBackupData.change_log = changeLogEntries;
+
 
                     currentBackupData.analysis_start_date = currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date + 'T00:00:00Z') : new Date();
                     currentBackupData.analysis_duration = parseInt(currentBackupData.analysis_duration, 10) || 12;
@@ -401,28 +425,29 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (exp.start_date) exp.start_date = new Date(exp.start_date + 'T00:00:00Z');
                         if (exp.end_date) exp.end_date = new Date(exp.end_date + 'T00:00:00Z');
                     });
-                    
+
                     originalLoadedData = JSON.parse(JSON.stringify(currentBackupData));
 
                     populateSettingsForm();
+                    populateExpenseCategoriesDropdowns();
+                    populateIncomeReimbursementCategoriesDropdown();
                     renderIncomesTable();
                     renderExpensesTable();
-                    populateExpenseCategoriesDropdowns(); 
                     renderBudgetsTable();
                     renderBabySteps();
                     renderReminders();
-                    renderLogTab(); 
-                    setupPaymentPeriodSelectors(); 
-                    renderPaymentsTableForCurrentPeriod(); 
-                    renderCashflowTable(); 
-                    
+                    renderLogTab();
+                    setupPaymentPeriodSelectors();
+                    renderPaymentsTableForCurrentPeriod();
+                    renderCashflowTable();
+
                     showMainContentScreen();
                 } else {
                     alert("La versión seleccionada no contiene datos válidos o está vacía.");
                     currentBackupData = null;
                     originalLoadedData = null;
                     currentBackupKey = null;
-                    changeLogEntries = []; 
+                    changeLogEntries = [];
                 }
                 loadingMessage.style.display = 'none';
             })
@@ -433,14 +458,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentBackupData = null;
                 originalLoadedData = null;
                 currentBackupKey = null;
-                changeLogEntries = []; 
+                changeLogEntries = [];
             });
     }
 
     function formatBackupKey(key) {
         if (!key) return "N/A";
         const ts = key.replace("backup_", "");
-        if (ts.length === 15 && ts.includes('T')) { 
+        if (ts.length === 15 && ts.includes('T')) {
             const year = ts.substring(0, 4);
             const month = ts.substring(4, 6);
             const day = ts.substring(6, 8);
@@ -449,16 +474,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const second = ts.substring(13, 15);
             return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
         }
-        return key; 
+        return key;
     }
-    
+
     function generateDetailedChangeLog(prevData, currentData) {
         const details = [];
         const symbol = currentData.display_currency_symbol || '$';
 
-        if (!prevData) { 
+        if (!prevData) {
             details.push("Versión inicial de datos creada.");
-            (currentData.incomes || []).forEach(inc => details.push(`Ingreso agregado: ${inc.name} (${formatCurrencyJS(inc.net_monthly, symbol)})`));
+            (currentData.incomes || []).forEach(inc => details.push(`Ingreso agregado: ${inc.name} (${formatCurrencyJS(inc.net_monthly, symbol)})${inc.is_reimbursement ? ' (Reembolso)' : ''}`));
             (currentData.expenses || []).forEach(exp => details.push(`Gasto agregado: ${exp.name} (${formatCurrencyJS(exp.amount, symbol)}, Cat: ${exp.category})`));
             return details;
         }
@@ -475,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentIncomes.forEach(currentInc => {
             const prevInc = prevIncomes.find(pInc => pInc.name === currentInc.name);
             if (!prevInc) {
-                details.push(`Ingreso agregado: ${currentInc.name} (${formatCurrencyJS(currentInc.net_monthly, symbol)}, ${currentInc.frequency}, Inicio: ${getISODateString(new Date(currentInc.start_date))}${currentInc.end_date ? ', Fin: '+getISODateString(new Date(currentInc.end_date)) : ''}).`);
+                details.push(`Ingreso agregado: ${currentInc.name} (${formatCurrencyJS(currentInc.net_monthly, symbol)}, ${currentInc.frequency}, Inicio: ${getISODateString(new Date(currentInc.start_date))}${currentInc.end_date ? ', Fin: ' + getISODateString(new Date(currentInc.end_date)) : ''})${currentInc.is_reimbursement ? ` (Reembolso de ${currentInc.reimbursement_category || 'N/A'})` : ''}.`);
             } else {
                 let mods = [];
                 if (prevInc.net_monthly !== currentInc.net_monthly) mods.push(`Monto: ${formatCurrencyJS(prevInc.net_monthly, symbol)} -> ${formatCurrencyJS(currentInc.net_monthly, symbol)}`);
@@ -484,6 +509,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const prevEndDateStr = prevInc.end_date ? getISODateString(new Date(prevInc.end_date)) : null;
                 const currentEndDateStr = currentInc.end_date ? getISODateString(new Date(currentInc.end_date)) : null;
                 if (prevEndDateStr !== currentEndDateStr) mods.push(`Fecha Fin: ${prevEndDateStr || 'N/A'} -> ${currentEndDateStr || 'N/A'}`);
+                if ((prevInc.is_reimbursement || false) !== (currentInc.is_reimbursement || false)) {
+                    mods.push(`Es Reembolso: ${prevInc.is_reimbursement ? 'Sí' : 'No'} -> ${currentInc.is_reimbursement ? 'Sí' : 'No'}`);
+                }
+                if (prevInc.reimbursement_category !== currentInc.reimbursement_category) {
+                    mods.push(`Categoría Reembolso: ${prevInc.reimbursement_category || 'N/A'} -> ${currentInc.reimbursement_category || 'N/A'}`);
+                }
                 if (mods.length > 0) details.push(`Ingreso modificado '${currentInc.name}': ${mods.join(', ')}.`);
             }
         });
@@ -492,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 details.push(`Ingreso eliminado: ${prevInc.name} (${formatCurrencyJS(prevInc.net_monthly, symbol)}).`);
             }
         });
-        
+
         const prevExpenses = prevData.expenses || [];
         const currentExpenses = currentData.expenses || [];
         currentExpenses.forEach(currentExp => {
@@ -508,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const prevEndDateStr = prevExp.end_date ? getISODateString(new Date(prevExp.end_date)) : null;
                 const currentEndDateStr = currentExp.end_date ? getISODateString(new Date(currentExp.end_date)) : null;
                 if (prevEndDateStr !== currentEndDateStr) mods.push(`Fecha Fin: ${prevEndDateStr || 'N/A'} -> ${currentEndDateStr || 'N/A'}`);
-                if ((prevExp.is_real || false) !== (currentExp.is_real || false)) mods.push(`Es Real: ${prevExp.is_real ? 'Sí':'No'} -> ${currentExp.is_real ? 'Sí':'No'}`);
+                if ((prevExp.is_real || false) !== (currentExp.is_real || false)) mods.push(`Es Real: ${prevExp.is_real ? 'Sí' : 'No'} -> ${currentExp.is_real ? 'Sí' : 'No'}`);
                 if (mods.length > 0) details.push(`Gasto modificado '${currentExp.name}': ${mods.join(', ')}.`);
             }
         });
@@ -535,18 +566,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const prevBudgets = prevData.budgets || {};
         const currentBudgets = currentData.budgets || {};
-        Object.keys(currentCategories).forEach(catName => { 
+        Object.keys(currentCategories).forEach(catName => {
             const prevAmount = prevBudgets[catName] !== undefined ? prevBudgets[catName] : 0;
             const currentAmount = currentBudgets[catName] !== undefined ? currentBudgets[catName] : 0;
             if (prevAmount !== currentAmount) {
-                 if (prevBudgets[catName] === undefined && currentAmount !== 0) { 
+                if (prevBudgets[catName] === undefined && currentAmount !== 0) {
                     details.push(`Presupuesto para '${catName}' establecido a: ${formatCurrencyJS(currentAmount, symbol)}.`);
-                 } else {
+                } else {
                     details.push(`Presupuesto para '${catName}' cambiado de ${formatCurrencyJS(prevAmount, symbol)} a ${formatCurrencyJS(currentAmount, symbol)}.`);
-                 }
+                }
             }
         });
-         Object.keys(prevBudgets).forEach(catName => { 
+        Object.keys(prevBudgets).forEach(catName => {
             if (!currentCategories[catName] && prevBudgets[catName] !== 0) {
                 details.push(`Presupuesto para categoría eliminada '${catName}' (era ${formatCurrencyJS(prevBudgets[catName], symbol)}) removido.`);
             }
@@ -555,12 +586,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const prevReminders = prevData.reminders_todos || [];
         const currentReminders = currentData.reminders_todos || [];
         currentReminders.forEach((currentRem, idx) => {
-            const prevRem = prevReminders.find(pRem => pRem.text === currentRem.text); 
+            const prevRem = prevReminders.find(pRem => pRem.text === currentRem.text);
             if (!prevRem) {
-                details.push(`Recordatorio agregado: "${currentRem.text}" (${currentRem.completed ? 'Completado':'Pendiente'}).`);
+                details.push(`Recordatorio agregado: "${currentRem.text}" (${currentRem.completed ? 'Completado' : 'Pendiente'}).`);
             } else {
                 if (prevRem.completed !== currentRem.completed) {
-                    details.push(`Recordatorio "${currentRem.text}" marcado como ${currentRem.completed ? 'Completado':'Pendiente'}.`);
+                    details.push(`Recordatorio "${currentRem.text}" marcado como ${currentRem.completed ? 'Completado' : 'Pendiente'}.`);
                 }
             }
         });
@@ -569,7 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 details.push(`Recordatorio eliminado: "${prevRem.text}".`);
             }
         });
-        
+
         if (JSON.stringify(prevData.baby_steps_status) !== JSON.stringify(currentData.baby_steps_status)) {
             details.push("Estado de Baby Steps modificado.");
         }
@@ -584,7 +615,19 @@ document.addEventListener('DOMContentLoaded', () => {
         return details;
     }
 
-    // --- GUARDAR CAMBIOS ---
+    // --- FUNCIÓN PARA MAPEAR EMAIL A NOMBRE ---
+    function mapEmailToName(email) {
+        if (!email) return 'Desconocido';
+        if (email.toLowerCase() === "sergio.acevedo.santic@gmail.com") return "Sergio";
+        if (email.toLowerCase() === "scarlett.real.e@gmail.com") return "Scarlett";
+        // Lógica genérica si no es uno de los correos específicos
+        const namePart = email.split('@')[0];
+        const names = namePart.split('.');
+        return names.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
+    }
+
+
+    // --- GUARDAR CAMBIOS (ÚNICO EVENT LISTENER) ---
     saveChangesButton.addEventListener('click', () => {
         if (!currentBackupData) {
             alert("No hay datos cargados para guardar.");
@@ -599,6 +642,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 validationIssues.push(`Ingreso #${index + 1} ("${inc.name || 'Sin Nombre'}") tiene un nombre con caracteres no permitidos.`);
                 dataIsValidForSaving = false;
             }
+            if (inc.is_reimbursement && (!inc.reimbursement_category || !isFirebaseKeySafe(inc.reimbursement_category))) {
+                validationIssues.push(`Ingreso de reembolso "${inc.name || 'Sin Nombre'}" no tiene una categoría de gasto válida seleccionada o la categoría tiene caracteres no permitidos.`);
+                dataIsValidForSaving = false;
+            }
         });
         (currentBackupData.expenses || []).forEach((exp, index) => {
             if (!isFirebaseKeySafe(exp.name)) {
@@ -606,8 +653,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 dataIsValidForSaving = false;
             }
             if (exp.category && !isFirebaseKeySafe(exp.category)) {
-                 validationIssues.push(`Gasto "${exp.name || 'Sin Nombre'}" usa una categoría con nombre no permitido: "${exp.category}".`);
-                 dataIsValidForSaving = false;
+                validationIssues.push(`Gasto "${exp.name || 'Sin Nombre'}" usa una categoría con nombre no permitido: "${exp.category}".`);
+                dataIsValidForSaving = false;
             }
         });
         if (currentBackupData.expense_categories) {
@@ -628,48 +675,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (!dataIsValidForSaving) {
             alert("No se pueden guardar los cambios debido a los siguientes problemas:\n- " + validationIssues.join("\n- ") +
-                  `\n\nLos caracteres no permitidos son: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}. Por favor, corrige estos elementos.`);
+                `\n\nLos caracteres no permitidos son: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}. Por favor, corrige estos elementos.`);
             return;
         }
 
-        const dataToSave = JSON.parse(JSON.stringify(currentBackupData)); 
-        
-         const defaultsFromPython = {
-            version: "1.0_web_v2_detailed_log", 
+        const dataToSave = JSON.parse(JSON.stringify(currentBackupData));
+
+        const defaultsFromPython = {
+            version: "1.0_web_v2_detailed_log_reimbursement_polished",
             analysis_start_date: getISODateString(new Date()),
             analysis_duration: 12,
             analysis_periodicity: "Mensual",
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
-            usd_clp_rate: null, 
+            usd_clp_rate: null,
             incomes: [],
-            expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)), 
+            expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
             expenses: [],
-            payments: {},       
-            budgets: {},        
-            baby_steps_status: BABY_STEPS_DATA_JS.map(step => ({ 
+            payments: {},
+            budgets: {},
+            baby_steps_status: BABY_STEPS_DATA_JS.map(step => ({
                 dos: new Array(step.dos.length).fill(false),
                 donts: new Array(step.donts.length).fill(false)
-            })), 
+            })),
             reminders_todos: [],
-            change_log: [] 
+            change_log: []
         };
         for (const key in defaultsFromPython) {
             if (dataToSave[key] === undefined || dataToSave[key] === null) {
                 if (key === 'expense_categories' && currentBackupData.expense_categories && Object.keys(currentBackupData.expense_categories).length > 0) {
+                    // No sobreescribir si ya existen
                 } else if (key === 'budgets' && currentBackupData.budgets && Object.keys(currentBackupData.budgets).length > 0) {
+                    // No sobreescribir si ya existen
                 } else if (key === 'baby_steps_status' && currentBackupData.baby_steps_status && currentBackupData.baby_steps_status.length > 0) {
+                    // No sobreescribir si ya existen
                 }
                 else {
                     dataToSave[key] = defaultsFromPython[key];
                 }
             }
         }
-        
+
         dataToSave.analysis_start_date = getISODateString(new Date(dataToSave.analysis_start_date));
         (dataToSave.incomes || []).forEach(inc => {
             if (inc.start_date) inc.start_date = getISODateString(new Date(inc.start_date));
             if (inc.end_date) inc.end_date = getISODateString(new Date(inc.end_date));
+            inc.is_reimbursement = typeof inc.is_reimbursement === 'boolean' ? inc.is_reimbursement : false;
+            inc.reimbursement_category = inc.is_reimbursement ? (inc.reimbursement_category || null) : null;
         });
         (dataToSave.expenses || []).forEach(exp => {
             if (exp.start_date) exp.start_date = getISODateString(new Date(exp.start_date));
@@ -677,44 +729,50 @@ document.addEventListener('DOMContentLoaded', () => {
             if (exp.category && dataToSave.expense_categories && dataToSave.expense_categories[exp.category]) {
                 exp.type = dataToSave.expense_categories[exp.category];
             } else {
-                exp.type = "Variable"; 
+                exp.type = "Variable";
             }
             if (typeof exp.is_real === 'undefined') {
-                exp.is_real = false; 
+                exp.is_real = false;
             }
         });
         const formattedPayments = {};
         if (dataToSave.payments) {
-            for (const keyObj in dataToSave.payments) { 
-                 formattedPayments[keyObj] = dataToSave.payments[keyObj];
+            for (const keyObj in dataToSave.payments) {
+                formattedPayments[keyObj] = dataToSave.payments[keyObj];
             }
         }
         dataToSave.payments = formattedPayments;
 
-        const detailedChanges = generateDetailedChangeLog(originalLoadedData, currentBackupData); 
+        const detailedChanges = generateDetailedChangeLog(originalLoadedData, currentBackupData);
 
         const now = new Date();
         const newBackupKey = `backup_${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}T${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
-        
+
         let logMessage = `Nueva versión ${formatBackupKey(newBackupKey)} guardada.`;
-        if (currentBackupKey) { 
+        if (currentBackupKey) {
             logMessage += ` Basada en ${formatBackupKey(currentBackupKey)}.`;
         } else {
             logMessage += ` Creada desde un estado inicial o datos por defecto.`;
         }
+
+        const user = firebase.auth().currentUser; // Paso 2: Asegura el campo user
+        const userName = user && user.email ? mapEmailToName(user.email) : 'Desconocido';
+
+
         const logEntry = {
-            timestamp: now.toISOString(), 
+            timestamp: now.toISOString(),
             message: logMessage,
-            details: detailedChanges, 
+            details: detailedChanges,
             newVersionKey: newBackupKey,
-            previousVersionKey: currentBackupKey || null
+            previousVersionKey: currentBackupKey || null,
+            user: userName // Paso 2: Asegura el campo user
         };
-        
-        if (!Array.isArray(changeLogEntries)) {
+
+        if (!Array.isArray(changeLogEntries)) { // Paso 3: Ajusta el esquema existente
             changeLogEntries = [];
         }
-        changeLogEntries.unshift(logEntry); 
-        dataToSave.change_log = changeLogEntries; 
+        changeLogEntries.unshift(logEntry);
+        dataToSave.change_log = changeLogEntries;
 
         loadingMessage.textContent = "Guardando cambios como nueva versión...";
         loadingMessage.style.display = 'block';
@@ -723,9 +781,9 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(() => {
                 loadingMessage.style.display = 'none';
                 alert(`Cambios guardados exitosamente como nueva versión: ${formatBackupKey(newBackupKey)}`);
-                
-                currentBackupKey = newBackupKey; 
-                currentBackupData = JSON.parse(JSON.stringify(dataToSave)); 
+
+                currentBackupKey = newBackupKey;
+                currentBackupData = JSON.parse(JSON.stringify(dataToSave));
 
                 currentBackupData.analysis_start_date = new Date(currentBackupData.analysis_start_date + 'T00:00:00Z');
                 (currentBackupData.incomes || []).forEach(inc => {
@@ -737,32 +795,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (exp.end_date) exp.end_date = new Date(exp.end_date + 'T00:00:00Z');
                 });
                 originalLoadedData = JSON.parse(JSON.stringify(currentBackupData));
-                
-                fetchBackups(); 
-                backupSelector.value = newBackupKey; 
-                
-                renderLogTab(); 
+
+                fetchBackups();
+                backupSelector.value = newBackupKey;
+
+                renderLogTab();
             })
             .catch(error => {
                 loadingMessage.style.display = 'none';
                 console.error("Error saving new version:", error);
                 alert(`Error al guardar la nueva versión: ${error.message}`);
-                changeLogEntries.shift(); 
+                changeLogEntries.shift(); // Revertir el log si falla el guardado
             });
     });
+
 
     // --- NAVEGACIÓN POR PESTAÑAS ---
     function activateTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
         document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
-        
+
         const activeContent = document.getElementById(tabId);
         const activeButton = document.querySelector(`.tab-button[data-tab="${tabId}"]`);
-        
+
         if (activeContent) activeContent.classList.add('active');
         if (activeButton) activeButton.classList.add('active');
 
-        if (tabId === 'flujo-caja' || tabId === 'grafico') renderCashflowTable(); 
+        if (tabId === 'flujo-caja' || tabId === 'grafico') renderCashflowTable();
         if (tabId === 'presupuestos') { renderBudgetsTable(); renderBudgetSummaryTable(); }
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); renderPaymentsTableForCurrentPeriod(); }
         if (tabId === 'ajustes') populateSettingsForm();
@@ -773,7 +832,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- LÓGICA PESTAÑA AJUSTES ---
-     function populateSettingsForm() {
+    function populateSettingsForm() {
         if (!currentBackupData) return;
         analysisPeriodicitySelect.value = currentBackupData.analysis_periodicity || "Mensual";
         analysisDurationInput.value = currentBackupData.analysis_duration || 12;
@@ -791,7 +850,7 @@ document.addEventListener('DOMContentLoaded', () => {
     usdClpRateInput.addEventListener('input', updateUsdClpInfoLabel);
     function updateUsdClpInfoLabel() {
         const rate = parseFloat(usdClpRateInput.value);
-        usdClpInfoLabel.textContent = (rate && rate > 0) ? `1 USD = ${rate.toLocaleString('es-CL', {style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2})}` : "1 USD = $CLP (No se usa en cálculos aún)";
+        usdClpInfoLabel.textContent = (rate && rate > 0) ? `1 USD = ${rate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "1 USD = $CLP (No se usa en cálculos aún)";
     }
     applySettingsButton.addEventListener('click', () => {
         if (!currentBackupData) { alert("No hay datos cargados para aplicar ajustes."); return; }
@@ -814,10 +873,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         updateAnalysisDurationLabel();
         alert("Ajustes aplicados. El flujo de caja y el gráfico se recalcularán.");
-        renderCashflowTable(); 
+        renderCashflowTable();
         setupPaymentPeriodSelectors();
         renderPaymentsTableForCurrentPeriod();
-        renderBudgetsTable(); 
+        renderBudgetsTable();
         renderBudgetSummaryTable();
     });
 
@@ -832,6 +891,38 @@ document.addEventListener('DOMContentLoaded', () => {
         incomeEndDateInput.disabled = isUnico || incomeOngoingCheckbox.checked;
         if (isUnico) { incomeOngoingCheckbox.checked = false; incomeEndDateInput.value = ''; }
     });
+
+    incomeIsReimbursementCheckbox.addEventListener('change', () => {
+        incomeReimbursementCategoryContainer.style.display = incomeIsReimbursementCheckbox.checked ? 'block' : 'none';
+        if (incomeIsReimbursementCheckbox.checked) {
+            populateIncomeReimbursementCategoriesDropdown();
+        } else {
+            incomeReimbursementCategorySelect.value = '';
+        }
+    });
+
+    function populateIncomeReimbursementCategoriesDropdown() {
+        if (!incomeReimbursementCategorySelect || !currentBackupData || !currentBackupData.expense_categories) {
+            if (incomeReimbursementCategorySelect) incomeReimbursementCategorySelect.innerHTML = '<option value="">No hay categorías de gasto</option>';
+            return;
+        }
+        const currentValue = incomeReimbursementCategorySelect.value;
+        incomeReimbursementCategorySelect.innerHTML = '<option value="">-- Selecciona Categoría de Gasto --</option>';
+        const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
+        sortedCategories.forEach(catName => {
+            if (isFirebaseKeySafe(catName)) {
+                const option = document.createElement('option');
+                option.value = catName;
+                option.textContent = catName;
+                incomeReimbursementCategorySelect.appendChild(option);
+            }
+        });
+        if (sortedCategories.includes(currentValue)) {
+            incomeReimbursementCategorySelect.value = currentValue;
+        }
+    }
+
+
     incomeForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const name = incomeNameInput.value.trim();
@@ -839,9 +930,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const frequency = incomeFrequencySelect.value;
         const startDateValue = incomeStartDateInput.value;
         const endDateValue = incomeEndDateInput.value;
+        const isReimbursement = incomeIsReimbursementCheckbox.checked;
+        const reimbursementCategory = isReimbursement ? incomeReimbursementCategorySelect.value : null;
 
         if (!isFirebaseKeySafe(name)) { alert(`El nombre del ingreso "${name}" contiene caracteres no permitidos: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}.`); return; }
         if (!name) { alert("El nombre del ingreso no puede estar vacío."); return; }
+        if (isReimbursement && !reimbursementCategory) { alert("Si es un reembolso, debe seleccionar una categoría de gasto a reembolsar."); return; }
+
 
         const startDate = startDateValue ? new Date(startDateValue + 'T00:00:00Z') : null;
         const isOngoing = incomeOngoingCheckbox.checked;
@@ -850,11 +945,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isNaN(amount) || !startDate) { alert("Por favor, completa los campos obligatorios (Nombre, Monto, Fecha Inicio)."); return; }
         if (endDate && startDate && endDate < startDate) { alert("La fecha de fin no puede ser anterior a la fecha de inicio."); return; }
 
-        const incomeEntry = { name, net_monthly: amount, frequency, start_date: startDate, end_date: endDate };
+        const incomeEntry = {
+            name,
+            net_monthly: amount,
+            frequency,
+            start_date: startDate,
+            end_date: endDate,
+            is_reimbursement: isReimbursement,
+            reimbursement_category: reimbursementCategory
+        };
 
-        if (editingIncomeIndex !== null) { 
+        if (editingIncomeIndex !== null) {
             currentBackupData.incomes[editingIncomeIndex] = incomeEntry;
-        } else { 
+        } else {
             const existingIncome = (currentBackupData.incomes || []).find(inc => inc.name.toLowerCase() === name.toLowerCase());
             if (existingIncome) { alert(`Ya existe un ingreso con el nombre "${name}".`); return; }
             if (!currentBackupData.incomes) currentBackupData.incomes = [];
@@ -862,27 +965,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         renderIncomesTable(); renderCashflowTable(); resetIncomeForm();
     });
+
     function resetIncomeForm() {
         incomeForm.reset();
         incomeOngoingCheckbox.checked = true;
         incomeEndDateInput.disabled = true; incomeEndDateInput.value = '';
         incomeFrequencySelect.value = 'Mensual';
+
+        incomeIsReimbursementCheckbox.checked = false;
+        incomeReimbursementCategoryContainer.style.display = 'none';
+        incomeReimbursementCategorySelect.value = '';
+
         addIncomeButton.textContent = 'Agregar Ingreso';
         cancelEditIncomeButton.style.display = 'none';
         editingIncomeIndex = null;
         incomeStartDateInput.value = getISODateString(currentBackupData && currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
     }
     cancelEditIncomeButton.addEventListener('click', resetIncomeForm);
+
     function renderIncomesTable() {
         if (!incomesTableView || !currentBackupData || !currentBackupData.incomes) return;
         incomesTableView.innerHTML = '';
-        const searchTerm = searchIncomeInput.value.toLowerCase(); 
-        const filteredIncomes = currentBackupData.incomes.filter(income => 
+        const searchTerm = searchIncomeInput.value.toLowerCase();
+        const filteredIncomes = currentBackupData.incomes.filter(income =>
             income.name.toLowerCase().includes(searchTerm) ||
             formatCurrencyJS(income.net_monthly, currentBackupData.display_currency_symbol || '$').toLowerCase().includes(searchTerm) ||
-            income.frequency.toLowerCase().includes(searchTerm)
+            income.frequency.toLowerCase().includes(searchTerm) ||
+            (income.is_reimbursement && "reembolso".includes(searchTerm))
         );
-        filteredIncomes.forEach((income) => { 
+        filteredIncomes.forEach((income) => {
             const originalIndex = currentBackupData.incomes.findIndex(inc => inc === income);
             const row = incomesTableView.insertRow();
             row.insertCell().textContent = income.name;
@@ -890,20 +1001,31 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = income.frequency;
             row.insertCell().textContent = income.start_date ? getISODateString(new Date(income.start_date)) : 'N/A';
             row.insertCell().textContent = income.end_date ? getISODateString(new Date(income.end_date)) : (income.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
+
+            const typeCell = row.insertCell();
+            if (income.is_reimbursement) {
+                typeCell.innerHTML = `Reembolso <span class="reimbursement-icon" title="Reembolso de ${income.reimbursement_category || 'N/A'}">↺</span>`;
+                typeCell.classList.add('reimbursement-income');
+            } else {
+                typeCell.textContent = 'Ingreso Regular';
+            }
+
             const actionsCell = row.insertCell();
             const editButton = document.createElement('button'); editButton.textContent = 'Editar'; editButton.classList.add('small-button');
-            editButton.onclick = () => loadIncomeForEdit(originalIndex); actionsCell.appendChild(editButton); 
+            editButton.onclick = () => loadIncomeForEdit(originalIndex); actionsCell.appendChild(editButton);
             const deleteButton = document.createElement('button'); deleteButton.textContent = 'Eliminar'; deleteButton.classList.add('small-button', 'danger');
-            deleteButton.onclick = () => deleteIncome(originalIndex); actionsCell.appendChild(deleteButton); 
+            deleteButton.onclick = () => deleteIncome(originalIndex); actionsCell.appendChild(deleteButton);
         });
     }
     searchIncomeInput.addEventListener('input', renderIncomesTable);
+
     function loadIncomeForEdit(index) {
         const income = currentBackupData.incomes[index];
         incomeNameInput.value = income.name;
         incomeAmountInput.value = income.net_monthly;
         incomeFrequencySelect.value = income.frequency;
         incomeStartDateInput.value = income.start_date ? getISODateString(new Date(income.start_date)) : '';
+
         const isUnico = income.frequency === 'Único';
         incomeOngoingCheckbox.disabled = isUnico;
         if (isUnico) {
@@ -913,14 +1035,26 @@ document.addEventListener('DOMContentLoaded', () => {
             incomeEndDateInput.value = income.end_date ? getISODateString(new Date(income.end_date)) : '';
             incomeEndDateInput.disabled = incomeOngoingCheckbox.checked;
         }
+
+        incomeIsReimbursementCheckbox.checked = income.is_reimbursement || false;
+        if (incomeIsReimbursementCheckbox.checked) {
+            populateIncomeReimbursementCategoriesDropdown();
+            incomeReimbursementCategorySelect.value = income.reimbursement_category || '';
+            incomeReimbursementCategoryContainer.style.display = 'block';
+        } else {
+            incomeReimbursementCategorySelect.value = '';
+            incomeReimbursementCategoryContainer.style.display = 'none';
+        }
+
         addIncomeButton.textContent = 'Guardar Cambios'; cancelEditIncomeButton.style.display = 'inline-block';
-        editingIncomeIndex = index; document.getElementById('ingresos').scrollIntoView({ behavior: 'smooth' }); 
+        editingIncomeIndex = index; document.getElementById('ingresos').scrollIntoView({ behavior: 'smooth' });
     }
+
     function deleteIncome(index) {
         if (confirm(`¿Eliminar ingreso "${currentBackupData.incomes[index].name}"?`)) {
             currentBackupData.incomes.splice(index, 1);
-            renderIncomesTable(); renderCashflowTable(); 
-            if(editingIncomeIndex === index) resetIncomeForm();
+            renderIncomesTable(); renderCashflowTable();
+            if (editingIncomeIndex === index) resetIncomeForm();
             else if (editingIncomeIndex !== null && editingIncomeIndex > index) editingIncomeIndex--;
         }
     }
@@ -936,11 +1070,11 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseEndDateInput.disabled = isUnico || expenseOngoingCheckbox.checked;
         if (isUnico) { expenseOngoingCheckbox.checked = false; expenseEndDateInput.value = ''; }
     });
-    function populateExpenseCategoriesDropdowns() { 
+    function populateExpenseCategoriesDropdowns() {
         const selects = [expenseCategorySelect, budgetCategorySelect];
         selects.forEach(select => {
             if (!select || !currentBackupData || !currentBackupData.expense_categories) {
-                if(select) select.innerHTML = '<option value="">No hay categorías</option>'; return;
+                if (select) select.innerHTML = '<option value="">No hay categorías</option>'; return;
             }
             const currentValue = select.value;
             select.innerHTML = '<option value="">-- Selecciona Categoría --</option>';
@@ -955,6 +1089,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (sortedCategories.length > 0 && select.id === 'expense-category') select.value = sortedCategories[0];
         });
         updateRemoveCategoryButtonState();
+        populateIncomeReimbursementCategoriesDropdown();
     }
     addCategoryButton.addEventListener('click', () => {
         const newCategoryName = prompt("Nombre de la nueva categoría de gasto:");
@@ -966,8 +1101,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (categoryType && (categoryType.toLowerCase() === 'fijo' || categoryType.toLowerCase() === 'variable')) {
                 currentBackupData.expense_categories[trimmedName] = categoryType.charAt(0).toUpperCase() + categoryType.slice(1).toLowerCase();
                 if (!currentBackupData.budgets) currentBackupData.budgets = {};
-                currentBackupData.budgets[trimmedName] = 0; 
-                populateExpenseCategoriesDropdowns(); renderBudgetsTable(); 
+                currentBackupData.budgets[trimmedName] = 0;
+                populateExpenseCategoriesDropdowns(); renderBudgetsTable();
                 alert(`Categoría "${trimmedName}" (${currentBackupData.expense_categories[trimmedName]}) agregada.`);
             } else if (categoryType !== null) alert("Tipo de categoría inválido. Debe ser 'Fijo' o 'Variable'.");
         }
@@ -975,7 +1110,8 @@ document.addEventListener('DOMContentLoaded', () => {
     removeCategoryButton.addEventListener('click', () => {
         const categoryToRemove = expenseCategorySelect.value;
         if (!categoryToRemove) { alert("Selecciona una categoría para eliminar."); return; }
-        if (currentBackupData.expenses.some(exp => exp.category === categoryToRemove)) { alert(`Categoría "${categoryToRemove}" en uso, no se puede eliminar.`); return; }
+        if (currentBackupData.expenses.some(exp => exp.category === categoryToRemove)) { alert(`Categoría "${categoryToRemove}" en uso por un gasto, no se puede eliminar.`); return; }
+        if (currentBackupData.incomes.some(inc => inc.is_reimbursement && inc.reimbursement_category === categoryToRemove)) { alert(`Categoría "${categoryToRemove}" en uso por un reembolso, no se puede eliminar.`); return; }
         if (confirm(`¿Eliminar categoría "${categoryToRemove}" y su presupuesto asociado?`)) {
             delete currentBackupData.expense_categories[categoryToRemove];
             if (currentBackupData.budgets) delete currentBackupData.budgets[categoryToRemove];
@@ -987,9 +1123,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateRemoveCategoryButtonState() {
         const selectedCategory = expenseCategorySelect.value;
         if (selectedCategory && currentBackupData && currentBackupData.expense_categories && currentBackupData.expense_categories[selectedCategory]) {
-            const isInUse = (currentBackupData.expenses || []).some(exp => exp.category === selectedCategory);
+            const isInUseByExpense = (currentBackupData.expenses || []).some(exp => exp.category === selectedCategory);
+            const isInUseByReimbursement = (currentBackupData.incomes || []).some(inc => inc.is_reimbursement && inc.reimbursement_category === selectedCategory);
+            const isInUse = isInUseByExpense || isInUseByReimbursement;
+
             removeCategoryButton.disabled = isInUse;
-            removeCategoryButton.title = isInUse ? `Categoría en uso` : `Eliminar categoría '${selectedCategory}'`;
+            removeCategoryButton.title = isInUse ? `Categoría en uso (por gasto o reembolso)` : `Eliminar categoría '${selectedCategory}'`;
         } else {
             removeCategoryButton.disabled = true;
             removeCategoryButton.title = `Selecciona una categoría válida`;
@@ -1006,7 +1145,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!isFirebaseKeySafe(name)) { alert(`El nombre del gasto "${name}" contiene caracteres no permitidos.`); return; }
         if (!name) { alert("El nombre del gasto no puede estar vacío."); return; }
-        if (!category) { alert("Selecciona una categoría."); return;}
+        if (!category) { alert("Selecciona una categoría."); return; }
         if (!isFirebaseKeySafe(category)) { alert(`Categoría "${category}" con nombre no permitido.`); return; }
 
         const startDate = startDateValue ? new Date(startDateValue + 'T00:00:00Z') : null;
@@ -1017,12 +1156,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isNaN(amount) || !category || !startDate) { alert("Completa los campos obligatorios (Nombre, Monto, Categoría, Fecha Inicio)."); return; }
         if (endDate && startDate && endDate < startDate) { alert("Fecha de fin no puede ser anterior a fecha de inicio."); return; }
 
-        const expenseType = currentBackupData.expense_categories[category] || "Variable"; 
+        const expenseType = currentBackupData.expense_categories[category] || "Variable";
         const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal };
 
-        if (editingExpenseIndex !== null) { 
+        if (editingExpenseIndex !== null) {
             currentBackupData.expenses[editingExpenseIndex] = expenseEntry;
-        } else { 
+        } else {
             const existingExpense = (currentBackupData.expenses || []).find(exp => exp.name.toLowerCase() === name.toLowerCase());
             if (existingExpense) { alert(`Ya existe un gasto con el nombre "${name}".`); return; }
             if (!currentBackupData.expenses) currentBackupData.expenses = [];
@@ -1033,13 +1172,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetExpenseForm() {
         expenseForm.reset();
         expenseOngoingCheckbox.checked = true; expenseEndDateInput.disabled = true; expenseEndDateInput.value = '';
-        expenseFrequencySelect.value = 'Mensual'; expenseIsRealCheckbox.checked = false;
+        expenseFrequencySelect.value = 'Único'; expenseIsRealCheckbox.checked = false;
         if (expenseCategorySelect.options.length > 0 && expenseCategorySelect.value === "") {
-             if (expenseCategorySelect.options[0].value !== "") expenseCategorySelect.selectedIndex = 0;
-             else if (expenseCategorySelect.options.length > 1) expenseCategorySelect.selectedIndex = 1;
+            if (expenseCategorySelect.options[0].value !== "") expenseCategorySelect.selectedIndex = 0;
+            else if (expenseCategorySelect.options.length > 1) expenseCategorySelect.selectedIndex = 1;
         }
         addExpenseButton.textContent = 'Agregar Gasto'; cancelEditExpenseButton.style.display = 'none';
-        editingExpenseIndex = null; 
+        editingExpenseIndex = null;
         expenseStartDateInput.value = getISODateString(currentBackupData && currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
         updateRemoveCategoryButtonState();
     }
@@ -1047,14 +1186,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderExpensesTable() {
         if (!expensesTableView || !currentBackupData || !currentBackupData.expenses) return;
         expensesTableView.innerHTML = '';
-        const searchTerm = searchExpenseInput.value.toLowerCase(); 
-        const filteredExpenses = currentBackupData.expenses.filter(expense => 
+        const searchTerm = searchExpenseInput.value.toLowerCase();
+        const filteredExpenses = currentBackupData.expenses.filter(expense =>
             expense.name.toLowerCase().includes(searchTerm) ||
             formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$').toLowerCase().includes(searchTerm) ||
             expense.category.toLowerCase().includes(searchTerm) ||
             expense.frequency.toLowerCase().includes(searchTerm)
         );
-        filteredExpenses.forEach((expense) => { 
+        filteredExpenses.forEach((expense) => {
             const originalIndex = currentBackupData.expenses.findIndex(exp => exp === expense);
             const row = expensesTableView.insertRow();
             row.insertCell().textContent = expense.name;
@@ -1066,9 +1205,9 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
             const actionsCell = row.insertCell();
             const editButton = document.createElement('button'); editButton.textContent = 'Editar'; editButton.classList.add('small-button');
-            editButton.onclick = () => loadExpenseForEdit(originalIndex); actionsCell.appendChild(editButton); 
+            editButton.onclick = () => loadExpenseForEdit(originalIndex); actionsCell.appendChild(editButton);
             const deleteButton = document.createElement('button'); deleteButton.textContent = 'Eliminar'; deleteButton.classList.add('small-button', 'danger');
-            deleteButton.onclick = () => deleteExpense(originalIndex); actionsCell.appendChild(deleteButton); 
+            deleteButton.onclick = () => deleteExpense(originalIndex); actionsCell.appendChild(deleteButton);
         });
     }
     searchExpenseInput.addEventListener('input', renderExpensesTable);
@@ -1094,9 +1233,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function deleteExpense(index) {
         if (confirm(`¿Eliminar gasto "${currentBackupData.expenses[index].name}"?`)) {
             currentBackupData.expenses.splice(index, 1);
-            renderExpensesTable(); renderCashflowTable(); 
-            if(editingExpenseIndex === index) resetExpenseForm();
-            else if (editingExpenseIndex !== null && editingExpenseIndex > index) editingExpenseIndex--; 
+            renderExpensesTable(); renderCashflowTable();
+            if (editingExpenseIndex === index) resetExpenseForm();
+            else if (editingExpenseIndex !== null && editingExpenseIndex > index) editingExpenseIndex--;
         }
     }
 
@@ -1115,7 +1254,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isFirebaseKeySafe(category)) { alert(`Categoría "${category}" con nombre no permitido.`); return; }
         if (!currentBackupData.budgets) currentBackupData.budgets = {};
         currentBackupData.budgets[category] = amount;
-        renderBudgetsTable(); renderBudgetSummaryTable(); renderCashflowTable(); 
+        renderBudgetsTable(); renderBudgetSummaryTable(); renderCashflowTable();
         alert(`Presupuesto para "${category}" guardado como ${formatCurrencyJS(amount, currentBackupData.display_currency_symbol || '$')}.`);
     });
     budgetCategorySelect.addEventListener('change', () => {
@@ -1154,10 +1293,50 @@ document.addEventListener('DOMContentLoaded', () => {
             let amountForSummary = 0;
             if (exp.frequency === "Único") { if (expStartDate.getUTCFullYear() === currentYear && expStartDate.getUTCMonth() === currentMonth) amountForSummary = exp.amount; }
             else if (exp.frequency === "Mensual") { if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) amountForSummary = exp.amount; }
-            else if (exp.frequency === "Semanal") { if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) amountForSummary = exp.amount * 4.33; }
-            else if (exp.frequency === "Bi-semanal") { if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) amountForSummary = exp.amount * 2.165; }
+            else if (exp.frequency === "Semanal") { if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) amountForSummary = exp.amount * (52 / 12); } // Using average for weekly
+            else if (exp.frequency === "Bi-semanal") { // Using occurrence count for bi-weekly
+                let paydays_in_month = 0;
+                let current_pay_date = new Date(expStartDate.getTime());
+                const month_start_date = new Date(Date.UTC(currentYear, currentMonth, 1));
+                const month_end_date = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
+                while (current_pay_date <= month_end_date && (!exp.end_date || current_pay_date <= new Date(exp.end_date))) {
+                    if (current_pay_date >= month_start_date) {
+                        paydays_in_month++;
+                    }
+                    current_pay_date = addWeeks(current_pay_date, 2);
+                }
+                amountForSummary = exp.amount * paydays_in_month;
+            }
             if (amountForSummary > 0) expensesThisMonth[exp.category] = (expensesThisMonth[exp.category] || 0) + amountForSummary;
         });
+
+        (currentBackupData.incomes || []).forEach(reimbInc => {
+            if (!reimbInc.is_reimbursement || !reimbInc.reimbursement_category || !reimbInc.start_date) return;
+            const reimbStartDate = new Date(reimbInc.start_date);
+            if (reimbStartDate.getUTCFullYear() === currentYear && reimbStartDate.getUTCMonth() === currentMonth) {
+                let amountToReimburse = reimbInc.net_monthly;
+                if (reimbInc.frequency === "Semanal") amountToReimburse = reimbInc.net_monthly * (52 / 12);
+                else if (reimbInc.frequency === "Bi-semanal") {
+                    let paydays_in_month = 0;
+                    let current_pay_date = new Date(reimbStartDate.getTime());
+                    const month_start_date = new Date(Date.UTC(currentYear, currentMonth, 1));
+                    const month_end_date = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
+                    while (current_pay_date <= month_end_date && (!reimbInc.end_date || current_pay_date <= new Date(reimbInc.end_date))) {
+                        if (current_pay_date >= month_start_date) {
+                            paydays_in_month++;
+                        }
+                        current_pay_date = addWeeks(current_pay_date, 2);
+                    }
+                    amountToReimburse = reimbInc.net_monthly * paydays_in_month;
+                }
+
+                if (expensesThisMonth[reimbInc.reimbursement_category]) {
+                    expensesThisMonth[reimbInc.reimbursement_category] = Math.max(0, expensesThisMonth[reimbInc.reimbursement_category] - amountToReimburse);
+                }
+            }
+        });
+
+
         const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
         sortedCategories.forEach(catName => {
             const budget = currentBackupData.budgets[catName] || 0;
@@ -1169,7 +1348,7 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = formatCurrencyJS(budget, currentBackupData.display_currency_symbol);
             row.insertCell().textContent = formatCurrencyJS(spent, currentBackupData.display_currency_symbol);
             const diffCell = row.insertCell(); diffCell.textContent = formatCurrencyJS(difference, currentBackupData.display_currency_symbol);
-            diffCell.classList.toggle('text-red', difference < 0); diffCell.classList.toggle('text-green', difference > 0 && budget > 0); 
+            diffCell.classList.toggle('text-red', difference < 0); diffCell.classList.toggle('text-green', difference > 0 && budget > 0);
             const percCell = row.insertCell(); percCell.textContent = `${percentageSpent.toFixed(1)}%`;
             if (budget > 0) { if (percentageSpent > 100) percCell.classList.add('text-red'); else if (percentageSpent >= 80) percCell.classList.add('text-orange'); else percCell.classList.add('text-green'); }
         });
@@ -1179,9 +1358,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupPaymentPeriodSelectors() {
         currentPaymentViewDate = (currentBackupData && currentBackupData.analysis_start_date) ? new Date(currentBackupData.analysis_start_date) : new Date();
         const analysisStartDate = new Date(currentPaymentViewDate);
-        const analysisEndDate = addMonths(new Date(analysisStartDate), (currentBackupData ? currentBackupData.analysis_duration : 12)); 
+        const analysisEndDate = addMonths(new Date(analysisStartDate), (currentBackupData ? currentBackupData.analysis_duration : 12));
         paymentYearSelect.innerHTML = '';
-        const startYear = Math.min(analysisStartDate.getUTCFullYear(), new Date().getUTCFullYear()) - 2; 
+        const startYear = Math.min(analysisStartDate.getUTCFullYear(), new Date().getUTCFullYear()) - 2;
         const endYear = Math.max(analysisEndDate.getUTCFullYear(), new Date().getUTCFullYear()) + 5;
         for (let y = startYear; y <= endYear; y++) { const option = document.createElement('option'); option.value = y; option.textContent = y; paymentYearSelect.appendChild(option); }
         paymentYearSelect.value = currentPaymentViewDate.getUTCFullYear();
@@ -1211,29 +1390,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const [newYear, newWeekNumber] = getWeekNumber(newDate);
             paymentYearSelect.value = newYear; paymentWeekSelect.value = newWeekNumber;
         } else {
-            let month = parseInt(paymentMonthSelect.value); 
-            const newMonthDate = new Date(Date.UTC(year, month, 15)); 
+            let month = parseInt(paymentMonthSelect.value);
+            const newMonthDate = new Date(Date.UTC(year, month, 15));
             newMonthDate.setUTCMonth(newMonthDate.getUTCMonth() + direction);
             paymentYearSelect.value = newMonthDate.getUTCFullYear(); paymentMonthSelect.value = newMonthDate.getUTCMonth();
         }
         renderPaymentsTableForCurrentPeriod();
     }
     function renderPaymentsTableForCurrentPeriod() {
-        if (!paymentsTableView || !currentBackupData || !currentBackupData.expenses) { if(paymentsTableView) paymentsTableView.innerHTML = '<tr><td colspan="6">No hay datos de gastos.</td></tr>'; return; }
-        updatePaymentPeriodSelectorVisibility(); 
+        if (!paymentsTableView || !currentBackupData || !currentBackupData.expenses) { if (paymentsTableView) paymentsTableView.innerHTML = '<tr><td colspan="6">No hay datos de gastos.</td></tr>'; return; }
+        updatePaymentPeriodSelectorVisibility();
         const isWeeklyView = currentBackupData.analysis_periodicity === "Semanal";
         const year = parseInt(paymentYearSelect.value);
-        let periodStart, periodEnd, paymentLogPeriodKeyPart; 
+        let periodStart, periodEnd, paymentLogPeriodKeyPart;
         if (isWeeklyView) {
             const week = parseInt(paymentWeekSelect.value);
-            periodStart = getMondayOfWeek(year, week); periodEnd = addWeeks(new Date(periodStart), 1); periodEnd.setUTCDate(periodEnd.getUTCDate() - 1); 
+            periodStart = getMondayOfWeek(year, week); periodEnd = addWeeks(new Date(periodStart), 1); periodEnd.setUTCDate(periodEnd.getUTCDate() - 1);
             paymentLogPeriodKeyPart = week;
         } else {
-            const monthIndex = parseInt(paymentMonthSelect.value); 
-            periodStart = new Date(Date.UTC(year, monthIndex, 1)); periodEnd = new Date(Date.UTC(year, monthIndex + 1, 0)); 
-            paymentLogPeriodKeyPart = monthIndex + 1; 
+            const monthIndex = parseInt(paymentMonthSelect.value);
+            periodStart = new Date(Date.UTC(year, monthIndex, 1)); periodEnd = new Date(Date.UTC(year, monthIndex + 1, 0));
+            paymentLogPeriodKeyPart = monthIndex + 1;
         }
-        currentPaymentViewDate = periodStart; 
+        currentPaymentViewDate = periodStart;
         paymentsTableView.innerHTML = ''; let expensesInPeriodFound = false;
         currentBackupData.expenses.forEach(expense => {
             if (!expense.start_date) return;
@@ -1241,8 +1420,8 @@ document.addEventListener('DOMContentLoaded', () => {
             let occursInPeriod = false;
             if (expense.frequency === "Único") { if (expStartDate >= periodStart && expStartDate <= periodEnd) occursInPeriod = true; }
             else if (expense.frequency === "Mensual") { if (isWeeklyView) { const payDay = expStartDate.getUTCDate(); const payDateThisMonth = new Date(Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth(), payDay)); if (payDateThisMonth >= periodStart && payDateThisMonth <= periodEnd) occursInPeriod = true; } else { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true; } }
-            else if (expense.frequency === "Semanal") { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true; }
-            else if (expense.frequency === "Bi-semanal") { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) { let paymentDate = new Date(expStartDate.getTime()); while(paymentDate <= periodEnd) { if (paymentDate >= periodStart) { occursInPeriod = true; break; } paymentDate = addWeeks(paymentDate, 2); } } }
+            else if (expense.frequency === "Semanal") { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true; } // Simplified check for weekly in period
+            else if (expense.frequency === "Bi-semanal") { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) { let paymentDate = new Date(expStartDate.getTime()); while (paymentDate <= periodEnd) { if (paymentDate >= periodStart) { occursInPeriod = true; break; } paymentDate = addWeeks(paymentDate, 2); } } }
             if (occursInPeriod) {
                 expensesInPeriodFound = true; const row = paymentsTableView.insertRow();
                 row.insertCell().textContent = expense.name; row.insertCell().textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol);
@@ -1261,7 +1440,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- LÓGICA PESTAÑA FLUJO DE CAJA ---
     function renderCashflowTable() {
-        if (!currentBackupData || !cashflowTableBody || !cashflowTableHead) return; 
+        if (!currentBackupData || !cashflowTableBody || !cashflowTableHead) return;
         cashflowTableHead.innerHTML = ''; cashflowTableBody.innerHTML = '';
         let analysisStartDateObj = currentBackupData.analysis_start_date;
         if (typeof analysisStartDateObj === 'string') analysisStartDateObj = new Date(analysisStartDateObj + 'T00:00:00Z');
@@ -1274,7 +1453,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const durationUnit = periodicity === "Semanal" ? "Semanas" : "Meses"; cashflowTitle.textContent = `Proyección Flujo de Caja (${currentBackupData.analysis_duration} ${durationUnit} desde ${startStr})`;
         const headerRow = cashflowTableHead.insertRow(); const thConcept = document.createElement('th'); thConcept.textContent = 'Categoría / Concepto'; headerRow.appendChild(thConcept);
         periodDates.forEach(d => { const th = document.createElement('th'); if (periodicity === "Semanal") { const [year, week] = getWeekNumber(d); const mondayOfWeek = getMondayOfWeek(year, week); th.innerHTML = `Sem ${week} (${DATE_WEEK_START_FORMAT(mondayOfWeek)})<br>${year}`; } else { th.innerHTML = `${MONTH_NAMES_ES[d.getUTCMonth()]}<br>${d.getUTCFullYear()}`; } headerRow.appendChild(th); });
-        const cf_row_definitions = [ { key: 'START_BALANCE', label: "Saldo Inicial", isBold: true, isHeaderBg: true }, { key: 'NET_INCOME', label: "Ingreso Total Neto", isBold: true }, ];
+        const cf_row_definitions = [{ key: 'START_BALANCE', label: "Saldo Inicial", isBold: true, isHeaderBg: true }, { key: 'NET_INCOME', label: "Ingreso Total Neto", isBold: true },];
         const fixedCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === "Fijo").sort() : [];
         const variableCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === "Variable").sort() : [];
         fixedCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat })); cf_row_definitions.push({ key: 'FIXED_EXP_TOTAL', label: "Total Gastos Fijos", isBold: true, isHeaderBg: true });
@@ -1294,31 +1473,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 tdValue.textContent = formatCurrencyJS(value, symbol); if (colorClass) tdValue.classList.add(colorClass); if (def.isBold) tdValue.classList.add('bold');
             }
         });
-        renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p); renderBudgetSummaryTable(); 
+        renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p); renderBudgetSummaryTable();
     }
-    function calculateCashFlowData(data) { 
+
+    function calculateCashFlowData(data) {
         const startDate = data.analysis_start_date; const duration = parseInt(data.analysis_duration, 10); const periodicity = data.analysis_periodicity; const initialBalance = parseFloat(data.analysis_initial_balance);
         let periodDates = []; let income_p = Array(duration).fill(0.0); let fixed_exp_p = Array(duration).fill(0.0); let var_exp_p = Array(duration).fill(0.0); let net_flow_p = Array(duration).fill(0.0); let end_bal_p = Array(duration).fill(0.0); let expenses_by_cat_p = Array(duration).fill(null).map(() => ({}));
-        let currentDate = new Date(startDate.getTime());  let currentBalance = initialBalance;
+        let currentDate = new Date(startDate.getTime()); let currentBalance = initialBalance;
         const fixedCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Fijo").sort() : [];
         const variableCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Variable").sort() : [];
         const orderedCategories = [...fixedCategories, ...variableCategories];
         orderedCategories.forEach(cat => { for (let i = 0; i < duration; i++) { expenses_by_cat_p[i][cat] = 0.0; } });
+
         for (let i = 0; i < duration; i++) {
             const p_start = new Date(currentDate.getTime()); let p_end;
             if (periodicity === "Mensual") { p_end = addMonths(new Date(p_start.getTime()), 1); p_end.setUTCDate(p_end.getUTCDate() - 1); } else { p_end = addWeeks(new Date(p_start.getTime()), 1); p_end.setUTCDate(p_end.getUTCDate() - 1); }
             periodDates.push(p_start); let p_inc_total = 0.0;
+
             (data.incomes || []).forEach(inc => {
-                if (!inc.start_date) return; const inc_start = inc.start_date; const inc_end = inc.end_date; const net_amount = parseFloat(inc.net_monthly || 0); const inc_freq = inc.frequency || "Mensual";
+                if (!inc.start_date) return;
+                if (inc.is_reimbursement) return;
+
+                const inc_start = inc.start_date; const inc_end = inc.end_date; const net_amount = parseFloat(inc.net_monthly || 0); const inc_freq = inc.frequency || "Mensual";
                 const isActiveRange = (inc_start <= p_end && (inc_end === null || inc_end >= p_start)); if (!isActiveRange) return;
                 let income_to_add = 0.0;
                 if (inc_freq === "Mensual") { if (periodicity === "Mensual") income_to_add = net_amount; else if (periodicity === "Semanal") { const payDay = inc_start.getUTCDate(); const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay)); if (p_start <= payDate && payDate <= p_end) income_to_add = net_amount; } }
                 else if (inc_freq === "Único") { if (p_start <= inc_start && inc_start <= p_end) income_to_add = net_amount; }
                 else if (inc_freq === "Semanal") { if (periodicity === "Semanal") income_to_add = net_amount; else if (periodicity === "Mensual") income_to_add = net_amount * (52 / 12); }
-                else if (inc_freq === "Bi-semanal") { if (periodicity === "Semanal") { let paymentDate = new Date(inc_start.getTime()); while(paymentDate <= p_end) { if (paymentDate >= p_start) { income_to_add = net_amount; break; } paymentDate = addWeeks(paymentDate, 2); } } else if (periodicity === "Mensual") { let paydays_in_month = 0; let current_pay_date = new Date(inc_start.getTime()); while (current_pay_date <= p_end) { if (current_pay_date >= p_start) paydays_in_month++; current_pay_date = addWeeks(current_pay_date, 2); } income_to_add = net_amount * paydays_in_month; } }
+                else if (inc_freq === "Bi-semanal") { if (periodicity === "Semanal") { let paymentDate = new Date(inc_start.getTime()); while (paymentDate <= p_end && (!inc_end || paymentDate <= inc_end)) { if (paymentDate >= p_start) { income_to_add = net_amount; break; } paymentDate = addWeeks(paymentDate, 2); } } else if (periodicity === "Mensual") { let paydays_in_month = 0; let current_pay_date = new Date(inc_start.getTime()); while (current_pay_date <= p_end && (!inc_end || current_pay_date <= inc_end)) { if (current_pay_date >= p_start) paydays_in_month++; current_pay_date = addWeeks(current_pay_date, 2); } income_to_add = net_amount * paydays_in_month; } }
                 p_inc_total += income_to_add;
             });
-            income_p[i] = p_inc_total; let p_fix_exp_total = 0.0; let p_var_exp_total = 0.0;
+            income_p[i] = p_inc_total;
+
+            let p_fix_exp_total_for_period = 0.0;
+            let p_var_exp_total_for_period = 0.0;
+
             (data.expenses || []).forEach(exp => {
                 if (!exp.start_date) return; const e_start = exp.start_date; const e_end = exp.end_date; const amt_raw = parseFloat(exp.amount || 0); const freq = exp.frequency || "Mensual"; const typ = exp.type || (data.expense_categories && data.expense_categories[exp.category]) || "Variable"; const cat = exp.category;
                 if (amt_raw < 0 || !cat || !orderedCategories.includes(cat)) return;
@@ -1326,12 +1515,82 @@ document.addEventListener('DOMContentLoaded', () => {
                 let exp_add_this_period = 0.0;
                 if (freq === "Mensual") { if (periodicity === "Mensual") exp_add_this_period = amt_raw; else if (periodicity === "Semanal") { const payDay = e_start.getUTCDate(); const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay)); if (p_start <= payDate && payDate <= p_end) exp_add_this_period = amt_raw; } }
                 else if (freq === "Único") { if (p_start <= e_start && e_start <= p_end) exp_add_this_period = amt_raw; }
-                else if (freq === "Semanal") { if (periodicity === "Semanal") exp_add_this_period = amt_raw; else if (periodicity === "Mensual") exp_add_this_period = amt_raw * (52/12); }
-                else if (freq === "Bi-semanal") { if (periodicity === "Semanal") { let paymentDate = new Date(e_start.getTime()); while(paymentDate <= p_end) { if (paymentDate >= p_start) { exp_add_this_period = amt_raw; break; } paymentDate = addWeeks(paymentDate, 2); } } else if (periodicity === "Mensual") { let paydays_in_month = 0; let current_pay_date = new Date(e_start.getTime()); while (current_pay_date <= p_end) { if (current_pay_date >= p_start) paydays_in_month++; current_pay_date = addWeeks(current_pay_date, 2); } exp_add_this_period = amt_raw * paydays_in_month; } }
-                if (exp_add_this_period > 0) { expenses_by_cat_p[i][cat] = (expenses_by_cat_p[i][cat] || 0) + exp_add_this_period; if (typ === "Fijo") p_fix_exp_total += exp_add_this_period; else p_var_exp_total += exp_add_this_period; }
+                else if (freq === "Semanal") { if (periodicity === "Semanal") exp_add_this_period = amt_raw; else if (periodicity === "Mensual") exp_add_this_period = amt_raw * (52 / 12); }
+                else if (freq === "Bi-semanal") { if (periodicity === "Semanal") { let paymentDate = new Date(e_start.getTime()); while (paymentDate <= p_end && (!e_end || paymentDate <= e_end)) { if (paymentDate >= p_start) { exp_add_this_period = amt_raw; break; } paymentDate = addWeeks(paymentDate, 2); } } else if (periodicity === "Mensual") { let paydays_in_month = 0; let current_pay_date = new Date(e_start.getTime()); while (current_pay_date <= p_end && (!e_end || current_pay_date <= e_end)) { if (current_pay_date >= p_start) paydays_in_month++; current_pay_date = addWeeks(current_pay_date, 2); } exp_add_this_period = amt_raw * paydays_in_month; } }
+                if (exp_add_this_period > 0) {
+                    expenses_by_cat_p[i][cat] = (expenses_by_cat_p[i][cat] || 0) + exp_add_this_period;
+                    if (typ === "Fijo") p_fix_exp_total_for_period += exp_add_this_period;
+                    else p_var_exp_total_for_period += exp_add_this_period;
+                }
             });
-            fixed_exp_p[i] = p_fix_exp_total; var_exp_p[i] = p_var_exp_total;
-            const net_flow = p_inc_total - (p_fix_exp_total + p_var_exp_total); net_flow_p[i] = net_flow;
+
+            (data.incomes || []).forEach(reimbInc => {
+                if (!reimbInc.is_reimbursement || !reimbInc.reimbursement_category || !reimbInc.start_date) return;
+
+                const reimb_start = reimbInc.start_date;
+                const reimb_end = reimbInc.end_date;
+                const reimb_amount_raw = parseFloat(reimbInc.net_monthly || 0);
+                const reimb_freq = reimbInc.frequency || "Mensual";
+                const reimb_cat = reimbInc.reimbursement_category;
+
+                const isActiveRange = (reimb_start <= p_end && (reimb_end === null || reimb_end >= p_start));
+                if (!isActiveRange) return;
+
+                let amount_of_reimbursement_in_this_period = 0.0;
+                if (reimb_freq === "Mensual") {
+                    if (periodicity === "Mensual") { amount_of_reimbursement_in_this_period = reimb_amount_raw; }
+                    else if (periodicity === "Semanal") {
+                        const payDay = reimb_start.getUTCDate();
+                        const payDateForReimb = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay));
+                        if (payDateForReimb >= p_start && payDateForReimb <= p_end) {
+                            amount_of_reimbursement_in_this_period = reimb_amount_raw;
+                        }
+                    }
+                } else if (reimb_freq === "Único") {
+                    if (p_start <= reimb_start && reimb_start <= p_end) { amount_of_reimbursement_in_this_period = reimb_amount_raw; }
+                } else if (reimb_freq === "Semanal") {
+                    if (periodicity === "Semanal") { amount_of_reimbursement_in_this_period = reimb_amount_raw; }
+                    else if (periodicity === "Mensual") {
+                        amount_of_reimbursement_in_this_period = reimb_amount_raw * (52 / 12); 
+                    }
+                } else if (reimb_freq === "Bi-semanal") {
+                    if (periodicity === "Semanal") {
+                        let paymentDate = new Date(reimb_start.getTime());
+                        while (paymentDate <= p_end && (!reimb_end || paymentDate <= reimb_end)) {
+                            if (paymentDate >= p_start) { amount_of_reimbursement_in_this_period = reimb_amount_raw; break; }
+                            paymentDate = addWeeks(paymentDate, 2);
+                        }
+                    } else if (periodicity === "Mensual") {
+                        let occurrences = 0; let checkDate = new Date(reimb_start.getTime());
+                        while (checkDate <= p_end && (!reimb_end || checkDate <= reimb_end)) {
+                            if (checkDate >= p_start) occurrences++;
+                            checkDate = addWeeks(checkDate, 2);
+                        }
+                        amount_of_reimbursement_in_this_period = reimb_amount_raw * occurrences;
+                    }
+                }
+
+                if (amount_of_reimbursement_in_this_period > 0 && expenses_by_cat_p[i][reimb_cat] !== undefined) {
+                    const expense_in_category_before_this_reimb = expenses_by_cat_p[i][reimb_cat];
+                    expenses_by_cat_p[i][reimb_cat] = Math.max(0, expense_in_category_before_this_reimb - amount_of_reimbursement_in_this_period);
+                    const actual_reduction_in_category = expense_in_category_before_this_reimb - expenses_by_cat_p[i][reimb_cat];
+
+                    const expenseType = data.expense_categories[reimb_cat] || "Variable";
+                    if (expenseType === "Fijo") {
+                        p_fix_exp_total_for_period -= actual_reduction_in_category;
+                    } else {
+                        p_var_exp_total_for_period -= actual_reduction_in_category;
+                    }
+                }
+            });
+
+            p_fix_exp_total_for_period = Math.max(0, p_fix_exp_total_for_period);
+            p_var_exp_total_for_period = Math.max(0, p_var_exp_total_for_period);
+
+            fixed_exp_p[i] = p_fix_exp_total_for_period;
+            var_exp_p[i] = p_var_exp_total_for_period;
+
+            const net_flow = p_inc_total - (fixed_exp_p[i] + var_exp_p[i]); net_flow_p[i] = net_flow;
             const end_bal = currentBalance + net_flow; end_bal_p[i] = end_bal;
             currentBalance = end_bal; currentDate = (periodicity === "Mensual") ? addMonths(currentDate, 1) : addWeeks(currentDate, 1);
         }
@@ -1341,20 +1600,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- LÓGICA PESTAÑA GRÁFICO ---
     function renderCashflowChart(periodDates, incomes, totalExpenses, netFlows, endBalances) {
         if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
-        if (!periodDates || periodDates.length === 0) { if(chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
-        if(chartMessage) chartMessage.textContent = "";
+        if (!periodDates || periodDates.length === 0) { if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
+        if (chartMessage) chartMessage.textContent = "";
         const labels = periodDates.map(date => currentBackupData.analysis_periodicity === "Semanal" ? `Sem ${getWeekNumber(date)[1]} ${getWeekNumber(date)[0]}` : `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`);
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
             type: 'line',
-            data: { labels: labels, datasets: [ { label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, } ] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { type: 'linear', display: true, position: 'left', title: { display: true, text: `Saldo / Flujos (${currentBackupData.display_currency_symbol || '$'})` } } }, plugins: { tooltip: { callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) label += ': '; if (context.parsed.y !== null) label += formatCurrencyJS(context.parsed.y, currentBackupData.display_currency_symbol || '$'); return label; } } }, legend: { position: 'top' } } }
+            data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { type: 'linear', display: true, position: 'left', title: { display: true, text: `Saldo / Flujos (${currentBackupData.display_currency_symbol || '$'})` } } }, plugins: { tooltip: { callbacks: { label: function (context) { let label = context.dataset.label || ''; if (label) label += ': '; if (context.parsed.y !== null) label += formatCurrencyJS(context.parsed.y, currentBackupData.display_currency_symbol || '$'); return label; } } }, legend: { position: 'top' } } }
         });
     }
 
     // --- LÓGICA PESTAÑA BABY STEPS ---
     function renderBabySteps() {
         if (!babyStepsContainer || !currentBackupData || !currentBackupData.baby_steps_status) return;
-        babyStepsContainer.innerHTML = ''; 
+        babyStepsContainer.innerHTML = '';
         BABY_STEPS_DATA_JS.forEach((stepData, stepIndex) => {
             const stepDiv = document.createElement('div'); stepDiv.classList.add('baby-step');
             const title = document.createElement('h3'); title.textContent = stepData.title; stepDiv.appendChild(title);
@@ -1365,7 +1624,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const ul = document.createElement('ul');
                     stepData[listType].forEach((itemText, itemIndex) => {
                         const li = document.createElement('li'); const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.id = `step-${stepIndex}-${listType}-${itemIndex}`;
-                        if (currentBackupData.baby_steps_status[stepIndex] && currentBackupData.baby_steps_status[stepIndex][listType]) checkbox.checked = currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] || false; else checkbox.checked = false; 
+                        if (currentBackupData.baby_steps_status[stepIndex] && currentBackupData.baby_steps_status[stepIndex][listType]) checkbox.checked = currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] || false; else checkbox.checked = false;
                         checkbox.addEventListener('change', (e) => { if (currentBackupData.baby_steps_status[stepIndex] && currentBackupData.baby_steps_status[stepIndex][listType]) currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] = e.target.checked; });
                         const label = document.createElement('label'); label.htmlFor = checkbox.id; label.textContent = itemText;
                         li.appendChild(checkbox); li.appendChild(label); ul.appendChild(li);
@@ -1400,10 +1659,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- LÓGICA PESTAÑA LOG ---
+    // --- LÓGICA PESTAÑA LOG (ACTUALIZADA) ---
     function renderLogTab() {
         if (!changeLogList) return;
-        changeLogList.innerHTML = ''; 
+        changeLogList.innerHTML = '';
 
         if (!changeLogEntries || changeLogEntries.length === 0) {
             const li = document.createElement('li');
@@ -1413,23 +1672,29 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        changeLogEntries.forEach(entry => { 
+        changeLogEntries.forEach(entry => {
             const li = document.createElement('li');
             li.classList.add('log-entry');
-            
+
             const headerDiv = document.createElement('div');
             headerDiv.classList.add('log-entry-header');
 
             const timestampSpan = document.createElement('span');
             timestampSpan.classList.add('log-timestamp');
             const date = new Date(entry.timestamp);
-            timestampSpan.textContent = `${date.toLocaleDateString('es-CL')} ${date.toLocaleTimeString('es-CL')}`;
-            
+            timestampSpan.textContent = `[${date.toLocaleDateString('es-CL')} ${date.toLocaleTimeString('es-CL')}]`; // Formato con corchetes
+
+            // Paso 4: Muestra el usuario en la UI
+            const userSpan = document.createElement('span');
+            userSpan.classList.add('log-user');
+            userSpan.textContent = entry.user || "Desconocido"; // Mostrar "Desconocido" si no hay usuario
+
             const messageSpan = document.createElement('span');
             messageSpan.classList.add('log-message');
             messageSpan.textContent = entry.message;
-            
+
             headerDiv.appendChild(timestampSpan);
+            headerDiv.appendChild(userSpan); // Añadir userSpan después del timestamp
             headerDiv.appendChild(messageSpan);
             li.appendChild(headerDiv);
 
@@ -1447,23 +1712,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+
     // --- FUNCIONES AUXILIARES DE FECHAS Y FORMATO ---
     function formatCurrencyJS(value, symbol = '$') { if (value === null || typeof value !== 'number' || isNaN(value)) return `${symbol}0`; return `${symbol}${Math.round(value).toLocaleString('es-CL')}`; }
     function addMonths(date, months) { const d = new Date(date.getTime()); d.setUTCMonth(d.getUTCMonth() + months); return d; }
     function addWeeks(date, weeks) { const d = new Date(date.getTime()); d.setUTCDate(d.getUTCDate() + (weeks * 7)); return d; }
     function getISODateString(date) { if (!(date instanceof Date) || isNaN(date.getTime())) return ''; return date.getUTCFullYear() + '-' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date.getUTCDate()).slice(-2); }
     function getWeekNumber(d) { const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7)); const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1)); const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7); return [date.getUTCFullYear(), weekNo]; }
-    function getMondayOfWeek(year, week) { const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7)); const dayOfWeek = simple.getUTCDay(); const isoDayOfWeek = ((dayOfWeek + 6) % 7) +1; const diff = isoDayOfWeek - 1; simple.setUTCDate(simple.getUTCDate() - diff); return simple; }
+    function getMondayOfWeek(year, week) { const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7)); const dayOfWeek = simple.getUTCDay(); const isoDayOfWeek = ((dayOfWeek + 6) % 7) + 1; const diff = isoDayOfWeek - 1; simple.setUTCDate(simple.getUTCDate() - diff); return simple; }
+    function getDaysInMonth(year, month) { return new Date(year, month + 1, 0).getUTCDate(); }
+
 
     // --- INICIALIZACIÓN ---
-    showLoginScreen(); 
+    showLoginScreen();
     const today = new Date();
     const todayISO = getISODateString(today);
     incomeStartDateInput.value = todayISO;
     expenseStartDateInput.value = todayISO;
-    analysisStartDateInput.value = todayISO; 
-    incomeEndDateInput.disabled = true; 
-    expenseEndDateInput.disabled = true; 
-    updateAnalysisDurationLabel(); 
-    updateUsdClpInfoLabel(); 
+    analysisStartDateInput.value = todayISO;
+    incomeEndDateInput.disabled = true;
+    expenseEndDateInput.disabled = true;
+    updateAnalysisDurationLabel();
+    updateUsdClpInfoLabel();
+    incomeReimbursementCategoryContainer.style.display = 'none';
 });

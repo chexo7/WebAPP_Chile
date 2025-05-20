@@ -111,7 +111,17 @@
                                 <input type="checkbox" id="income-ongoing" checked>
                                 <label for="income-ongoing">Ingreso recurrente sin fin</label>
                             </div>
-
+                            
+                            <div class="checkbox-container">
+                                <input type="checkbox" id="income-is-reimbursement">
+                                <label for="income-is-reimbursement">Es un reembolso</label>
+                            </div>
+                            <div id="income-reimbursement-category-container" style="display:none;">
+                                <label for="income-reimbursement-category">Categoría de Gasto a Reembolsar:</label>
+                                <select id="income-reimbursement-category">
+                                    <option value="">-- Selecciona Categoría de Gasto --</option>
+                                </select>
+                            </div>
                             <button type="submit" id="add-income-button">Agregar Ingreso</button>
                             <button type="button" id="cancel-edit-income-button" style="display:none;" class="danger">Cancelar Edición</button>
                         </form>
@@ -129,6 +139,7 @@
                                         <th>Frecuencia</th>
                                         <th>Inicio</th>
                                         <th>Fin</th>
+                                        <th>Tipo</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -164,7 +175,7 @@
                                 <option value="Mensual">Mensual</option>
                                 <option value="Semanal">Semanal</option>
                                 <option value="Bi-semanal">Bi-semanal</option>
-                                <option value="Único">Único</option>
+                                <option value="Único" selected>Único</option>
                             </select>
 
                             <label for="expense-start-date">Fecha Inicio / Única:</label>
