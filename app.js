@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const analysisStartDateInput = document.getElementById('analysis-start-date-input');
     const analysisInitialBalanceInput = document.getElementById('analysis-initial-balance-input');
     const displayCurrencySymbolInput = document.getElementById('display-currency-symbol-input');
-    const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); 
+    const usdClpInfoLabel = document.getElementById('usd-clp-info-label');
     const applySettingsButton = document.getElementById('apply-settings-button');
 
     // Elements for "Ingresos" (Incomes) Tab
@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     const MONTH_NAMES_FULL_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const DATE_WEEK_START_FORMAT = (date) => `${date.getUTCDate()}-${MONTH_NAMES_ES[date.getUTCMonth()]}`;
-    
+
     let currentBackupData = null;     // Holds the currently loaded data from a backup.
     let originalLoadedData = null;  // Holds a pristine copy of the loaded data for change detection.
     let currentBackupKey = null;      // Key of the currently loaded backup.
@@ -148,7 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 "No usas tarjetas de crédito para cubrir emergencias mientras estás en este paso.",
             ]
         },
-        // ... (Add other baby steps here)
          {
             "title": "Paso 2: Pagar todas las deudas (excepto la hipoteca) con la “bola de nieve”",
             "description": "Liberarte de las deudas de consumo es crucial para redirigir tu dinero hacia la creación de riqueza. La 'bola de nieve' te da victorias rápidas y motivación.",
@@ -267,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logoutArea.style.display = 'none';
         dataSelectionContainer.style.display = 'none';
         mainContentContainer.style.display = 'none';
-        
+
         clearAllDataViews(); // Clear any previously displayed data
         currentBackupData = null;
         originalLoadedData = null;
@@ -285,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         authContainer.style.display = 'block';
         loginForm.style.display = 'none';
         logoutArea.style.display = 'block';
-        authStatus.textContent = `Conectado como: ${user.email}`; 
+        authStatus.textContent = `Conectado como: ${user.email}`;
         dataSelectionContainer.style.display = 'block';
         mainContentContainer.style.display = 'none';
         fetchBackups(); // Load available backups for the user
@@ -314,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (budgetsTableView) budgetsTableView.innerHTML = '';
         if (budgetSummaryTableBody) budgetSummaryTableBody.innerHTML = '';
         if (paymentsTableView) paymentsTableView.innerHTML = '';
-        
+
         // Clear other dynamic content areas
         if (babyStepsContainer) babyStepsContainer.innerHTML = '';
         if (pendingRemindersList) pendingRemindersList.innerHTML = '';
@@ -338,7 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cashflowChartInstance = null;
         }
         if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja.";
-        
+
         // Reset USD/CLP label
         if (usdClpInfoLabel) usdClpInfoLabel.textContent = "1 USD = $CLP (Obteniendo...)";
     }
@@ -353,6 +352,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const email = emailInput.value;
         const password = passwordInput.value;
         authStatus.textContent = "Ingresando...";
+        // MODIFICACIÓN: Asegurar que logoutArea (y por lo tanto authStatus) sea visible
+        logoutArea.style.display = 'block';
         loginButton.disabled = true;
 
         let loggedInSuccessfully = false;
@@ -377,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Initialize if it doesn't exist
                     tempAppInstance = firebase.initializeApp(configEntry.config, configEntry.appName);
                 }
-                
+
                 const tempAuthService = tempAppInstance.auth();
                 const userCredential = await tempAuthService.signInWithEmailAndPassword(email, password);
                 const user = userCredential.user;
@@ -385,15 +386,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 // CRUCIAL CHECK: Verify if the logged-in user's UID matches the target UID for this config
                 if (user && user.uid === configEntry.targetUid) {
                     // Correct UID for this Firebase configuration!
-                    
+
                     // If there was a previously active Firebase app, delete it to avoid conflicts.
                     if (currentFirebaseApp && currentFirebaseApp.name !== tempAppInstance.name) {
                         await currentFirebaseApp.delete().catch(e => console.warn("Error deleting previous Firebase app instance:", e));
                     }
-                    
+
                     // Set the global Firebase variables to this successfully matched instance.
                     currentFirebaseApp = tempAppInstance;
-                    auth = tempAuthService; 
+                    auth = tempAuthService;
                     database = currentFirebaseApp.database(configEntry.actualDatabaseURL); // Use the specified database URL
                     activeConfigEntry = configEntry; // Store the active configuration details
 
@@ -407,7 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             } catch (e) { /* App doesn't exist or already cleaned, ignore */ }
                         }
                     }
-                    
+
                     showDataSelectionScreen(user); // Proceed to data selection screen
                     loggedInSuccessfully = true;
 
@@ -435,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // UID did not match the target UID for this config. Sign out from this temporary app.
                     await tempAuthService.signOut();
                     // Optionally, delete the temporary app instance if it won't be reused.
-                    // await tempAppInstance.delete(); 
+                    // await tempAppInstance.delete();
                 }
             } catch (error) {
                 // Login failed for this specific Firebase configuration.
@@ -452,6 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!loggedInSuccessfully) {
             // If login failed for all configurations.
             authStatus.innerHTML = `Error: Usuario/contraseña erróneo o no asociado a una base de datos configurada.<br><small>Detalles: ${encounteredErrorMessages.join('; ')}</small>`;
+            // logoutArea ya está 'block', por lo que el mensaje de error será visible.
             // Ensure no Firebase app remains active if all attempts failed.
             if(currentFirebaseApp) {
                 try { await currentFirebaseApp.delete(); } catch(e){ /* ignore */ }
@@ -463,6 +465,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         loginButton.disabled = false; // Re-enable login button
     }
+
 
     /**
      * Handles the logout process.
@@ -489,7 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
         auth = null;
         database = null;
         activeConfigEntry = null;
-        
+
         showLoginScreen(); // Return to login screen
         logoutButton.disabled = false; // Re-enable logout button
     }
@@ -497,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Attach event listeners for login and logout
     loginButton.addEventListener('click', handleLogin);
     logoutButton.addEventListener('click', handleLogout);
-    
+
     // --- BACKUP LOADING LOGIC ---
     /**
      * Fetches the list of available backups from the active Firebase database.
@@ -610,7 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!currentBackupData.reminders_todos) currentBackupData.reminders_todos = [];
 
                     changeLogEntries = currentBackupData.change_log || [];
-                    if (!Array.isArray(changeLogEntries)) { 
+                    if (!Array.isArray(changeLogEntries)) {
                         changeLogEntries = [];
                     }
                     changeLogEntries.forEach(entry => { // Ensure user field exists for older logs
@@ -626,7 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentBackupData.analysis_periodicity = currentBackupData.analysis_periodicity || "Mensual";
                     currentBackupData.analysis_initial_balance = parseFloat(currentBackupData.analysis_initial_balance) || 0;
                     currentBackupData.display_currency_symbol = currentBackupData.display_currency_symbol || "$";
-                    
+
                     (currentBackupData.incomes || []).forEach(inc => {
                         if (inc.start_date) inc.start_date = new Date(inc.start_date + 'T00:00:00Z');
                         if (inc.end_date) inc.end_date = new Date(inc.end_date + 'T00:00:00Z');
@@ -650,7 +653,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderReminders();
                     renderLogTab();
                     setupPaymentPeriodSelectors();
-                    renderPaymentsTableForCurrentPeriod(); 
+                    renderPaymentsTableForCurrentPeriod();
                     renderCashflowTable(); // This will also trigger chart rendering
 
                     showMainContentScreen(); // Display the main application interface
@@ -685,7 +688,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!key) return "N/A";
         const ts = key.replace("backup_", "");
         // Check if the timestamp part matches the expected format YYYYMMDDTHHMMSS
-        if (ts.length === 15 && ts.includes('T')) { 
+        if (ts.length === 15 && ts.includes('T')) {
             const year = ts.substring(0, 4);
             const month = ts.substring(4, 6);
             const day = ts.substring(6, 8);
@@ -696,7 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return key; // Return original key if format doesn't match
     }
-    
+
     /**
      * Generates a detailed list of changes between two data states.
      * @param {object} prevData - The previous data state.
@@ -797,19 +800,19 @@ document.addEventListener('DOMContentLoaded', () => {
         // Compare Budgets
         const prevBudgets = prevData.budgets || {};
         const currentBudgets = currentData.budgets || {};
-        Object.keys(currentCategories).forEach(catName => { 
+        Object.keys(currentCategories).forEach(catName => {
             const prevAmount = prevBudgets[catName] !== undefined ? prevBudgets[catName] : 0;
             const currentAmount = currentBudgets[catName] !== undefined ? currentBudgets[catName] : 0;
             if (prevAmount !== currentAmount) {
-                if (prevBudgets[catName] === undefined && currentAmount !== 0) { 
+                if (prevBudgets[catName] === undefined && currentAmount !== 0) {
                     details.push(`Presupuesto para '${catName}' establecido a: ${formatCurrencyJS(currentAmount, symbol)}.`);
-                } else { 
+                } else {
                     details.push(`Presupuesto para '${catName}' cambiado de ${formatCurrencyJS(prevAmount, symbol)} a ${formatCurrencyJS(currentAmount, symbol)}.`);
                 }
             }
         });
-         Object.keys(prevBudgets).forEach(catName => { 
-            if (!currentCategories[catName] && prevBudgets[catName] !== 0) { 
+         Object.keys(prevBudgets).forEach(catName => {
+            if (!currentCategories[catName] && prevBudgets[catName] !== 0) {
                 details.push(`Presupuesto para categoría eliminada '${catName}' (era ${formatCurrencyJS(prevBudgets[catName], symbol)}) removido.`);
             }
         });
@@ -818,7 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const prevReminders = prevData.reminders_todos || [];
         const currentReminders = currentData.reminders_todos || [];
         currentReminders.forEach((currentRem) => {
-            const prevRem = prevReminders.find(pRem => pRem.text === currentRem.text); 
+            const prevRem = prevReminders.find(pRem => pRem.text === currentRem.text);
             if (!prevRem) {
                 details.push(`Recordatorio agregado: "${currentRem.text}" (${currentRem.completed ? 'Completado' : 'Pendiente'}).`);
             } else {
@@ -878,7 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("No hay datos cargados para guardar.");
             return;
         }
-        
+
         // Validate data before saving (names, categories for forbidden characters)
         let dataIsValidForSaving = true;
         const validationIssues = [];
@@ -926,7 +929,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Create a deep copy of the data to save.
-        const dataToSave = JSON.parse(JSON.stringify(currentBackupData)); 
+        const dataToSave = JSON.parse(JSON.stringify(currentBackupData));
         delete dataToSave.usd_clp_rate; // Do not save the USD/CLP rate to Firebase.
 
         // Ensure default values for any missing top-level properties.
@@ -980,13 +983,13 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 exp.type = "Variable"; // Default if category type not found
             }
-            if (typeof exp.is_real === 'undefined') { 
+            if (typeof exp.is_real === 'undefined') {
                 exp.is_real = false; // Ensure 'is_real' field exists
             }
         });
         // Ensure payments is an object
         const formattedPayments = {};
-        if (dataToSave.payments && typeof dataToSave.payments === 'object') { 
+        if (dataToSave.payments && typeof dataToSave.payments === 'object') {
             for (const keyObj in dataToSave.payments) {
                 formattedPayments[keyObj] = dataToSave.payments[keyObj];
             }
@@ -998,11 +1001,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const now = new Date();
         const newBackupKey = `backup_${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}T${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
-        
+
         let logMessage = `Nueva versión ${formatBackupKey(newBackupKey)} guardada.`;
         logMessage += currentBackupKey ? ` Basada en ${formatBackupKey(currentBackupKey)}.` : ` Creada desde un estado inicial o datos por defecto.`;
 
-        const user = auth.currentUser; 
+        const user = auth.currentUser;
         const userName = user && user.email ? mapEmailToName(user.email) : 'Desconocido';
 
         const logEntry = {
@@ -1011,10 +1014,10 @@ document.addEventListener('DOMContentLoaded', () => {
             details: detailedChanges,
             newVersionKey: newBackupKey,
             previousVersionKey: currentBackupKey || null,
-            user: userName 
+            user: userName
         };
 
-        if (!Array.isArray(changeLogEntries)) { 
+        if (!Array.isArray(changeLogEntries)) {
             changeLogEntries = []; // Ensure changeLogEntries is an array
         }
         changeLogEntries.unshift(logEntry); // Add new log entry to the beginning
@@ -1028,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(() => {
                 loadingMessage.style.display = 'none';
                 alert(`Cambios guardados exitosamente como nueva versión: ${formatBackupKey(newBackupKey)}`);
-                
+
                 // Update local state to reflect the saved data
                 currentBackupKey = newBackupKey;
                 currentBackupData = JSON.parse(JSON.stringify(dataToSave)); // Use the data that was actually saved
@@ -1081,7 +1084,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); renderPaymentsTableForCurrentPeriod(); }
         if (tabId === 'ajustes') {
             populateSettingsForm();
-            fetchAndUpdateUSDCLPRate(); 
+            fetchAndUpdateUSDCLPRate();
         }
         if (tabId === 'log') renderLogTab();
     }
@@ -1153,7 +1156,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // If periodicity changed, and duration was the default for the old periodicity,
         // update duration to the default for the new periodicity.
         if (prevPeriodicity !== newPeriodicity) {
-            const prevDefaultDuration = (prevPeriodicity === "Mensual") ? 12 : 52; 
+            const prevDefaultDuration = (prevPeriodicity === "Mensual") ? 12 : 52;
             if (currentBackupData.analysis_duration === prevDefaultDuration) {
                 currentBackupData.analysis_duration = (newPeriodicity === "Mensual") ? 12 : 52;
                 analysisDurationInput.value = currentBackupData.analysis_duration;
@@ -1178,9 +1181,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const isUnico = incomeFrequencySelect.value === 'Único';
         incomeOngoingCheckbox.disabled = isUnico; // Disable ongoing if frequency is "Único"
         incomeEndDateInput.disabled = isUnico || incomeOngoingCheckbox.checked;
-        if (isUnico) { 
-            incomeOngoingCheckbox.checked = false; 
-            incomeEndDateInput.value = ''; 
+        if (isUnico) {
+            incomeOngoingCheckbox.checked = false;
+            incomeEndDateInput.value = '';
         }
     });
 
@@ -1205,7 +1208,7 @@ document.addEventListener('DOMContentLoaded', () => {
         incomeReimbursementCategorySelect.innerHTML = '<option value="">-- Selecciona Categoría de Gasto --</option>';
         const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
         sortedCategories.forEach(catName => {
-            if (isFirebaseKeySafe(catName)) { 
+            if (isFirebaseKeySafe(catName)) {
                 const option = document.createElement('option');
                 option.value = catName;
                 option.textContent = catName;
@@ -1250,7 +1253,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!currentBackupData.incomes) currentBackupData.incomes = [];
             currentBackupData.incomes.push(incomeEntry);
         }
-        renderIncomesTable(); 
+        renderIncomesTable();
         renderCashflowTable(); // Recalculate cashflow
         resetIncomeForm();
     });
@@ -1261,7 +1264,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetIncomeForm() {
         incomeForm.reset();
         incomeOngoingCheckbox.checked = true; // Default to ongoing
-        incomeEndDateInput.disabled = true; 
+        incomeEndDateInput.disabled = true;
         incomeEndDateInput.value = '';
         incomeFrequencySelect.value = 'Mensual'; // Default frequency
 
@@ -1272,7 +1275,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addIncomeButton.textContent = 'Agregar Ingreso';
         cancelEditIncomeButton.style.display = 'none'; // Hide cancel edit button
         editingIncomeIndex = null; // Clear editing state
-        
+
         // Set default start date (analysis start date or today)
         incomeStartDateInput.value = getISODateString(currentBackupData && currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
     }
@@ -1285,12 +1288,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!incomesTableView || !currentBackupData || !currentBackupData.incomes) return;
         incomesTableView.innerHTML = ''; // Clear existing rows
         const searchTerm = searchIncomeInput.value.toLowerCase();
-        
+
         const filteredIncomes = currentBackupData.incomes.filter(income =>
             income.name.toLowerCase().includes(searchTerm) ||
             formatCurrencyJS(income.net_monthly, currentBackupData.display_currency_symbol || '$').toLowerCase().includes(searchTerm) ||
             income.frequency.toLowerCase().includes(searchTerm) ||
-            (income.is_reimbursement && "reembolso".includes(searchTerm)) 
+            (income.is_reimbursement && "reembolso".includes(searchTerm))
         );
 
         filteredIncomes.forEach((income) => {
@@ -1301,7 +1304,7 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = income.frequency;
             row.insertCell().textContent = income.start_date ? getISODateString(new Date(income.start_date)) : 'N/A';
             row.insertCell().textContent = income.end_date ? getISODateString(new Date(income.end_date)) : (income.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
-            
+
             const typeCell = row.insertCell();
             if (income.is_reimbursement) {
                 typeCell.innerHTML = `Reembolso <span class="reimbursement-icon" title="Reembolso de ${income.reimbursement_category || 'N/A'}">↺</span>`;
@@ -1311,16 +1314,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const actionsCell = row.insertCell();
-            const editButton = document.createElement('button'); 
-            editButton.textContent = 'Editar'; 
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Editar';
             editButton.classList.add('small-button');
-            editButton.onclick = () => loadIncomeForEdit(originalIndex); 
+            editButton.onclick = () => loadIncomeForEdit(originalIndex);
             actionsCell.appendChild(editButton);
 
-            const deleteButton = document.createElement('button'); 
-            deleteButton.textContent = 'Eliminar'; 
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Eliminar';
             deleteButton.classList.add('small-button', 'danger');
-            deleteButton.onclick = () => deleteIncome(originalIndex); 
+            deleteButton.onclick = () => deleteIncome(originalIndex);
             actionsCell.appendChild(deleteButton);
         });
     }
@@ -1336,22 +1339,22 @@ document.addEventListener('DOMContentLoaded', () => {
         incomeAmountInput.value = income.net_monthly;
         incomeFrequencySelect.value = income.frequency;
         incomeStartDateInput.value = income.start_date ? getISODateString(new Date(income.start_date)) : '';
-        
+
         const isUnico = income.frequency === 'Único';
         incomeOngoingCheckbox.disabled = isUnico;
         if (isUnico) {
-            incomeOngoingCheckbox.checked = false; 
-            incomeEndDateInput.value = ''; 
+            incomeOngoingCheckbox.checked = false;
+            incomeEndDateInput.value = '';
             incomeEndDateInput.disabled = true;
         } else {
-            incomeOngoingCheckbox.checked = !income.end_date; 
+            incomeOngoingCheckbox.checked = !income.end_date;
             incomeEndDateInput.value = income.end_date ? getISODateString(new Date(income.end_date)) : '';
             incomeEndDateInput.disabled = incomeOngoingCheckbox.checked;
         }
 
         incomeIsReimbursementCheckbox.checked = income.is_reimbursement || false;
         if (incomeIsReimbursementCheckbox.checked) {
-            populateIncomeReimbursementCategoriesDropdown(); 
+            populateIncomeReimbursementCategoriesDropdown();
             incomeReimbursementCategorySelect.value = income.reimbursement_category || '';
             incomeReimbursementCategoryContainer.style.display = 'block';
         } else {
@@ -1359,7 +1362,7 @@ document.addEventListener('DOMContentLoaded', () => {
             incomeReimbursementCategoryContainer.style.display = 'none';
         }
 
-        addIncomeButton.textContent = 'Guardar Cambios'; 
+        addIncomeButton.textContent = 'Guardar Cambios';
         cancelEditIncomeButton.style.display = 'inline-block'; // Show cancel button
         editingIncomeIndex = index; // Set editing state
         document.getElementById('ingresos').scrollIntoView({ behavior: 'smooth' }); // Scroll to form
@@ -1372,10 +1375,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function deleteIncome(index) {
         if (confirm(`¿Eliminar ingreso "${currentBackupData.incomes[index].name}"?`)) {
             currentBackupData.incomes.splice(index, 1);
-            renderIncomesTable(); 
+            renderIncomesTable();
             renderCashflowTable(); // Recalculate cashflow
-            if (editingIncomeIndex === index) resetIncomeForm(); 
-            else if (editingIncomeIndex !== null && editingIncomeIndex > index) editingIncomeIndex--; 
+            if (editingIncomeIndex === index) resetIncomeForm();
+            else if (editingIncomeIndex !== null && editingIncomeIndex > index) editingIncomeIndex--;
         }
     }
 
@@ -1388,16 +1391,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const isUnico = expenseFrequencySelect.value === 'Único';
         expenseOngoingCheckbox.disabled = isUnico;
         expenseEndDateInput.disabled = isUnico || expenseOngoingCheckbox.checked;
-        if (isUnico) { 
-            expenseOngoingCheckbox.checked = false; 
-            expenseEndDateInput.value = ''; 
+        if (isUnico) {
+            expenseOngoingCheckbox.checked = false;
+            expenseEndDateInput.value = '';
         }
     });
     /**
      * Populates expense category dropdowns (for expenses and budgets).
      */
     function populateExpenseCategoriesDropdowns() {
-        const selects = [expenseCategorySelect, budgetCategorySelect]; 
+        const selects = [expenseCategorySelect, budgetCategorySelect];
         selects.forEach(select => {
             if (!select || !currentBackupData || !currentBackupData.expense_categories) {
                 if(select) select.innerHTML = '<option value="">No hay categorías</option>';
@@ -1407,9 +1410,9 @@ document.addEventListener('DOMContentLoaded', () => {
             select.innerHTML = '<option value="">-- Selecciona Categoría --</option>';
             const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
             sortedCategories.forEach(catName => {
-                if (isFirebaseKeySafe(catName)) { 
-                    const option = document.createElement('option'); 
-                    option.value = catName; 
+                if (isFirebaseKeySafe(catName)) {
+                    const option = document.createElement('option');
+                    option.value = catName;
                     option.textContent = catName;
                     select.appendChild(option);
                 }
@@ -1429,13 +1432,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const trimmedName = newCategoryName.trim();
             if (!isFirebaseKeySafe(trimmedName)) { alert(`El nombre de categoría "${trimmedName}" contiene caracteres no permitidos: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}.`); return; }
             if (currentBackupData.expense_categories[trimmedName]) { alert(`La categoría "${trimmedName}" ya existe.`); return; }
-            
+
             const categoryType = prompt(`Tipo para "${trimmedName}" (Fijo/Variable):`, "Variable");
             if (categoryType && (categoryType.toLowerCase() === 'fijo' || categoryType.toLowerCase() === 'variable')) {
                 currentBackupData.expense_categories[trimmedName] = categoryType.charAt(0).toUpperCase() + categoryType.slice(1).toLowerCase();
-                if (!currentBackupData.budgets) currentBackupData.budgets = {}; 
+                if (!currentBackupData.budgets) currentBackupData.budgets = {};
                 currentBackupData.budgets[trimmedName] = 0; // Default budget to 0
-                populateExpenseCategoriesDropdowns(); 
+                populateExpenseCategoriesDropdowns();
                 renderBudgetsTable(); // Update budgets table
                 alert(`Categoría "${trimmedName}" (${currentBackupData.expense_categories[trimmedName]}) agregada.`);
             } else if (categoryType !== null) { // User provided input but it was invalid
@@ -1449,7 +1452,7 @@ document.addEventListener('DOMContentLoaded', () => {
     removeCategoryButton.addEventListener('click', () => {
         const categoryToRemove = expenseCategorySelect.value;
         if (!categoryToRemove) { alert("Selecciona una categoría para eliminar."); return; }
-        
+
         // Check if category is in use
         const isInUseByExpense = (currentBackupData.expenses || []).some(exp => exp.category === categoryToRemove);
         const isInUseByReimbursement = (currentBackupData.incomes || []).some(inc => inc.is_reimbursement && inc.reimbursement_category === categoryToRemove);
@@ -1459,7 +1462,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirm(`¿Eliminar categoría "${categoryToRemove}" y su presupuesto asociado?`)) {
             delete currentBackupData.expense_categories[categoryToRemove];
             if (currentBackupData.budgets) delete currentBackupData.budgets[categoryToRemove];
-            populateExpenseCategoriesDropdowns(); 
+            populateExpenseCategoriesDropdowns();
             renderBudgetsTable();
             alert(`Categoría "${categoryToRemove}" eliminada.`);
         }
@@ -1508,7 +1511,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isNaN(amount) || !category || !startDate) { alert("Completa los campos obligatorios (Nombre, Monto, Categoría, Fecha Inicio)."); return; }
         if (endDate && startDate && endDate < startDate) { alert("Fecha de fin no puede ser anterior a fecha de inicio."); return; }
 
-        const expenseType = currentBackupData.expense_categories[category] || "Variable"; 
+        const expenseType = currentBackupData.expense_categories[category] || "Variable";
         const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal };
 
         if (editingExpenseIndex !== null) { // Editing existing expense
@@ -1517,7 +1520,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!currentBackupData.expenses) currentBackupData.expenses = [];
             currentBackupData.expenses.push(expenseEntry);
         }
-        renderExpensesTable(); 
+        renderExpensesTable();
         renderCashflowTable(); // Recalculate cashflow
         resetExpenseForm();
     });
@@ -1526,21 +1529,21 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function resetExpenseForm() {
         expenseForm.reset();
-        expenseOngoingCheckbox.checked = true; 
-        expenseEndDateInput.disabled = true; 
+        expenseOngoingCheckbox.checked = true;
+        expenseEndDateInput.disabled = true;
         expenseEndDateInput.value = '';
         expenseFrequencySelect.value = 'Único'; // Default frequency
         expenseIsRealCheckbox.checked = false; // Default not real
 
         // Auto-select first category if available
-        if (expenseCategorySelect.options.length > 0 && expenseCategorySelect.value === "") { 
+        if (expenseCategorySelect.options.length > 0 && expenseCategorySelect.value === "") {
             if (expenseCategorySelect.options[0].value !== "") expenseCategorySelect.selectedIndex = 0;
             else if (expenseCategorySelect.options.length > 1) expenseCategorySelect.selectedIndex = 1;
         }
-        addExpenseButton.textContent = 'Agregar Gasto'; 
+        addExpenseButton.textContent = 'Agregar Gasto';
         cancelEditExpenseButton.style.display = 'none'; // Hide cancel button
         editingExpenseIndex = null; // Clear editing state
-        
+
         // Set default start date
         expenseStartDateInput.value = getISODateString(currentBackupData && currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
         updateRemoveCategoryButtonState(); // Update button state
@@ -1553,7 +1556,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!expensesTableView || !currentBackupData || !currentBackupData.expenses) return;
         expensesTableView.innerHTML = ''; // Clear existing rows
         const searchTerm = searchExpenseInput.value.toLowerCase();
-        
+
         const filteredExpenses = currentBackupData.expenses.filter(expense =>
             expense.name.toLowerCase().includes(searchTerm) ||
             formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$').toLowerCase().includes(searchTerm) ||
@@ -1571,18 +1574,18 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A';
             row.insertCell().textContent = expense.end_date ? getISODateString(new Date(expense.end_date)) : (expense.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
             row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
-            
+
             const actionsCell = row.insertCell();
-            const editButton = document.createElement('button'); 
-            editButton.textContent = 'Editar'; 
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Editar';
             editButton.classList.add('small-button');
-            editButton.onclick = () => loadExpenseForEdit(originalIndex); 
+            editButton.onclick = () => loadExpenseForEdit(originalIndex);
             actionsCell.appendChild(editButton);
 
-            const deleteButton = document.createElement('button'); 
-            deleteButton.textContent = 'Eliminar'; 
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Eliminar';
             deleteButton.classList.add('small-button', 'danger');
-            deleteButton.onclick = () => deleteExpense(originalIndex); 
+            deleteButton.onclick = () => deleteExpense(originalIndex);
             actionsCell.appendChild(deleteButton);
         });
     }
@@ -1593,27 +1596,27 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function loadExpenseForEdit(index) {
         const expense = currentBackupData.expenses[index];
-        expenseNameInput.value = expense.name; 
+        expenseNameInput.value = expense.name;
         expenseAmountInput.value = expense.amount;
-        expenseCategorySelect.value = expense.category; 
+        expenseCategorySelect.value = expense.category;
         expenseFrequencySelect.value = expense.frequency;
         expenseStartDateInput.value = expense.start_date ? getISODateString(new Date(expense.start_date)) : '';
-        expenseIsRealCheckbox.checked = expense.is_real || false; 
+        expenseIsRealCheckbox.checked = expense.is_real || false;
 
         const isUnico = expense.frequency === 'Único';
         expenseOngoingCheckbox.disabled = isUnico;
         if (isUnico) {
-            expenseOngoingCheckbox.checked = false; 
-            expenseEndDateInput.value = ''; 
+            expenseOngoingCheckbox.checked = false;
+            expenseEndDateInput.value = '';
             expenseEndDateInput.disabled = true;
         } else {
             expenseOngoingCheckbox.checked = !expense.end_date;
             expenseEndDateInput.value = expense.end_date ? getISODateString(new Date(expense.end_date)) : '';
             expenseEndDateInput.disabled = expenseOngoingCheckbox.checked;
         }
-        addExpenseButton.textContent = 'Guardar Cambios'; 
+        addExpenseButton.textContent = 'Guardar Cambios';
         cancelEditExpenseButton.style.display = 'inline-block';
-        editingExpenseIndex = index; 
+        editingExpenseIndex = index;
         document.getElementById('gastos').scrollIntoView({ behavior: 'smooth' });
         updateRemoveCategoryButtonState();
     }
@@ -1624,7 +1627,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function deleteExpense(index) {
         if (confirm(`¿Eliminar gasto "${currentBackupData.expenses[index].name}"?`)) {
             currentBackupData.expenses.splice(index, 1);
-            renderExpensesTable(); 
+            renderExpensesTable();
             renderCashflowTable();
             if (editingExpenseIndex === index) resetExpenseForm();
             else if (editingExpenseIndex !== null && editingExpenseIndex > index) editingExpenseIndex--;
@@ -1637,8 +1640,8 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function resetBudgetForm() {
         budgetForm.reset();
-        if (budgetCategorySelect.options.length > 0) budgetCategorySelect.selectedIndex = 0; 
-        budgetAmountInput.value = ''; 
+        if (budgetCategorySelect.options.length > 0) budgetCategorySelect.selectedIndex = 0;
+        budgetAmountInput.value = '';
     }
     /**
      * Handles submission of the budget form.
@@ -1651,11 +1654,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isNaN(amount) || amount < 0) { alert("Ingresa un monto válido."); return; }
         if (!isFirebaseKeySafe(category)) { alert(`Categoría "${category}" con nombre no permitido.`); return; }
 
-        if (!currentBackupData.budgets) currentBackupData.budgets = {}; 
+        if (!currentBackupData.budgets) currentBackupData.budgets = {};
         currentBackupData.budgets[category] = amount;
-        renderBudgetsTable(); 
-        renderBudgetSummaryTable(); 
-        renderCashflowTable(); 
+        renderBudgetsTable();
+        renderBudgetSummaryTable();
+        renderCashflowTable();
         alert(`Presupuesto para "${category}" guardado como ${formatCurrencyJS(amount, currentBackupData.display_currency_symbol || '$')}.`);
     });
     /**
@@ -1699,9 +1702,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const analysisStartDate = new Date(currentBackupData.analysis_start_date);
-        const currentMonth = analysisStartDate.getUTCMonth(); 
+        const currentMonth = analysisStartDate.getUTCMonth();
         const currentYear = analysisStartDate.getUTCFullYear();
-        const expensesThisMonth = {}; 
+        const expensesThisMonth = {};
 
         // Calculate expenses for the "current" month (based on analysis_start_date)
         (currentBackupData.expenses || []).forEach(exp => {
@@ -1714,12 +1717,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     amountForSummary = exp.amount;
                 }
             } else if (exp.frequency === "Mensual") {
-                if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && 
+                if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) &&
                     (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) {
                     amountForSummary = exp.amount;
                 }
             } else if (exp.frequency === "Semanal") {
-                if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && 
+                if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) &&
                     (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) {
                     amountForSummary = exp.amount * (52 / 12); // Approximate
                 }
@@ -1766,13 +1769,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const budget = currentBackupData.budgets[catName] || 0;
             const spent = expensesThisMonth[catName] || 0;
             const difference = budget - spent;
-            const percentageSpent = budget > 0 ? (spent / budget * 100) : (spent > 0 ? 100 : 0) ; 
+            const percentageSpent = budget > 0 ? (spent / budget * 100) : (spent > 0 ? 100 : 0) ;
 
             const row = budgetSummaryTableBody.insertRow();
             row.insertCell().textContent = catName;
             row.insertCell().textContent = formatCurrencyJS(budget, currentBackupData.display_currency_symbol);
             row.insertCell().textContent = formatCurrencyJS(spent, currentBackupData.display_currency_symbol);
-            
+
             const diffCell = row.insertCell(); diffCell.textContent = formatCurrencyJS(difference, currentBackupData.display_currency_symbol);
             diffCell.classList.toggle('text-red', difference < 0);
             diffCell.classList.toggle('text-green', difference > 0 && budget > 0);
@@ -1782,7 +1785,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (percentageSpent > 100) percCell.classList.add('text-red');
                 else if (percentageSpent >= 80) percCell.classList.add('text-orange');
                 else percCell.classList.add('text-green');
-            } else if (spent > 0) { 
+            } else if (spent > 0) {
                 percCell.classList.add('text-red');
             }
         });
@@ -1794,7 +1797,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
      function setupPaymentPeriodSelectors() {
         currentPaymentViewDate = (currentBackupData && currentBackupData.analysis_start_date) ? new Date(currentBackupData.analysis_start_date) : new Date();
-        
+
         const analysisStartDate = new Date(currentPaymentViewDate);
         // Calculate analysis end date based on duration and periodicity
         let analysisEndDate;
@@ -1810,8 +1813,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         paymentYearSelect.innerHTML = '';
-        const startYear = Math.min(analysisStartDate.getUTCFullYear(), new Date().getUTCFullYear()) - 2; 
-        const endYear = Math.max(analysisEndDate.getUTCFullYear(), new Date().getUTCFullYear()) + 5;   
+        const startYear = Math.min(analysisStartDate.getUTCFullYear(), new Date().getUTCFullYear()) - 2;
+        const endYear = Math.max(analysisEndDate.getUTCFullYear(), new Date().getUTCFullYear()) + 5;
         for (let y = startYear; y <= endYear; y++) { const option = document.createElement('option'); option.value = y; option.textContent = y; paymentYearSelect.appendChild(option); }
         paymentYearSelect.value = currentPaymentViewDate.getUTCFullYear();
 
@@ -1825,7 +1828,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updatePaymentPeriodSelectorVisibility();
         [paymentYearSelect, paymentMonthSelect, paymentWeekSelect].forEach(sel => {
-            sel.removeEventListener('change', renderPaymentsTableForCurrentPeriod); 
+            sel.removeEventListener('change', renderPaymentsTableForCurrentPeriod);
             sel.addEventListener('change', renderPaymentsTableForCurrentPeriod);
         });
     }
@@ -1854,7 +1857,7 @@ document.addEventListener('DOMContentLoaded', () => {
             paymentYearSelect.value = newYear; paymentWeekSelect.value = newWeekNumber;
         } else {
             let month = parseInt(paymentMonthSelect.value);
-            const newMonthDate = new Date(Date.UTC(year, month, 15)); 
+            const newMonthDate = new Date(Date.UTC(year, month, 15));
             newMonthDate.setUTCMonth(newMonthDate.getUTCMonth() + direction);
             paymentYearSelect.value = newMonthDate.getUTCFullYear(); paymentMonthSelect.value = newMonthDate.getUTCMonth();
         }
@@ -1868,7 +1871,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(paymentsTableView) paymentsTableView.innerHTML = '<tr><td colspan="6">No hay datos de gastos.</td></tr>';
             return;
         }
-        updatePaymentPeriodSelectorVisibility(); 
+        updatePaymentPeriodSelectorVisibility();
 
         const isWeeklyView = currentBackupData.analysis_periodicity === "Semanal";
         const year = parseInt(paymentYearSelect.value);
@@ -1878,15 +1881,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const week = parseInt(paymentWeekSelect.value);
             periodStart = getMondayOfWeek(year, week);
             periodEnd = addWeeks(new Date(periodStart), 1);
-            periodEnd.setUTCDate(periodEnd.getUTCDate() - 1); 
-            paymentLogPeriodKeyPart = week; 
+            periodEnd.setUTCDate(periodEnd.getUTCDate() - 1);
+            paymentLogPeriodKeyPart = week;
         } else {
             const monthIndex = parseInt(paymentMonthSelect.value);
             periodStart = new Date(Date.UTC(year, monthIndex, 1));
-            periodEnd = new Date(Date.UTC(year, monthIndex + 1, 0)); 
-            paymentLogPeriodKeyPart = monthIndex + 1; 
+            periodEnd = new Date(Date.UTC(year, monthIndex + 1, 0));
+            paymentLogPeriodKeyPart = monthIndex + 1;
         }
-        currentPaymentViewDate = periodStart; 
+        currentPaymentViewDate = periodStart;
 
         paymentsTableView.innerHTML = ''; let expensesInPeriodFound = false;
         currentBackupData.expenses.forEach(expense => {
@@ -1898,11 +1901,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (expense.frequency === "Único") {
                 if (expStartDate >= periodStart && expStartDate <= periodEnd) occursInPeriod = true;
             } else if (expense.frequency === "Mensual") {
-                if (isWeeklyView) { 
-                    const payDay = expStartDate.getUTCDate(); 
+                if (isWeeklyView) {
+                    const payDay = expStartDate.getUTCDate();
                     const payDateThisMonth = new Date(Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth(), payDay));
                     if (payDateThisMonth >= periodStart && payDateThisMonth <= periodEnd) occursInPeriod = true;
-                } else { 
+                } else {
                    if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true;
                 }
             } else if (expense.frequency === "Semanal") {
@@ -1919,7 +1922,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Safety break for potential infinite loop with incorrect date logic
                         if (paymentDate < expStartDate && expStartDate > addWeeks(paymentDate, -2)) {
                             console.warn("Bi-semanal payment loop safety break triggered for expense:", expense.name);
-                            break; 
+                            break;
                         }
                     }
                 }
@@ -1930,9 +1933,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.insertCell().textContent = expense.name;
                 row.insertCell().textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol);
                 row.insertCell().textContent = expense.category;
-                row.insertCell().textContent = currentBackupData.expense_categories[expense.category] || 'Variable'; 
+                row.insertCell().textContent = currentBackupData.expense_categories[expense.category] || 'Variable';
                 row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
-                
+
                 const paidCell = row.insertCell(); const checkbox = document.createElement('input'); checkbox.type = 'checkbox';
                 const paymentKey = `${expense.name}|${year}|${paymentLogPeriodKeyPart}`;
                 checkbox.checked = currentBackupData.payments && currentBackupData.payments[paymentKey] === true;
@@ -1992,7 +1995,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const periodicity = currentBackupData.analysis_periodicity;
         const initialBalance = parseFloat(currentBackupData.analysis_initial_balance);
 
-        const startQDate = analysisStartDateObj; 
+        const startQDate = analysisStartDateObj;
         const startStr = `${('0' + startQDate.getUTCDate()).slice(-2)}/${('0' + (startQDate.getUTCMonth() + 1)).slice(-2)}/${startQDate.getUTCFullYear()}`;
         const durationUnit = periodicity === "Semanal" ? "Semanas" : "Meses";
         cashflowTitle.textContent = `Proyección Flujo de Caja (${currentBackupData.analysis_duration} ${durationUnit} desde ${startStr})`;
@@ -2017,10 +2020,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
         const fixedCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === "Fijo").sort() : [];
         const variableCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === "Variable").sort() : [];
-        
+
         fixedCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat }));
         cf_row_definitions.push({ key: 'FIXED_EXP_TOTAL', label: "Total Gastos Fijos", isBold: true, isHeaderBg: true });
-        
+
         variableCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat }));
         cf_row_definitions.push({ key: 'VAR_EXP_TOTAL', label: "Total Gastos Variables", isBold: true, isHeaderBg: true });
 
@@ -2033,7 +2036,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tdLabel.textContent = def.isIndent ? `  ${def.label}` : def.label;
             if (def.isBold) tdLabel.classList.add('bold');
             if (def.isHeaderBg) tr.classList.add('bg-header');
-            else if (rowIndex % 2 !== 0 && !def.isHeaderBg) tr.classList.add('bg-alt-row'); 
+            else if (rowIndex % 2 !== 0 && !def.isHeaderBg) tr.classList.add('bg-alt-row');
 
             for (let i = 0; i < periodDates.length; i++) {
                 const tdValue = tr.insertCell();
@@ -2046,7 +2049,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'VAR_EXP_TOTAL': value = -var_exp_p[i]; break;
                     case 'NET_FLOW':      value = net_flow_p[i]; break;
                     case 'END_BALANCE':   value = end_bal_p[i]; colorClass = value >= 0 ? 'text-blue' : 'text-red'; break;
-                    default: 
+                    default:
                         value = (def.category && expenses_by_cat_p[i]) ? -(expenses_by_cat_p[i][def.category] || 0) : 0;
                 }
                 tdValue.textContent = formatCurrencyJS(value, symbol);
@@ -2055,7 +2058,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p);
-        renderBudgetSummaryTable(); 
+        renderBudgetSummaryTable();
     }
     /**
      * Calculates cashflow data based on current settings, incomes, and expenses.
@@ -2063,7 +2066,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @returns {object} An object containing arrays of cashflow data per period.
      */
     function calculateCashFlowData(data) {
-        const startDate = data.analysis_start_date; 
+        const startDate = data.analysis_start_date;
         const duration = parseInt(data.analysis_duration, 10);
         const periodicity = data.analysis_periodicity;
         const initialBalance = parseFloat(data.analysis_initial_balance);
@@ -2074,7 +2077,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let var_exp_p = Array(duration).fill(0.0);
         let net_flow_p = Array(duration).fill(0.0);
         let end_bal_p = Array(duration).fill(0.0);
-        let expenses_by_cat_p = Array(duration).fill(null).map(() => ({})); 
+        let expenses_by_cat_p = Array(duration).fill(null).map(() => ({}));
 
         let currentDate = new Date(startDate.getTime());
         let currentBalance = initialBalance;
@@ -2082,7 +2085,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fixedCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Fijo").sort() : [];
         const variableCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Variable").sort() : [];
         const orderedCategories = [...fixedCategories, ...variableCategories];
-        
+
         orderedCategories.forEach(cat => {
             for (let i = 0; i < duration; i++) {
                 expenses_by_cat_p[i][cat] = 0.0;
@@ -2094,20 +2097,20 @@ document.addEventListener('DOMContentLoaded', () => {
             let p_end;
             if (periodicity === "Mensual") {
                 p_end = addMonths(new Date(p_start.getTime()), 1);
-                p_end.setUTCDate(p_end.getUTCDate() - 1); 
-            } else { 
+                p_end.setUTCDate(p_end.getUTCDate() - 1);
+            } else {
                 p_end = addWeeks(new Date(p_start.getTime()), 1);
-                p_end.setUTCDate(p_end.getUTCDate() - 1); 
+                p_end.setUTCDate(p_end.getUTCDate() - 1);
             }
             periodDates.push(p_start);
 
             let p_inc_total = 0.0;
             (data.incomes || []).forEach(inc => {
-                if (!inc.start_date) return; 
-                if (inc.is_reimbursement) return; 
+                if (!inc.start_date) return;
+                if (inc.is_reimbursement) return;
 
-                const inc_start = inc.start_date; 
-                const inc_end = inc.end_date;     
+                const inc_start = inc.start_date;
+                const inc_end = inc.end_date;
                 const net_amount = parseFloat(inc.net_monthly || 0);
                 const inc_freq = inc.frequency || "Mensual";
 
@@ -2117,8 +2120,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 let income_to_add = 0.0;
                 if (inc_freq === "Mensual") {
                     if (periodicity === "Mensual") income_to_add = net_amount;
-                    else if (periodicity === "Semanal") { 
-                        const payDay = inc_start.getUTCDate(); 
+                    else if (periodicity === "Semanal") {
+                        const payDay = inc_start.getUTCDate();
                         const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay));
                         if (p_start <= payDate && payDate <= p_end) income_to_add = net_amount;
                     }
@@ -2126,7 +2129,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (p_start <= inc_start && inc_start <= p_end) income_to_add = net_amount;
                 } else if (inc_freq === "Semanal") {
                     if (periodicity === "Semanal") income_to_add = net_amount;
-                    else if (periodicity === "Mensual") income_to_add = net_amount * (52 / 12); 
+                    else if (periodicity === "Mensual") income_to_add = net_amount * (52 / 12);
                 } else if (inc_freq === "Bi-semanal") {
                     if (periodicity === "Semanal") {
                         let paymentDate = new Date(inc_start.getTime());
@@ -2153,13 +2156,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             (data.expenses || []).forEach(exp => {
                 if (!exp.start_date) return;
-                const e_start = exp.start_date; 
-                const e_end = exp.end_date;     
+                const e_start = exp.start_date;
+                const e_end = exp.end_date;
                 const amt_raw = parseFloat(exp.amount || 0);
                 const freq = exp.frequency || "Mensual";
                 const cat = exp.category;
 
-                if (amt_raw < 0 || !cat || !orderedCategories.includes(cat)) return; 
+                if (amt_raw < 0 || !cat || !orderedCategories.includes(cat)) return;
 
                 const isActiveRange = (e_start <= p_end && (e_end === null || e_end >= p_start));
                 if (!isActiveRange) return;
@@ -2202,8 +2205,8 @@ document.addEventListener('DOMContentLoaded', () => {
             (data.incomes || []).forEach(reimbInc => {
                 if (!reimbInc.is_reimbursement || !reimbInc.reimbursement_category || !reimbInc.start_date) return;
 
-                const reimb_start = reimbInc.start_date; 
-                const reimb_end = reimbInc.end_date;     
+                const reimb_start = reimbInc.start_date;
+                const reimb_end = reimbInc.end_date;
                 const reimb_amount_raw = parseFloat(reimbInc.net_monthly || 0);
                 const reimb_freq = reimbInc.frequency || "Mensual";
                 const reimb_cat = reimbInc.reimbursement_category;
@@ -2226,7 +2229,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (reimb_freq === "Semanal") {
                     if (periodicity === "Semanal") { amount_of_reimbursement_in_this_period = reimb_amount_raw; }
                     else if (periodicity === "Mensual") {
-                        amount_of_reimbursement_in_this_period = reimb_amount_raw * (52 / 12); 
+                        amount_of_reimbursement_in_this_period = reimb_amount_raw * (52 / 12);
                     }
                 } else if (reimb_freq === "Bi-semanal") {
                     if (periodicity === "Semanal") {
@@ -2249,7 +2252,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     expenses_by_cat_p[i][reimb_cat] = Math.max(0, expenses_by_cat_p[i][reimb_cat] - amount_of_reimbursement_in_this_period);
                 }
             });
-            
+
             p_fix_exp_total_for_period = 0;
             p_var_exp_total_for_period = 0;
             for (const cat_name_final in expenses_by_cat_p[i]) {
@@ -2301,7 +2304,7 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
-            type: 'line', 
+            type: 'line',
             data: {
                 labels: labels,
                 datasets: [
@@ -2311,32 +2314,32 @@ document.addEventListener('DOMContentLoaded', () => {
                         borderColor: 'rgba(54, 162, 235, 1)',
                         backgroundColor: 'rgba(54, 162, 235, 0.2)',
                         tension: 0.1,
-                        fill: false, 
+                        fill: false,
                         pointRadius: 4,
                         pointBackgroundColor: 'rgba(54, 162, 235, 1)',
                         borderWidth: 2,
-                        order: 1, 
+                        order: 1,
                     },
                     {
                         label: 'Ingreso Total Neto',
                         data: incomes,
                         borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 1)', 
-                        type: 'scatter', 
-                        showLine: false, 
+                        backgroundColor: 'rgba(75, 192, 192, 1)',
+                        type: 'scatter',
+                        showLine: false,
                         pointRadius: 6,
                         pointStyle: 'circle',
-                        order: 2, 
+                        order: 2,
                     },
                     {
                         label: 'Gasto Total',
-                        data: totalExpenses.map(e => -e), 
+                        data: totalExpenses.map(e => -e),
                         borderColor: 'rgba(255, 99, 132, 1)',
                         backgroundColor: 'rgba(255, 99, 132, 1)',
                         type: 'scatter',
                         showLine: false,
                         pointRadius: 6,
-                        pointStyle: 'rectRot', 
+                        pointStyle: 'rectRot',
                         order: 2,
                     },
                     {
@@ -2391,7 +2394,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function renderBabySteps() {
         if (!babyStepsContainer || !currentBackupData || !currentBackupData.baby_steps_status) return;
-        babyStepsContainer.innerHTML = ''; 
+        babyStepsContainer.innerHTML = '';
 
         BABY_STEPS_DATA_JS.forEach((stepData, stepIndex) => {
             const stepDiv = document.createElement('div');
@@ -2402,7 +2405,7 @@ document.addEventListener('DOMContentLoaded', () => {
             stepDiv.appendChild(title);
 
             const description = document.createElement('p');
-            description.innerHTML = stepData.description.replace(/\n/g, '<br>'); 
+            description.innerHTML = stepData.description.replace(/\n/g, '<br>');
             stepDiv.appendChild(description);
 
             ['dos', 'donts'].forEach(listType => {
@@ -2417,18 +2420,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         const checkbox = document.createElement('input');
                         checkbox.type = 'checkbox';
                         checkbox.id = `step-${stepIndex}-${listType}-${itemIndex}`;
-                        
+
                         if (currentBackupData.baby_steps_status[stepIndex] &&
                             currentBackupData.baby_steps_status[stepIndex][listType]) {
                             checkbox.checked = currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] || false;
                         } else {
-                            checkbox.checked = false; 
+                            checkbox.checked = false;
                         }
 
                         checkbox.addEventListener('change', (e) => {
                             if (!currentBackupData.baby_steps_status[stepIndex]) currentBackupData.baby_steps_status[stepIndex] = { dos: [], donts: [] };
                             if (!currentBackupData.baby_steps_status[stepIndex][listType]) currentBackupData.baby_steps_status[stepIndex][listType] = new Array(stepData[listType].length).fill(false);
-                            
+
                             currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] = e.target.checked;
                         });
 
@@ -2456,12 +2459,12 @@ document.addEventListener('DOMContentLoaded', () => {
      * Handles submission of the reminder form.
      */
     reminderForm.addEventListener('submit', (e) => {
-        e.preventDefault(); 
+        e.preventDefault();
         const text = reminderTextInput.value.trim();
         if (!text) { alert("Ingresa el texto del recordatorio."); return; }
         if (!currentBackupData.reminders_todos) currentBackupData.reminders_todos = [];
         currentBackupData.reminders_todos.push({ text: text, completed: false });
-        renderReminders(); 
+        renderReminders();
         resetReminderForm();
     });
     /**
@@ -2469,42 +2472,42 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function renderReminders() {
         if (!pendingRemindersList || !completedRemindersList || !currentBackupData) return;
-        pendingRemindersList.innerHTML = ''; 
+        pendingRemindersList.innerHTML = '';
         completedRemindersList.innerHTML = '';
         (currentBackupData.reminders_todos || []).forEach((reminder, index) => {
-            const li = document.createElement('li'); 
-            li.textContent = reminder.text; 
+            const li = document.createElement('li');
+            li.textContent = reminder.text;
             li.dataset.index = index;
-            
-            const toggleButton = document.createElement('button'); 
-            toggleButton.textContent = reminder.completed ? 'Marcar Pendiente' : 'Marcar Completado'; 
+
+            const toggleButton = document.createElement('button');
+            toggleButton.textContent = reminder.completed ? 'Marcar Pendiente' : 'Marcar Completado';
             toggleButton.classList.add('small-button');
-            toggleButton.addEventListener('click', () => { 
-                reminder.completed = !reminder.completed; 
-                renderReminders(); 
+            toggleButton.addEventListener('click', () => {
+                reminder.completed = !reminder.completed;
+                renderReminders();
             });
-            
-            const deleteButton = document.createElement('button'); 
-            deleteButton.textContent = 'Eliminar'; 
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Eliminar';
             deleteButton.classList.add('small-button', 'danger');
-            deleteButton.addEventListener('click', () => { 
-                if (confirm(`¿Eliminar recordatorio "${reminder.text}"?`)) { 
-                    currentBackupData.reminders_todos.splice(index, 1); 
-                    renderReminders(); 
-                } 
+            deleteButton.addEventListener('click', () => {
+                if (confirm(`¿Eliminar recordatorio "${reminder.text}"?`)) {
+                    currentBackupData.reminders_todos.splice(index, 1);
+                    renderReminders();
+                }
             });
-            
-            const buttonContainer = document.createElement('div'); 
-            buttonContainer.classList.add('reminder-actions'); 
-            buttonContainer.appendChild(toggleButton); 
-            buttonContainer.appendChild(deleteButton); 
+
+            const buttonContainer = document.createElement('div');
+            buttonContainer.classList.add('reminder-actions');
+            buttonContainer.appendChild(toggleButton);
+            buttonContainer.appendChild(deleteButton);
             li.appendChild(buttonContainer);
-            
-            if (reminder.completed) { 
-                li.classList.add('completed'); 
-                completedRemindersList.appendChild(li); 
-            } else { 
-                pendingRemindersList.appendChild(li); 
+
+            if (reminder.completed) {
+                li.classList.add('completed');
+                completedRemindersList.appendChild(li);
+            } else {
+                pendingRemindersList.appendChild(li);
             }
         });
     }
@@ -2539,7 +2542,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const userSpan = document.createElement('span');
             userSpan.classList.add('log-user');
-            userSpan.textContent = entry.user || "Desconocido"; 
+            userSpan.textContent = entry.user || "Desconocido";
 
             const messageSpan = document.createElement('span');
             messageSpan.classList.add('log-message');
@@ -2576,17 +2579,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- INITIALIZATION ---
     showLoginScreen(); // Start by showing the login screen
-    
+
     // Set default dates for input fields
     const today = new Date();
     const todayISO = getISODateString(today);
     incomeStartDateInput.value = todayISO;
     expenseStartDateInput.value = todayISO;
     analysisStartDateInput.value = todayISO;
-    
+
     // Default states for checkboxes and related inputs
-    incomeEndDateInput.disabled = true; 
-    expenseEndDateInput.disabled = true; 
+    incomeEndDateInput.disabled = true;
+    expenseEndDateInput.disabled = true;
     updateAnalysisDurationLabel(); // Set initial label for duration
     incomeReimbursementCategoryContainer.style.display = 'none'; // Hide reimbursement category by default
 });
