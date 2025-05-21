@@ -307,12 +307,50 @@ document.addEventListener('DOMContentLoaded', () => {
     logoutButton.addEventListener('click', () => { auth.signOut(); });
     auth.onAuthStateChanged(user => user ? showDataSelectionScreen(user) : showLoginScreen());
 
-    // --- CARGA DE VERSIONES (BACKUPS) ---
+    // --- CARGA DE VERSIONES (BACKUPS) - MODIFICADO ---
+    // NUEVA FUNCIÓN: Obtiene la referencia a la rama de datos del usuario autenticado
+    function getUserDataRef() {
+        const user = firebase.auth().currentUser;
+        if (!user) {
+            console.error("No hay usuario autenticado.");
+            return null;
+        }
+        // Mapea los UID a las sub-rutas específicas (ej. "SS", "JOSE", "PAPAS")
+        const userPaths = {
+            "POurDKWezHXAsAQ9v86zT2KIHNH2": "SS",
+            "eLmByfa8isM6r37aMNUajpp2GG72": "SS",
+            "eqFrOEklfEREaBDYgr761ipHPQK2": "JOSE",
+            "0ceYKka1nbZfyftQlVE0jFRUeY73": "PAPAS",
+            "y0kGbOIqurc0kDmdWzl6YHWQ9IX2": "PAPAS",
+            "d4GAITAu8iP75h8aUqaDXeqMoc02": "VICENTE"
+        };
+
+        const userSubPath = userPaths[user.uid];
+
+        if (!userSubPath) {
+            console.error(`UID ${user.uid} no mapeado a una sub-ruta de usuario específica.`);
+            return null;
+        }
+
+        // Retorna la referencia a la ruta específica del usuario, por ejemplo, `/users/SS`
+        return database.ref(`users/${userSubPath}`);
+    }
+
+
     function fetchBackups() {
+        const userRef = getUserDataRef();
+        if (!userRef) {
+            loadingMessage.textContent = "Error: No se pudo obtener la referencia de datos del usuario.";
+            loadingMessage.style.display = 'block';
+            return;
+        }
+
         loadingMessage.textContent = "Cargando lista de versiones...";
         loadingMessage.style.display = 'block';
         loadLatestVersionButton.disabled = true;
-        database.ref('backups').once('value')
+
+        // MODIFICADO: Apunta a `users/${userSubPath}/backups`
+        userRef.child('backups').once('value')
             .then(snapshot => {
                 backupSelector.innerHTML = '<option value="">-- Selecciona una versión --</option>';
                 if (snapshot.exists()) {
@@ -363,13 +401,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function loadSpecificBackup(key) {
+        const userRef = getUserDataRef();
+        if (!userRef) {
+            alert("Error: No se pudo obtener la referencia de datos del usuario para cargar el backup.");
+            return;
+        }
+
         loadingMessage.textContent = `Cargando datos de la versión: ${formatBackupKey(key)}...`;
         loadingMessage.style.display = 'block';
         mainContentContainer.style.display = 'none';
         clearAllDataViews();
         originalLoadedData = null;
 
-        database.ref(`backups/${key}`).once('value')
+        // MODIFICADO: Apunta a `users/${userSubPath}/backups/${key}`
+        userRef.child(`backups/${key}`).once('value')
             .then(snapshot => {
                 if (snapshot.exists()) {
                     currentBackupData = snapshot.val();
@@ -412,7 +457,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentBackupData.analysis_periodicity = currentBackupData.analysis_periodicity || "Mensual";
                     currentBackupData.analysis_initial_balance = parseFloat(currentBackupData.analysis_initial_balance) || 0;
                     currentBackupData.display_currency_symbol = currentBackupData.display_currency_symbol || "$";
-                    // currentBackupData.usd_clp_rate = parseFloat(currentBackupData.usd_clp_rate) || null; // No longer stored
 
                     (currentBackupData.incomes || []).forEach(inc => {
                         if (inc.start_date) inc.start_date = new Date(inc.start_date + 'T00:00:00Z');
@@ -438,13 +482,47 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderPaymentsTableForCurrentPeriod();
                     renderCashflowTable();
 
-                    showMainContentScreen(); // This will also call fetchAndUpdateUSDCLPRate
+                    showMainContentScreen();
                 } else {
-                    alert("La versión seleccionada no contiene datos válidos o está vacía.");
-                    currentBackupData = null;
-                    originalLoadedData = null;
-                    currentBackupKey = null;
+                    // MODIFICADO: Si no existe el backup, carga los datos por defecto y permite guardar
+                    alert("La versión seleccionada no contiene datos válidos o está vacía. Se cargarán los datos por defecto.");
+                    currentBackupData = {
+                        version: "1.0_web_v3_usd_clp_auto",
+                        analysis_start_date: new Date(),
+                        analysis_duration: 12,
+                        analysis_periodicity: "Mensual",
+                        analysis_initial_balance: 0,
+                        display_currency_symbol: "$",
+                        incomes: [],
+                        expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
+                        expenses: [],
+                        payments: {},
+                        budgets: {},
+                        baby_steps_status: BABY_STEPS_DATA_JS.map(step => ({
+                            dos: new Array(step.dos.length).fill(false),
+                            donts: new Array(step.donts.length).fill(false)
+                        })),
+                        reminders_todos: [],
+                        change_log: []
+                    };
+                    currentBackupKey = null; // No hay un backup previo para este caso
+                    originalLoadedData = JSON.parse(JSON.stringify(currentBackupData));
                     changeLogEntries = [];
+
+                    populateSettingsForm();
+                    populateExpenseCategoriesDropdowns();
+                    populateIncomeReimbursementCategoriesDropdown();
+                    renderIncomesTable();
+                    renderExpensesTable();
+                    renderBudgetsTable();
+                    renderBabySteps();
+                    renderReminders();
+                    renderLogTab();
+                    setupPaymentPeriodSelectors();
+                    renderPaymentsTableForCurrentPeriod();
+                    renderCashflowTable();
+
+                    showMainContentScreen();
                 }
                 loadingMessage.style.display = 'none';
             })
@@ -625,10 +703,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- GUARDAR CAMBIOS (ÚNICO EVENT LISTENER) ---
+    // --- GUARDAR CAMBIOS (ÚNICO EVENT LISTENER) - MODIFICADO ---
     saveChangesButton.addEventListener('click', () => {
         if (!currentBackupData) {
             alert("No hay datos cargados para guardar.");
+            return;
+        }
+
+        const userRef = getUserDataRef(); // OBTENER LA REFERENCIA DEL USUARIO
+        if (!userRef) {
+            alert("Error: No se pudo obtener la referencia de datos del usuario para guardar.");
             return;
         }
 
@@ -776,7 +860,8 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingMessage.textContent = "Guardando cambios como nueva versión...";
         loadingMessage.style.display = 'block';
 
-        database.ref('backups/' + newBackupKey).set(dataToSave)
+        // MODIFICADO: Apunta a `users/${userSubPath}/backups/${newBackupKey}`
+        userRef.child(`backups/${newBackupKey}`).set(dataToSave)
             .then(() => {
                 loadingMessage.style.display = 'none';
                 alert(`Cambios guardados exitosamente como nueva versión: ${formatBackupKey(newBackupKey)}`);
