@@ -305,7 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     });
     logoutButton.addEventListener('click', () => { auth.signOut(); });
-    auth.onAuthStateChanged(user => user ? showDataSelectionScreen(user) : showLoginScreen());
+    auth.onAuthStateChanged(user => {     if (user) {         initializeUserDatabase(user.uid); // <-- Esta línea es clave para el cambio de BD         showDataSelectionScreen(user);     } else {         initializeUserDatabase(null); // Revertir a la BD por defecto al cerrar sesión         showLoginScreen();     } });
 
     // --- CARGA DE VERSIONES (BACKUPS) ---
     function fetchBackups() {
