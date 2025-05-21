@@ -108,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- CONSTANTES Y ESTADO ---
+    let currentUserUID = null; // Added for user-specific paths
     const MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     const MONTH_NAMES_FULL_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const DATE_WEEK_START_FORMAT = (date) => `${date.getUTCDate()}-${MONTH_NAMES_ES[date.getUTCMonth()]}`;
@@ -305,14 +306,30 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     });
     logoutButton.addEventListener('click', () => { auth.signOut(); });
-    auth.onAuthStateChanged(user => user ? showDataSelectionScreen(user) : showLoginScreen());
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUserUID = user.uid; // Store UID
+            showDataSelectionScreen(user);
+        } else {
+            currentUserUID = null; // Reset UID on logout
+            showLoginScreen();
+        }
+    });
 
     // --- CARGA DE VERSIONES (BACKUPS) ---
     function fetchBackups() {
         loadingMessage.textContent = "Cargando lista de versiones...";
         loadingMessage.style.display = 'block';
         loadLatestVersionButton.disabled = true;
-        database.ref('backups').once('value')
+        if (!currentUserUID) {
+            console.error("Error: No hay usuario autenticado para cargar versiones.");
+            authStatus.textContent = "Error: No autenticado.";
+            loadingMessage.textContent = "Error: No autenticado.";
+            backupSelector.innerHTML = '<option value="">Error: No autenticado</option>';
+            loadLatestVersionButton.disabled = true;
+            return;
+        }
+        database.ref(`users/${currentUserUID}/backups`).once('value')
             .then(snapshot => {
                 backupSelector.innerHTML = '<option value="">-- Selecciona una versión --</option>';
                 if (snapshot.exists()) {
@@ -369,7 +386,13 @@ document.addEventListener('DOMContentLoaded', () => {
         clearAllDataViews();
         originalLoadedData = null;
 
-        database.ref(`backups/${key}`).once('value')
+        if (!currentUserUID) {
+            console.error("Error: No hay usuario autenticado para cargar la versión específica.");
+            alert("Error: No autenticado. No se puede cargar la versión.");
+            loadingMessage.style.display = 'none';
+            return;
+        }
+        database.ref(`users/${currentUserUID}/backups/${key}`).once('value')
             .then(snapshot => {
                 if (snapshot.exists()) {
                     currentBackupData = snapshot.val();
@@ -617,8 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FUNCIÓN PARA MAPEAR EMAIL A NOMBRE ---
     function mapEmailToName(email) {
         if (!email) return 'Desconocido';
-        if (email.toLowerCase() === "sergio.acevedo.santic@gmail.com") return "Sergio";
-        if (email.toLowerCase() === "scarlett.real.e@gmail.com") return "Scarlett";
+        // The hardcoded mappings have been removed.
         const namePart = email.split('@')[0];
         const names = namePart.split('.');
         return names.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
@@ -776,7 +798,13 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingMessage.textContent = "Guardando cambios como nueva versión...";
         loadingMessage.style.display = 'block';
 
-        database.ref('backups/' + newBackupKey).set(dataToSave)
+        if (!currentUserUID) {
+            console.error("Error: No hay usuario autenticado para guardar cambios.");
+            alert("Error: No autenticado. No se pueden guardar los cambios.");
+            loadingMessage.style.display = 'none';
+            return;
+        }
+        database.ref(`users/${currentUserUID}/backups/` + newBackupKey).set(dataToSave)
             .then(() => {
                 loadingMessage.style.display = 'none';
                 alert(`Cambios guardados exitosamente como nueva versión: ${formatBackupKey(newBackupKey)}`);
