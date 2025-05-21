@@ -9,7 +9,7 @@
 function parseFirebaseConfigString(configStr) {
     // Regular expression to find "const firebaseConfig = { ... };"
     // It captures the content within the curly braces.
-    const match = /const\s+firebaseConfig\s*=\s*(\{[\s\S]*?\});/.exec(configStr);
+    const match = /const\s+firebaseConfig\s*=\s*(\{[\s\S]*?\})\s*;/.exec(configStr); // Corrected line
     if (!match || !match[1]) {
         console.error("Could not extract firebaseConfig object from string:", configStr);
         return null;
