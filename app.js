@@ -1,15 +1,5 @@
-// Contenido de app.js (modificado)
-
-// Global Firebase variables - these will be set after a successful login
-// to point to the correct Firebase instance for the logged-in user.
-let currentFirebaseApp = null; // Stores the currently active Firebase app instance.
-let auth = null;               // Stores the auth service for the currentFirebaseApp.
-let database = null;           // Stores the database service for the currentFirebaseApp.
-let activeConfigEntry = null;  // Stores the configuration entry (from firebaseConfigurations) for the active app.
-
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM ELEMENT REFERENCES ---
-    // Authentication elements
+    // --- ELEMENTOS GLOBALES ---
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const loginButton = document.getElementById('login-button');
@@ -19,19 +9,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('login-form');
     const logoutArea = document.getElementById('logout-area');
 
-    // Data selection elements (for loading backups)
     const dataSelectionContainer = document.getElementById('data-selection-container');
     const backupSelector = document.getElementById('backup-selector');
     const loadBackupButton = document.getElementById('load-backup-button');
     const loadLatestVersionButton = document.getElementById('load-latest-version-button');
     const loadingMessage = document.getElementById('loading-message');
 
-    // Main content and navigation elements
     const mainContentContainer = document.getElementById('main-content-container');
     const tabsContainer = document.querySelector('.tabs-container');
     const saveChangesButton = document.getElementById('save-changes-button');
 
-    // Elements for "Ajustes" (Settings) Tab
+    // --- ELEMENTOS PESTAÑA AJUSTES ---
     const settingsForm = document.getElementById('settings-form');
     const analysisPeriodicitySelect = document.getElementById('analysis-periodicity-select');
     const analysisDurationInput = document.getElementById('analysis-duration-input');
@@ -39,10 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const analysisStartDateInput = document.getElementById('analysis-start-date-input');
     const analysisInitialBalanceInput = document.getElementById('analysis-initial-balance-input');
     const displayCurrencySymbolInput = document.getElementById('display-currency-symbol-input');
-    const usdClpInfoLabel = document.getElementById('usd-clp-info-label');
+    const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
 
-    // Elements for "Ingresos" (Incomes) Tab
+    // --- ELEMENTOS PESTAÑA INGRESOS ---
     const incomeForm = document.getElementById('income-form');
     const incomeNameInput = document.getElementById('income-name');
     const incomeAmountInput = document.getElementById('income-amount');
@@ -57,9 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const cancelEditIncomeButton = document.getElementById('cancel-edit-income-button');
     const incomesTableView = document.querySelector('#incomes-table-view tbody');
     const searchIncomeInput = document.getElementById('search-income-input');
-    let editingIncomeIndex = null; // Stores the index of the income being edited
+    let editingIncomeIndex = null;
 
-    // Elements for "Gastos" (Expenses) Tab
+    // --- ELEMENTOS PESTAÑA GASTOS ---
     const expenseForm = document.getElementById('expense-form');
     const expenseNameInput = document.getElementById('expense-name');
     const expenseAmountInput = document.getElementById('expense-amount');
@@ -75,9 +63,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const cancelEditExpenseButton = document.getElementById('cancel-edit-expense-button');
     const expensesTableView = document.querySelector('#expenses-table-view tbody');
     const searchExpenseInput = document.getElementById('search-expense-input');
-    let editingExpenseIndex = null; // Stores the index of the expense being edited
+    let editingExpenseIndex = null;
 
-    // Elements for "Presupuestos" (Budgets) Tab
+    // --- ELEMENTOS PESTAÑA PRESUPUESTOS ---
     const budgetForm = document.getElementById('budget-form');
     const budgetCategorySelect = document.getElementById('budget-category-select');
     const budgetAmountInput = document.getElementById('budget-amount-input');
@@ -85,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const budgetsTableView = document.querySelector('#budgets-table-view tbody');
     const budgetSummaryTableBody = document.querySelector('#budget-summary-table tbody');
 
-    // Elements for "Registro Pagos" (Payment Log) Tab
+    // --- ELEMENTOS PESTAÑA REGISTRO PAGOS ---
     const paymentsTabTitle = document.getElementById('payments-tab-title');
     const prevPeriodButton = document.getElementById('prev-period-button');
     const nextPeriodButton = document.getElementById('next-period-button');
@@ -93,46 +81,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const paymentMonthSelect = document.getElementById('payment-month-select');
     const paymentWeekSelect = document.getElementById('payment-week-select');
     const paymentsTableView = document.querySelector('#payments-table-view tbody');
-    let currentPaymentViewDate = new Date(); // Tracks the currently viewed period for payments
+    let currentPaymentViewDate = new Date();
 
-    // Elements for "Flujo de Caja" (Cashflow) Tab
+    // --- ELEMENTOS PESTAÑA FLUJO DE CAJA ---
     const cashflowTableBody = document.querySelector('#cashflow-table tbody');
     const cashflowTableHead = document.querySelector('#cashflow-table thead');
     const cashflowTitle = document.getElementById('cashflow-title');
 
-    // Elements for "Gráfico" (Chart) Tab
+    // --- ELEMENTOS PESTAÑA GRÁFICO ---
     const cashflowChartCanvas = document.getElementById('cashflow-chart');
     const chartMessage = document.getElementById('chart-message');
-    let cashflowChartInstance = null; // Stores the Chart.js instance
+    let cashflowChartInstance = null;
 
-    // Elements for "Baby Steps" Tab
+    // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
 
-    // Elements for "Recordatorios" (Reminders) Tab
+    // --- ELEMENTOS PESTAÑA RECORDATORIOS ---
     const reminderForm = document.getElementById('reminder-form');
     const reminderTextInput = document.getElementById('reminder-text-input');
     const addReminderButton = document.getElementById('add-reminder-button');
     const pendingRemindersList = document.getElementById('pending-reminders-list');
     const completedRemindersList = document.getElementById('completed-reminders-list');
 
-    // Elements for "Log" Tab
+    // --- ELEMENTOS PESTAÑA LOG ---
     const changeLogList = document.getElementById('change-log-list');
 
-    // --- CONSTANTS AND STATE VARIABLES ---
+
+    // --- CONSTANTES Y ESTADO ---
     const MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     const MONTH_NAMES_FULL_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const DATE_WEEK_START_FORMAT = (date) => `${date.getUTCDate()}-${MONTH_NAMES_ES[date.getUTCMonth()]}`;
-
-    let currentBackupData = null;     // Holds the currently loaded data from a backup.
-    let originalLoadedData = null;  // Holds a pristine copy of the loaded data for change detection.
-    let currentBackupKey = null;      // Key of the currently loaded backup.
-    let changeLogEntries = [];        // Array to store change log entries.
-
-    // Characters forbidden in Firebase Realtime Database keys.
+    let currentBackupData = null;
+    let originalLoadedData = null;
+    let currentBackupKey = null;
+    let changeLogEntries = [];
     const FIREBASE_FORBIDDEN_KEY_CHARS = ['.', '$', '#', '[', ']', '/'];
     const FIREBASE_FORBIDDEN_CHARS_DISPLAY = FIREBASE_FORBIDDEN_KEY_CHARS.join(" ");
 
-    // Data for "Baby Steps" tab (replace with your actual data structure)
     const BABY_STEPS_DATA_JS = [
         {
             "title": "Paso 1: Ahorrar $1.000 (o equivalente) para tu fondo de emergencia inicial",
@@ -148,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 "No usas tarjetas de crédito para cubrir emergencias mientras estás en este paso.",
             ]
         },
-         {
+        {
             "title": "Paso 2: Pagar todas las deudas (excepto la hipoteca) con la “bola de nieve”",
             "description": "Liberarte de las deudas de consumo es crucial para redirigir tu dinero hacia la creación de riqueza. La 'bola de nieve' te da victorias rápidas y motivación.",
             "dos": [
@@ -234,77 +219,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     ];
 
-    // Default expense categories (replace with your actual data structure)
     const DEFAULT_EXPENSE_CATEGORIES_JS = {
         "Arriendo": "Fijo", "Gastos Comunes": "Fijo", "Cuentas": "Fijo", "Suscripciones": "Fijo", "Ahorros": "Fijo", "Créditos": "Fijo", "Inversiones": "Fijo",
         "Supermercado": "Variable", "Auto": "Variable", "Delivery": "Variable", "Salidas a comer": "Variable", "Minimarket": "Variable", "Uber": "Variable", "Regalos para alguien": "Variable", "Otros": "Variable", "Cosas de Casa": "Variable", "Salud": "Variable", "Panoramas": "Variable", "Ropa": "Variable", "Deporte": "Variable", "Vega": "Variable", "Transporte Publico": "Variable"
     };
 
-
-    // --- FIREBASE KEY VALIDATION ---
-    /**
-     * Checks if a string is safe to use as a Firebase key.
-     * Firebase keys cannot contain '.', '$', '#', '[', ']', or '/'.
-     * @param {string} text - The string to validate.
-     * @returns {boolean} True if the key is safe, false otherwise.
-     */
+    // --- VALIDACIÓN DE CLAVES DE FIREBASE ---
     function isFirebaseKeySafe(text) {
         if (typeof text !== 'string' || !text.trim()) {
-            return false; // Empty or non-string keys are not safe/valid.
+            return false;
         }
         return !FIREBASE_FORBIDDEN_KEY_CHARS.some(char => text.includes(char));
     }
 
-    // --- UI LOGIC (Screen Management) ---
-    /**
-     * Shows the login screen and hides other sections.
-     * Resets application state related to loaded data.
-     */
+    // --- LÓGICA DE UI ---
     function showLoginScreen() {
         authContainer.style.display = 'block';
         loginForm.style.display = 'block';
         logoutArea.style.display = 'none';
         dataSelectionContainer.style.display = 'none';
         mainContentContainer.style.display = 'none';
-
-        clearAllDataViews(); // Clear any previously displayed data
+        clearAllDataViews();
         currentBackupData = null;
         originalLoadedData = null;
         currentBackupKey = null;
-        backupSelector.innerHTML = '<option value="">-- Selecciona una versión --</option>'; // Reset backup selector
+        backupSelector.innerHTML = '<option value="">-- Selecciona una versión --</option>';
         loadLatestVersionButton.disabled = true;
-        authStatus.textContent = "Por favor, inicie sesión."; // Initial auth status message
     }
 
-    /**
-     * Shows the data selection screen after a successful login.
-     * @param {firebase.User} user - The authenticated Firebase user object.
-     */
     function showDataSelectionScreen(user) {
         authContainer.style.display = 'block';
         loginForm.style.display = 'none';
         logoutArea.style.display = 'block';
-        authStatus.textContent = `Conectado como: ${user.email}`;
+        authStatus.textContent = `Conectado como: ${user.email}`; 
         dataSelectionContainer.style.display = 'block';
         mainContentContainer.style.display = 'none';
-        fetchBackups(); // Load available backups for the user
+        fetchBackups();
     }
 
-    /**
-     * Shows the main content screen where data is displayed and edited.
-     */
     function showMainContentScreen() {
         mainContentContainer.style.display = 'block';
-        activateTab('gastos'); // Activate a default tab (e.g., expenses)
+        activateTab('gastos'); // Activate a default tab
         fetchAndUpdateUSDCLPRate(); // Fetch USD/CLP rate when main content is shown
     }
 
-    /**
-     * Clears all data views and resets forms.
-     * Called when logging out or before loading new data.
-     */
     function clearAllDataViews() {
-        // Clear tables
         if (cashflowTableHead) cashflowTableHead.innerHTML = '';
         if (cashflowTableBody) cashflowTableBody.innerHTML = '';
         if (cashflowTitle) cashflowTitle.textContent = 'Flujo de Caja';
@@ -313,219 +272,56 @@ document.addEventListener('DOMContentLoaded', () => {
         if (budgetsTableView) budgetsTableView.innerHTML = '';
         if (budgetSummaryTableBody) budgetSummaryTableBody.innerHTML = '';
         if (paymentsTableView) paymentsTableView.innerHTML = '';
-
-        // Clear other dynamic content areas
         if (babyStepsContainer) babyStepsContainer.innerHTML = '';
         if (pendingRemindersList) pendingRemindersList.innerHTML = '';
         if (completedRemindersList) completedRemindersList.innerHTML = '';
         if (changeLogList) changeLogList.innerHTML = '';
 
-        // Reset dropdowns
         if (expenseCategorySelect) expenseCategorySelect.innerHTML = '<option value="">Cargando...</option>';
         if (budgetCategorySelect) budgetCategorySelect.innerHTML = '<option value="">Cargando...</option>';
         if (incomeReimbursementCategorySelect) incomeReimbursementCategorySelect.innerHTML = '<option value="">Cargando...</option>';
 
-        // Reset forms
+
         resetIncomeForm();
         resetExpenseForm();
         resetBudgetForm();
         resetReminderForm();
-
-        // Clear chart
         if (cashflowChartInstance) {
             cashflowChartInstance.destroy();
             cashflowChartInstance = null;
         }
         if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja.";
-
-        // Reset USD/CLP label
         if (usdClpInfoLabel) usdClpInfoLabel.textContent = "1 USD = $CLP (Obteniendo...)";
     }
 
-    // --- AUTHENTICATION LOGIC (Multi-DB aware) ---
-    /**
-     * Handles the login process.
-     * Iterates through predefined Firebase configurations, attempts to sign in,
-     * and matches the user's UID against the target UID for each configuration.
-     */
-    async function handleLogin() {
+    // --- AUTENTICACIÓN ---
+    loginButton.addEventListener('click', () => {
         const email = emailInput.value;
         const password = passwordInput.value;
         authStatus.textContent = "Ingresando...";
-        // MODIFICACIÓN: Asegurar que logoutArea (y por lo tanto authStatus) sea visible
-        logoutArea.style.display = 'block';
-        loginButton.disabled = true;
+        auth.signInWithEmailAndPassword(email, password)
+            .catch(error => {
+                authStatus.textContent = `Error: ${error.message}`;
+            });
+    });
+    logoutButton.addEventListener('click', () => { auth.signOut(); });
+    auth.onAuthStateChanged(user => user ? showDataSelectionScreen(user) : showLoginScreen());
 
-        let loggedInSuccessfully = false;
-        let encounteredErrorMessages = [];
-
-        // Iterate over each configured Firebase app setup
-        for (const configEntry of firebaseConfigurations) {
-            if (!configEntry.config) {
-                console.warn(`Skipping invalid or unparsed config for ${configEntry.id}.`);
-                encounteredErrorMessages.push(`Configuración base para ${configEntry.id} no disponible.`);
-                continue;
-            }
-
-            let tempAppInstance;
-            try {
-                // Attempt to get an existing initialized app or initialize a new one.
-                // Firebase SDK throws an error if an app with the same name is re-initialized,
-                // so we try to get it first.
-                try {
-                    tempAppInstance = firebase.app(configEntry.appName);
-                } catch (e) {
-                    // Initialize if it doesn't exist
-                    tempAppInstance = firebase.initializeApp(configEntry.config, configEntry.appName);
-                }
-
-                const tempAuthService = tempAppInstance.auth();
-                const userCredential = await tempAuthService.signInWithEmailAndPassword(email, password);
-                const user = userCredential.user;
-
-                // CRUCIAL CHECK: Verify if the logged-in user's UID matches the target UID for this config
-                if (user && user.uid === configEntry.targetUid) {
-                    // Correct UID for this Firebase configuration!
-
-                    // If there was a previously active Firebase app, delete it to avoid conflicts.
-                    if (currentFirebaseApp && currentFirebaseApp.name !== tempAppInstance.name) {
-                        await currentFirebaseApp.delete().catch(e => console.warn("Error deleting previous Firebase app instance:", e));
-                    }
-
-                    // Set the global Firebase variables to this successfully matched instance.
-                    currentFirebaseApp = tempAppInstance;
-                    auth = tempAuthService;
-                    database = currentFirebaseApp.database(configEntry.actualDatabaseURL); // Use the specified database URL
-                    activeConfigEntry = configEntry; // Store the active configuration details
-
-                    // Clean up any other Firebase app instances that might have been initialized
-                    // during previous attempts in this loop, ensuring only the correct one remains.
-                    for (const otherConfig of firebaseConfigurations) {
-                        if (otherConfig.appName !== currentFirebaseApp.name) {
-                            try {
-                                const appToClean = firebase.app(otherConfig.appName);
-                                await appToClean.delete();
-                            } catch (e) { /* App doesn't exist or already cleaned, ignore */ }
-                        }
-                    }
-
-                    showDataSelectionScreen(user); // Proceed to data selection screen
-                    loggedInSuccessfully = true;
-
-                    // Set up onAuthStateChanged listener for the *active* auth instance
-                    auth.onAuthStateChanged(loggedInUser => {
-                        if (loggedInUser && activeConfigEntry && loggedInUser.uid === activeConfigEntry.targetUid) {
-                            // User is still logged in to the correct Firebase app.
-                            authStatus.textContent = `Conectado como: ${loggedInUser.email} (DB: ${activeConfigEntry.id})`;
-                        } else {
-                            // User logged out, or session/UID mismatch.
-                            authStatus.textContent = "Sesión expirada o inválida. Por favor, inicie sesión de nuevo.";
-                            if (currentFirebaseApp) { // Clean up app if state is invalid
-                                currentFirebaseApp.delete().catch(e => console.error("Error deleting app on auth state change:", e));
-                            }
-                            // Reset global Firebase variables
-                            currentFirebaseApp = null;
-                            auth = null;
-                            database = null;
-                            activeConfigEntry = null;
-                            showLoginScreen(); // Go back to login screen
-                        }
-                    });
-                    break; // Exit the loop as we found the correct Firebase instance
-                } else {
-                    // UID did not match the target UID for this config. Sign out from this temporary app.
-                    await tempAuthService.signOut();
-                    // Optionally, delete the temporary app instance if it won't be reused.
-                    // await tempAppInstance.delete();
-                }
-            } catch (error) {
-                // Login failed for this specific Firebase configuration.
-                console.warn(`Login attempt failed for config ${configEntry.id} (App: ${configEntry.appName}): ${error.message}`);
-                encounteredErrorMessages.push(`Fallo en ${configEntry.id}: ${error.code || error.message}`);
-                // Clean up the temporary app instance if login failed.
-                try {
-                    const appInstance = firebase.app(configEntry.appName);
-                    await appInstance.delete();
-                } catch (e) { /* App doesn't exist or already cleaned, ignore */ }
-            }
-        }
-
-        if (!loggedInSuccessfully) {
-            // If login failed for all configurations.
-            authStatus.innerHTML = `Error: Usuario/contraseña erróneo o no asociado a una base de datos configurada.<br><small>Detalles: ${encounteredErrorMessages.join('; ')}</small>`;
-            // logoutArea ya está 'block', por lo que el mensaje de error será visible.
-            // Ensure no Firebase app remains active if all attempts failed.
-            if(currentFirebaseApp) {
-                try { await currentFirebaseApp.delete(); } catch(e){ /* ignore */ }
-                currentFirebaseApp = null;
-                auth = null;
-                database = null;
-                activeConfigEntry = null;
-            }
-        }
-        loginButton.disabled = false; // Re-enable login button
-    }
-
-
-    /**
-     * Handles the logout process.
-     * Signs out the user and cleans up the active Firebase app instance.
-     */
-    async function handleLogout() {
-        logoutButton.disabled = true;
-        if (auth) { // Check if auth service is initialized
-            try {
-                await auth.signOut();
-            } catch (e) {
-                console.error("Error during sign out:", e);
-            }
-        }
-        if (currentFirebaseApp) { // Check if an app instance is active
-            try {
-                await currentFirebaseApp.delete(); // Delete the Firebase app instance
-            } catch (e) {
-                console.error("Error deleting Firebase app on logout:", e);
-            }
-        }
-        // Reset global Firebase variables
-        currentFirebaseApp = null;
-        auth = null;
-        database = null;
-        activeConfigEntry = null;
-
-        showLoginScreen(); // Return to login screen
-        logoutButton.disabled = false; // Re-enable logout button
-    }
-
-    // Attach event listeners for login and logout
-    loginButton.addEventListener('click', handleLogin);
-    logoutButton.addEventListener('click', handleLogout);
-
-    // --- BACKUP LOADING LOGIC ---
-    /**
-     * Fetches the list of available backups from the active Firebase database.
-     */
+    // --- CARGA DE VERSIONES (BACKUPS) ---
     function fetchBackups() {
-        if (!database) { // Ensure database service is initialized
-            authStatus.textContent = "Error: No hay base de datos activa.";
-            loadingMessage.textContent = "Error: No hay base de datos activa.";
-            loadingMessage.style.display = 'block';
-            return;
-        }
         loadingMessage.textContent = "Cargando lista de versiones...";
         loadingMessage.style.display = 'block';
         loadLatestVersionButton.disabled = true;
-
         database.ref('backups').once('value')
             .then(snapshot => {
-                backupSelector.innerHTML = '<option value="">-- Selecciona una versión --</option>'; // Reset selector
+                backupSelector.innerHTML = '<option value="">-- Selecciona una versión --</option>';
                 if (snapshot.exists()) {
                     const backups = snapshot.val();
-                    const sortedKeys = Object.keys(backups).sort().reverse(); // Show newest first
+                    const sortedKeys = Object.keys(backups).sort().reverse();
                     sortedKeys.forEach(key => {
                         const option = document.createElement('option');
                         option.value = key;
-                        option.textContent = formatBackupKey(key); // Format timestamp for display
+                        option.textContent = formatBackupKey(key);
                         backupSelector.appendChild(option);
                     });
                     loadLatestVersionButton.disabled = sortedKeys.length === 0;
@@ -543,12 +339,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     }
 
-    // Event listener for "Load Latest Version" button
     loadLatestVersionButton.addEventListener('click', () => {
-        if (backupSelector.options.length > 1) { // First option is placeholder
-            const latestKey = backupSelector.options[1].value; // The first actual version
+        if (backupSelector.options.length > 1) {
+            const latestKey = backupSelector.options[1].value;
             if (latestKey) {
-                backupSelector.value = latestKey; // Select it in the dropdown
+                backupSelector.value = latestKey;
                 loadSpecificBackup(latestKey);
             } else {
                 alert("No se encontró la última versión.");
@@ -558,7 +353,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Event listener for "Load Selected Version" button
     loadBackupButton.addEventListener('click', () => {
         const selectedKey = backupSelector.value;
         if (selectedKey) {
@@ -568,20 +362,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    /**
-     * Loads data for a specific backup key from Firebase.
-     * @param {string} key - The key of the backup to load.
-     */
     function loadSpecificBackup(key) {
-        if (!database) { // Ensure database service is initialized
-            alert("Error: No hay base de datos activa para cargar el backup.");
-            return;
-        }
         loadingMessage.textContent = `Cargando datos de la versión: ${formatBackupKey(key)}...`;
         loadingMessage.style.display = 'block';
-        mainContentContainer.style.display = 'none'; // Hide main content while loading
-        clearAllDataViews(); // Clear previous data
-        originalLoadedData = null; // Reset original loaded data
+        mainContentContainer.style.display = 'none';
+        clearAllDataViews();
+        originalLoadedData = null;
 
         database.ref(`backups/${key}`).once('value')
             .then(snapshot => {
@@ -589,9 +375,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentBackupData = snapshot.val();
                     currentBackupKey = key;
 
-                    // --- Data Normalization (copied from your original app.js) ---
-                    // This section ensures that the loaded data has a consistent structure,
-                    // applying defaults for missing fields or converting types if necessary.
                     if (!currentBackupData.incomes) currentBackupData.incomes = [];
                     currentBackupData.incomes.forEach(inc => {
                         if (typeof inc.is_reimbursement === 'undefined') inc.is_reimbursement = false;
@@ -613,22 +396,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!currentBackupData.reminders_todos) currentBackupData.reminders_todos = [];
 
                     changeLogEntries = currentBackupData.change_log || [];
-                    if (!Array.isArray(changeLogEntries)) {
+                    if (!Array.isArray(changeLogEntries)) { 
                         changeLogEntries = [];
                     }
-                    changeLogEntries.forEach(entry => { // Ensure user field exists for older logs
+                    changeLogEntries.forEach(entry => {
                         if (!entry.user) {
                             entry.user = "Desconocido (Versión Antigua)";
                         }
                     });
                     currentBackupData.change_log = changeLogEntries;
 
-                    // Convert date strings from Firebase to Date objects for calculations
+
                     currentBackupData.analysis_start_date = currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date + 'T00:00:00Z') : new Date();
                     currentBackupData.analysis_duration = parseInt(currentBackupData.analysis_duration, 10) || 12;
                     currentBackupData.analysis_periodicity = currentBackupData.analysis_periodicity || "Mensual";
                     currentBackupData.analysis_initial_balance = parseFloat(currentBackupData.analysis_initial_balance) || 0;
                     currentBackupData.display_currency_symbol = currentBackupData.display_currency_symbol || "$";
+                    // currentBackupData.usd_clp_rate = parseFloat(currentBackupData.usd_clp_rate) || null; // No longer stored
 
                     (currentBackupData.incomes || []).forEach(inc => {
                         if (inc.start_date) inc.start_date = new Date(inc.start_date + 'T00:00:00Z');
@@ -638,11 +422,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (exp.start_date) exp.start_date = new Date(exp.start_date + 'T00:00:00Z');
                         if (exp.end_date) exp.end_date = new Date(exp.end_date + 'T00:00:00Z');
                     });
-                    // --- End Data Normalization ---
 
-                    originalLoadedData = JSON.parse(JSON.stringify(currentBackupData)); // Store a deep copy
+                    originalLoadedData = JSON.parse(JSON.stringify(currentBackupData));
 
-                    // Populate UI with the loaded and normalized data
                     populateSettingsForm();
                     populateExpenseCategoriesDropdowns();
                     populateIncomeReimbursementCategoriesDropdown();
@@ -654,12 +436,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderLogTab();
                     setupPaymentPeriodSelectors();
                     renderPaymentsTableForCurrentPeriod();
-                    renderCashflowTable(); // This will also trigger chart rendering
+                    renderCashflowTable();
 
-                    showMainContentScreen(); // Display the main application interface
+                    showMainContentScreen(); // This will also call fetchAndUpdateUSDCLPRate
                 } else {
                     alert("La versión seleccionada no contiene datos válidos o está vacía.");
-                    // Reset state if backup is invalid
                     currentBackupData = null;
                     originalLoadedData = null;
                     currentBackupKey = null;
@@ -671,7 +452,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Error loading backup data:", error);
                 alert(`Error al cargar datos de la versión: ${error.message}`);
                 loadingMessage.textContent = "Error al cargar datos.";
-                // Reset state on error
                 currentBackupData = null;
                 originalLoadedData = null;
                 currentBackupKey = null;
@@ -679,15 +459,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     }
 
-    /**
-     * Formats a backup key (timestamp) for display.
-     * @param {string} key - The backup key (e.g., "backup_YYYYMMDDTHHMMSS").
-     * @returns {string} A formatted date string or the original key if formatting fails.
-     */
     function formatBackupKey(key) {
         if (!key) return "N/A";
         const ts = key.replace("backup_", "");
-        // Check if the timestamp part matches the expected format YYYYMMDDTHHMMSS
         if (ts.length === 15 && ts.includes('T')) {
             const year = ts.substring(0, 4);
             const month = ts.substring(4, 6);
@@ -697,20 +471,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const second = ts.substring(13, 15);
             return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
         }
-        return key; // Return original key if format doesn't match
+        return key;
     }
 
-    /**
-     * Generates a detailed list of changes between two data states.
-     * @param {object} prevData - The previous data state.
-     * @param {object} currentData - The current data state.
-     * @returns {string[]} An array of strings describing the changes.
-     */
     function generateDetailedChangeLog(prevData, currentData) {
         const details = [];
         const symbol = currentData.display_currency_symbol || '$';
 
-        // If there's no previous data, log it as an initial creation.
         if (!prevData) {
             details.push("Versión inicial de datos creada.");
             (currentData.incomes || []).forEach(inc => details.push(`Ingreso agregado: ${inc.name} (${formatCurrencyJS(inc.net_monthly, symbol)})${inc.is_reimbursement ? ' (Reembolso)' : ''}`));
@@ -718,18 +485,19 @@ document.addEventListener('DOMContentLoaded', () => {
             return details;
         }
 
-        // Compare settings
         if (prevData.analysis_periodicity !== currentData.analysis_periodicity) details.push(`Ajuste: Periodicidad cambiada de '${prevData.analysis_periodicity}' a '${currentData.analysis_periodicity}'.`);
         if (prevData.analysis_duration !== currentData.analysis_duration) details.push(`Ajuste: Duración cambiada de ${prevData.analysis_duration} a ${currentData.analysis_duration}.`);
         if (getISODateString(new Date(prevData.analysis_start_date)) !== getISODateString(new Date(currentData.analysis_start_date))) details.push(`Ajuste: Fecha de inicio cambiada de ${getISODateString(new Date(prevData.analysis_start_date))} a ${getISODateString(new Date(currentData.analysis_start_date))}.`);
         if (prevData.analysis_initial_balance !== currentData.analysis_initial_balance) details.push(`Ajuste: Saldo inicial cambiado de ${formatCurrencyJS(prevData.analysis_initial_balance, symbol)} a ${formatCurrencyJS(currentData.analysis_initial_balance, symbol)}.`);
         if (prevData.display_currency_symbol !== currentData.display_currency_symbol) details.push(`Ajuste: Símbolo de moneda cambiado de '${prevData.display_currency_symbol}' a '${currentData.display_currency_symbol}'.`);
+        // No longer tracking usd_clp_rate in data model
+        // if (prevData.usd_clp_rate !== currentData.usd_clp_rate) details.push(`Ajuste: Tasa USD/CLP cambiada de ${prevData.usd_clp_rate || 'N/A'} a ${currentData.usd_clp_rate || 'N/A'}.`);
 
-        // Compare Incomes
+
         const prevIncomes = prevData.incomes || [];
         const currentIncomes = currentData.incomes || [];
         currentIncomes.forEach(currentInc => {
-            const prevInc = prevIncomes.find(pInc => pInc.name === currentInc.name); // Simple find by name
+            const prevInc = prevIncomes.find(pInc => pInc.name === currentInc.name); // Simple find by name for now
             if (!prevInc) {
                 details.push(`Ingreso agregado: ${currentInc.name} (${formatCurrencyJS(currentInc.net_monthly, symbol)}, ${currentInc.frequency}, Inicio: ${getISODateString(new Date(currentInc.start_date))}${currentInc.end_date ? ', Fin: ' + getISODateString(new Date(currentInc.end_date)) : ''})${currentInc.is_reimbursement ? ` (Reembolso de ${currentInc.reimbursement_category || 'N/A'})` : ''}.`);
             } else {
@@ -755,7 +523,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Compare Expenses
         const prevExpenses = prevData.expenses || [];
         const currentExpenses = currentData.expenses || [];
         currentExpenses.forEach(currentExp => {
@@ -781,7 +548,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Compare Expense Categories
         const prevCategories = prevData.expense_categories || {};
         const currentCategories = currentData.expense_categories || {};
         Object.keys(currentCategories).forEach(catName => {
@@ -797,7 +563,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Compare Budgets
         const prevBudgets = prevData.budgets || {};
         const currentBudgets = currentData.budgets || {};
         Object.keys(currentCategories).forEach(catName => {
@@ -811,16 +576,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
-         Object.keys(prevBudgets).forEach(catName => {
+        Object.keys(prevBudgets).forEach(catName => {
             if (!currentCategories[catName] && prevBudgets[catName] !== 0) {
                 details.push(`Presupuesto para categoría eliminada '${catName}' (era ${formatCurrencyJS(prevBudgets[catName], symbol)}) removido.`);
             }
         });
 
-        // Compare Reminders
         const prevReminders = prevData.reminders_todos || [];
         const currentReminders = currentData.reminders_todos || [];
-        currentReminders.forEach((currentRem) => {
+        currentReminders.forEach((currentRem, idx) => {
             const prevRem = prevReminders.find(pRem => pRem.text === currentRem.text);
             if (!prevRem) {
                 details.push(`Recordatorio agregado: "${currentRem.text}" (${currentRem.completed ? 'Completado' : 'Pendiente'}).`);
@@ -836,12 +600,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Compare Baby Steps (simple comparison for now)
         if (JSON.stringify(prevData.baby_steps_status) !== JSON.stringify(currentData.baby_steps_status)) {
             details.push("Estado de Baby Steps modificado.");
         }
 
-        // Compare Payments (simple comparison for now)
         if (JSON.stringify(prevData.payments) !== JSON.stringify(currentData.payments)) {
             details.push("Registros de pagos modificados.");
         }
@@ -852,37 +614,24 @@ document.addEventListener('DOMContentLoaded', () => {
         return details;
     }
 
-    /**
-     * Maps a user's email to a display name.
-     * @param {string} email - The user's email.
-     * @returns {string} The display name.
-     */
+    // --- FUNCIÓN PARA MAPEAR EMAIL A NOMBRE ---
     function mapEmailToName(email) {
         if (!email) return 'Desconocido';
-        // Simple mapping, can be expanded
         if (email.toLowerCase() === "sergio.acevedo.santic@gmail.com") return "Sergio";
         if (email.toLowerCase() === "scarlett.real.e@gmail.com") return "Scarlett";
-        // Fallback: extract from email
         const namePart = email.split('@')[0];
         const names = namePart.split('.');
         return names.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
     }
 
-    // --- SAVE CHANGES LOGIC ---
-    /**
-     * Saves the current data as a new backup version in Firebase.
-     */
+
+    // --- GUARDAR CAMBIOS (ÚNICO EVENT LISTENER) ---
     saveChangesButton.addEventListener('click', () => {
-        if (!database || !auth || !auth.currentUser) {
-            alert("No hay base de datos activa o usuario autenticado para guardar.");
-            return;
-        }
         if (!currentBackupData) {
             alert("No hay datos cargados para guardar.");
             return;
         }
 
-        // Validate data before saving (names, categories for forbidden characters)
         let dataIsValidForSaving = true;
         const validationIssues = [];
 
@@ -928,18 +677,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Create a deep copy of the data to save.
         const dataToSave = JSON.parse(JSON.stringify(currentBackupData));
-        delete dataToSave.usd_clp_rate; // Do not save the USD/CLP rate to Firebase.
+        delete dataToSave.usd_clp_rate; // No guardar la tasa USD/CLP en Firebase
 
-        // Ensure default values for any missing top-level properties.
-        const defaultStructure = {
-            version: "1.0_web_v3_usd_clp_auto_multi_db", // Update version string
+        const defaultsFromPython = {
+            version: "1.0_web_v3_usd_clp_auto", // Updated version
             analysis_start_date: getISODateString(new Date()),
             analysis_duration: 12,
             analysis_periodicity: "Mensual",
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
+            // usd_clp_rate: null, // No longer stored
             incomes: [],
             expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
             expenses: [],
@@ -952,22 +700,21 @@ document.addEventListener('DOMContentLoaded', () => {
             reminders_todos: [],
             change_log: []
         };
-
-        for (const key in defaultStructure) {
+        for (const key in defaultsFromPython) {
             if (dataToSave[key] === undefined || dataToSave[key] === null) {
-                // Special handling for objects/arrays to avoid overwriting if they exist but are empty
-                if ((key === 'expense_categories' || key === 'budgets' || key === 'payments') && currentBackupData[key] && Object.keys(currentBackupData[key]).length > 0) {
-                    // Do not overwrite if already populated
-                } else if ((key === 'incomes' || key === 'expenses' || key === 'baby_steps_status' || key === 'reminders_todos' || key === 'change_log') && currentBackupData[key] && currentBackupData[key].length > 0) {
-                    // Do not overwrite if already populated
+                if (key === 'expense_categories' && currentBackupData.expense_categories && Object.keys(currentBackupData.expense_categories).length > 0) {
+                    // No sobreescribir si ya existen
+                } else if (key === 'budgets' && currentBackupData.budgets && Object.keys(currentBackupData.budgets).length > 0) {
+                    // No sobreescribir si ya existen
+                } else if (key === 'baby_steps_status' && currentBackupData.baby_steps_status && currentBackupData.baby_steps_status.length > 0) {
+                    // No sobreescribir si ya existen
                 }
                 else {
-                     dataToSave[key] = defaultStructure[key];
+                    dataToSave[key] = defaultsFromPython[key];
                 }
             }
         }
 
-        // Format dates to ISO strings and other data adjustments before saving.
         dataToSave.analysis_start_date = getISODateString(new Date(dataToSave.analysis_start_date));
         (dataToSave.incomes || []).forEach(inc => {
             if (inc.start_date) inc.start_date = getISODateString(new Date(inc.start_date));
@@ -981,32 +728,35 @@ document.addEventListener('DOMContentLoaded', () => {
             if (exp.category && dataToSave.expense_categories && dataToSave.expense_categories[exp.category]) {
                 exp.type = dataToSave.expense_categories[exp.category];
             } else {
-                exp.type = "Variable"; // Default if category type not found
+                exp.type = "Variable";
             }
             if (typeof exp.is_real === 'undefined') {
-                exp.is_real = false; // Ensure 'is_real' field exists
+                exp.is_real = false;
             }
         });
-        // Ensure payments is an object
         const formattedPayments = {};
-        if (dataToSave.payments && typeof dataToSave.payments === 'object') {
+        if (dataToSave.payments) {
             for (const keyObj in dataToSave.payments) {
                 formattedPayments[keyObj] = dataToSave.payments[keyObj];
             }
         }
         dataToSave.payments = formattedPayments;
 
-        // Generate detailed change log
         const detailedChanges = generateDetailedChangeLog(originalLoadedData, currentBackupData);
 
         const now = new Date();
         const newBackupKey = `backup_${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}T${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
 
         let logMessage = `Nueva versión ${formatBackupKey(newBackupKey)} guardada.`;
-        logMessage += currentBackupKey ? ` Basada en ${formatBackupKey(currentBackupKey)}.` : ` Creada desde un estado inicial o datos por defecto.`;
+        if (currentBackupKey) {
+            logMessage += ` Basada en ${formatBackupKey(currentBackupKey)}.`;
+        } else {
+            logMessage += ` Creada desde un estado inicial o datos por defecto.`;
+        }
 
-        const user = auth.currentUser;
+        const user = firebase.auth().currentUser;
         const userName = user && user.email ? mapEmailToName(user.email) : 'Desconocido';
+
 
         const logEntry = {
             timestamp: now.toISOString(),
@@ -1018,25 +768,22 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         if (!Array.isArray(changeLogEntries)) {
-            changeLogEntries = []; // Ensure changeLogEntries is an array
+            changeLogEntries = [];
         }
-        changeLogEntries.unshift(logEntry); // Add new log entry to the beginning
+        changeLogEntries.unshift(logEntry);
         dataToSave.change_log = changeLogEntries;
 
         loadingMessage.textContent = "Guardando cambios como nueva versión...";
         loadingMessage.style.display = 'block';
 
-        // Save to Firebase
         database.ref('backups/' + newBackupKey).set(dataToSave)
             .then(() => {
                 loadingMessage.style.display = 'none';
                 alert(`Cambios guardados exitosamente como nueva versión: ${formatBackupKey(newBackupKey)}`);
 
-                // Update local state to reflect the saved data
                 currentBackupKey = newBackupKey;
-                currentBackupData = JSON.parse(JSON.stringify(dataToSave)); // Use the data that was actually saved
+                currentBackupData = JSON.parse(JSON.stringify(dataToSave));
 
-                // Re-parse dates to Date objects for internal logic
                 currentBackupData.analysis_start_date = new Date(currentBackupData.analysis_start_date + 'T00:00:00Z');
                 (currentBackupData.incomes || []).forEach(inc => {
                     if (inc.start_date) inc.start_date = new Date(inc.start_date + 'T00:00:00Z');
@@ -1046,59 +793,47 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (exp.start_date) exp.start_date = new Date(exp.start_date + 'T00:00:00Z');
                     if (exp.end_date) exp.end_date = new Date(exp.end_date + 'T00:00:00Z');
                 });
-                originalLoadedData = JSON.parse(JSON.stringify(currentBackupData)); // Update base for next change log
+                originalLoadedData = JSON.parse(JSON.stringify(currentBackupData));
 
-                fetchBackups(); // Refresh the list of backups in the UI
-                backupSelector.value = newBackupKey; // Select the newly saved version
+                fetchBackups();
+                backupSelector.value = newBackupKey;
 
-                renderLogTab(); // Update the log tab display
+                renderLogTab();
             })
             .catch(error => {
                 loadingMessage.style.display = 'none';
                 console.error("Error saving new version:", error);
                 alert(`Error al guardar la nueva versión: ${error.message}`);
-                changeLogEntries.shift(); // Revert log entry addition if save failed
+                changeLogEntries.shift();
             });
     });
 
-    // --- TAB NAVIGATION ---
-    /**
-     * Activates a specific tab and displays its content.
-     * @param {string} tabId - The ID of the tab to activate.
-     */
+
+    // --- NAVEGACIÓN POR PESTAÑAS ---
     function activateTab(tabId) {
-        // Deactivate all tabs and content
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
         document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
 
-        // Activate the selected tab and content
         const activeContent = document.getElementById(tabId);
         const activeButton = document.querySelector(`.tab-button[data-tab="${tabId}"]`);
 
         if (activeContent) activeContent.classList.add('active');
         if (activeButton) activeButton.classList.add('active');
 
-        // Specific actions when certain tabs are activated
         if (tabId === 'flujo-caja' || tabId === 'grafico') renderCashflowTable();
         if (tabId === 'presupuestos') { renderBudgetsTable(); renderBudgetSummaryTable(); }
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); renderPaymentsTableForCurrentPeriod(); }
         if (tabId === 'ajustes') {
             populateSettingsForm();
-            fetchAndUpdateUSDCLPRate();
+            fetchAndUpdateUSDCLPRate(); // Fetch rate when adjustments tab is activated
         }
         if (tabId === 'log') renderLogTab();
     }
-    // Event listener for tab clicks
     tabsContainer.addEventListener('click', (event) => {
-        if (event.target.classList.contains('tab-button')) {
-            activateTab(event.target.dataset.tab);
-        }
+        if (event.target.classList.contains('tab-button')) activateTab(event.target.dataset.tab);
     });
 
-    // --- "AJUSTES" (SETTINGS) TAB LOGIC ---
-    /**
-     * Fetches and updates the USD/CLP exchange rate from an API.
-     */
+    // --- LÓGICA PESTAÑA AJUSTES ---
     async function fetchAndUpdateUSDCLPRate() {
         if (!usdClpInfoLabel) return;
         usdClpInfoLabel.innerHTML = `1 USD = $CLP (Obteniendo...) <span class="loading-dots"></span>`;
@@ -1110,7 +845,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const data = await response.json();
             const clpRate = data.usd && data.usd.clp;
-
             if (clpRate === undefined || clpRate === null) {
                 throw new Error("Tasa CLP no encontrada en la respuesta de la API.");
             }
@@ -1120,9 +854,8 @@ document.addEventListener('DOMContentLoaded', () => {
             usdClpInfoLabel.innerHTML = `<b>1 USD = N/D</b> <small>(Error al obtener tasa)</small>`;
         }
     }
-    /**
-     * Populates the settings form with data from `currentBackupData`.
-     */
+
+
     function populateSettingsForm() {
         if (!currentBackupData) return;
         analysisPeriodicitySelect.value = currentBackupData.analysis_periodicity || "Mensual";
@@ -1130,18 +863,19 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisStartDateInput.value = getISODateString(currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
         analysisInitialBalanceInput.value = currentBackupData.analysis_initial_balance || 0;
         displayCurrencySymbolInput.value = currentBackupData.display_currency_symbol || "$";
+        // usdClpRateInput.value = currentBackupData.usd_clp_rate || ''; // No longer used
+        // updateUsdClpInfoLabel(); // This will be handled by fetchAndUpdateUSDCLPRate
         updateAnalysisDurationLabel();
     }
     analysisPeriodicitySelect.addEventListener('change', updateAnalysisDurationLabel);
-    /**
-     * Updates the label for the analysis duration input based on periodicity.
-     */
     function updateAnalysisDurationLabel() {
         analysisDurationLabel.textContent = analysisPeriodicitySelect.value === "Semanal" ? "Duración (Semanas):" : "Duración (Meses):";
     }
-    /**
-     * Applies settings from the form to `currentBackupData` and recalculates relevant views.
-     */
+    // usdClpRateInput.addEventListener('input', updateUsdClpInfoLabel); // No longer used
+    // function updateUsdClpInfoLabel() { // No longer used, handled by fetchAndUpdateUSDCLPRate
+    //     const rate = parseFloat(usdClpRateInput.value);
+    //     usdClpInfoLabel.textContent = (rate && rate > 0) ? `1 USD = ${rate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "1 USD = $CLP (No se usa en cálculos aún)";
+    // }
     applySettingsButton.addEventListener('click', () => {
         if (!currentBackupData) { alert("No hay datos cargados para aplicar ajustes."); return; }
         const prevPeriodicity = currentBackupData.analysis_periodicity;
@@ -1149,12 +883,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         currentBackupData.analysis_periodicity = newPeriodicity;
         currentBackupData.analysis_duration = parseInt(analysisDurationInput.value, 10);
-        currentBackupData.analysis_start_date = new Date(analysisStartDateInput.value + 'T00:00:00Z'); // Ensure UTC interpretation
+        currentBackupData.analysis_start_date = new Date(analysisStartDateInput.value + 'T00:00:00Z');
         currentBackupData.analysis_initial_balance = parseFloat(analysisInitialBalanceInput.value);
         currentBackupData.display_currency_symbol = displayCurrencySymbolInput.value.trim() || "$";
+        // currentBackupData.usd_clp_rate = parseFloat(usdClpRateInput.value) || null; // No longer stored
 
-        // If periodicity changed, and duration was the default for the old periodicity,
-        // update duration to the default for the new periodicity.
         if (prevPeriodicity !== newPeriodicity) {
             const prevDefaultDuration = (prevPeriodicity === "Mensual") ? 12 : 52;
             if (currentBackupData.analysis_duration === prevDefaultDuration) {
@@ -1164,47 +897,40 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         updateAnalysisDurationLabel();
         alert("Ajustes aplicados. El flujo de caja y el gráfico se recalcularán.");
-        // Re-render affected views
         renderCashflowTable();
-        setupPaymentPeriodSelectors(); // Re-setup payment selectors as periodicity might change
+        setupPaymentPeriodSelectors();
         renderPaymentsTableForCurrentPeriod();
         renderBudgetsTable();
         renderBudgetSummaryTable();
     });
 
-    // --- "INGRESOS" (INCOMES) TAB LOGIC ---
+    // --- LÓGICA PESTAÑA INGRESOS ---
     incomeOngoingCheckbox.addEventListener('change', () => {
         incomeEndDateInput.disabled = incomeOngoingCheckbox.checked;
-        if (incomeOngoingCheckbox.checked) incomeEndDateInput.value = ''; // Clear end date if ongoing
+        if (incomeOngoingCheckbox.checked) incomeEndDateInput.value = '';
     });
     incomeFrequencySelect.addEventListener('change', () => {
         const isUnico = incomeFrequencySelect.value === 'Único';
-        incomeOngoingCheckbox.disabled = isUnico; // Disable ongoing if frequency is "Único"
+        incomeOngoingCheckbox.disabled = isUnico;
         incomeEndDateInput.disabled = isUnico || incomeOngoingCheckbox.checked;
-        if (isUnico) {
-            incomeOngoingCheckbox.checked = false;
-            incomeEndDateInput.value = '';
-        }
+        if (isUnico) { incomeOngoingCheckbox.checked = false; incomeEndDateInput.value = ''; }
     });
 
     incomeIsReimbursementCheckbox.addEventListener('change', () => {
         incomeReimbursementCategoryContainer.style.display = incomeIsReimbursementCheckbox.checked ? 'block' : 'none';
         if (incomeIsReimbursementCheckbox.checked) {
-            populateIncomeReimbursementCategoriesDropdown(); // Populate categories if it's a reimbursement
+            populateIncomeReimbursementCategoriesDropdown();
         } else {
-            incomeReimbursementCategorySelect.value = ''; // Clear category if not a reimbursement
+            incomeReimbursementCategorySelect.value = '';
         }
     });
 
-    /**
-     * Populates the dropdown for reimbursement categories with available expense categories.
-     */
     function populateIncomeReimbursementCategoriesDropdown() {
         if (!incomeReimbursementCategorySelect || !currentBackupData || !currentBackupData.expense_categories) {
-            if(incomeReimbursementCategorySelect) incomeReimbursementCategorySelect.innerHTML = '<option value="">No hay categorías de gasto</option>';
+            if (incomeReimbursementCategorySelect) incomeReimbursementCategorySelect.innerHTML = '<option value="">No hay categorías de gasto</option>';
             return;
         }
-        const currentValue = incomeReimbursementCategorySelect.value; // Preserve current selection if possible
+        const currentValue = incomeReimbursementCategorySelect.value;
         incomeReimbursementCategorySelect.innerHTML = '<option value="">-- Selecciona Categoría de Gasto --</option>';
         const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
         sortedCategories.forEach(catName => {
@@ -1215,14 +941,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 incomeReimbursementCategorySelect.appendChild(option);
             }
         });
-        if (sortedCategories.includes(currentValue)) { // Restore selection
+        if (sortedCategories.includes(currentValue)) {
             incomeReimbursementCategorySelect.value = currentValue;
         }
     }
 
-    /**
-     * Handles submission of the income form (add or edit).
-     */
+
     incomeForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const name = incomeNameInput.value.trim();
@@ -1233,10 +957,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const isReimbursement = incomeIsReimbursementCheckbox.checked;
         const reimbursementCategory = isReimbursement ? incomeReimbursementCategorySelect.value : null;
 
-        // Validations
         if (!isFirebaseKeySafe(name)) { alert(`El nombre del ingreso "${name}" contiene caracteres no permitidos: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}.`); return; }
         if (!name) { alert("El nombre del ingreso no puede estar vacío."); return; }
         if (isReimbursement && !reimbursementCategory) { alert("Si es un reembolso, debe seleccionar una categoría de gasto a reembolsar."); return; }
+
 
         const startDate = startDateValue ? new Date(startDateValue + 'T00:00:00Z') : null;
         const isOngoing = incomeOngoingCheckbox.checked;
@@ -1245,59 +969,54 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isNaN(amount) || !startDate) { alert("Por favor, completa los campos obligatorios (Nombre, Monto, Fecha Inicio)."); return; }
         if (endDate && startDate && endDate < startDate) { alert("La fecha de fin no puede ser anterior a la fecha de inicio."); return; }
 
-        const incomeEntry = { name, net_monthly: amount, frequency, start_date: startDate, end_date: endDate, is_reimbursement: isReimbursement, reimbursement_category: reimbursementCategory };
+        const incomeEntry = {
+            name,
+            net_monthly: amount,
+            frequency,
+            start_date: startDate,
+            end_date: endDate,
+            is_reimbursement: isReimbursement,
+            reimbursement_category: reimbursementCategory
+        };
 
-        if (editingIncomeIndex !== null) { // Editing existing income
+        if (editingIncomeIndex !== null) {
             currentBackupData.incomes[editingIncomeIndex] = incomeEntry;
-        } else { // Adding new income
+        } else {
             if (!currentBackupData.incomes) currentBackupData.incomes = [];
             currentBackupData.incomes.push(incomeEntry);
         }
-        renderIncomesTable();
-        renderCashflowTable(); // Recalculate cashflow
-        resetIncomeForm();
+        renderIncomesTable(); renderCashflowTable(); resetIncomeForm();
     });
 
-    /**
-     * Resets the income form to its default state.
-     */
     function resetIncomeForm() {
         incomeForm.reset();
-        incomeOngoingCheckbox.checked = true; // Default to ongoing
-        incomeEndDateInput.disabled = true;
-        incomeEndDateInput.value = '';
-        incomeFrequencySelect.value = 'Mensual'; // Default frequency
+        incomeOngoingCheckbox.checked = true;
+        incomeEndDateInput.disabled = true; incomeEndDateInput.value = '';
+        incomeFrequencySelect.value = 'Mensual';
 
         incomeIsReimbursementCheckbox.checked = false;
         incomeReimbursementCategoryContainer.style.display = 'none';
         incomeReimbursementCategorySelect.value = '';
 
         addIncomeButton.textContent = 'Agregar Ingreso';
-        cancelEditIncomeButton.style.display = 'none'; // Hide cancel edit button
-        editingIncomeIndex = null; // Clear editing state
-
-        // Set default start date (analysis start date or today)
+        cancelEditIncomeButton.style.display = 'none';
+        editingIncomeIndex = null;
         incomeStartDateInput.value = getISODateString(currentBackupData && currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
     }
     cancelEditIncomeButton.addEventListener('click', resetIncomeForm);
 
-    /**
-     * Renders the incomes table based on `currentBackupData` and search filter.
-     */
     function renderIncomesTable() {
         if (!incomesTableView || !currentBackupData || !currentBackupData.incomes) return;
-        incomesTableView.innerHTML = ''; // Clear existing rows
+        incomesTableView.innerHTML = '';
         const searchTerm = searchIncomeInput.value.toLowerCase();
-
         const filteredIncomes = currentBackupData.incomes.filter(income =>
             income.name.toLowerCase().includes(searchTerm) ||
             formatCurrencyJS(income.net_monthly, currentBackupData.display_currency_symbol || '$').toLowerCase().includes(searchTerm) ||
             income.frequency.toLowerCase().includes(searchTerm) ||
             (income.is_reimbursement && "reembolso".includes(searchTerm))
         );
-
         filteredIncomes.forEach((income) => {
-            const originalIndex = currentBackupData.incomes.indexOf(income); // Get original index for actions
+            const originalIndex = currentBackupData.incomes.findIndex(inc => inc === income);
             const row = incomesTableView.insertRow();
             row.insertCell().textContent = income.name;
             row.insertCell().textContent = formatCurrencyJS(income.net_monthly, currentBackupData.display_currency_symbol || '$');
@@ -1314,25 +1033,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const actionsCell = row.insertCell();
-            const editButton = document.createElement('button');
-            editButton.textContent = 'Editar';
-            editButton.classList.add('small-button');
-            editButton.onclick = () => loadIncomeForEdit(originalIndex);
-            actionsCell.appendChild(editButton);
-
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Eliminar';
-            deleteButton.classList.add('small-button', 'danger');
-            deleteButton.onclick = () => deleteIncome(originalIndex);
-            actionsCell.appendChild(deleteButton);
+            const editButton = document.createElement('button'); editButton.textContent = 'Editar'; editButton.classList.add('small-button');
+            editButton.onclick = () => loadIncomeForEdit(originalIndex); actionsCell.appendChild(editButton);
+            const deleteButton = document.createElement('button'); deleteButton.textContent = 'Eliminar'; deleteButton.classList.add('small-button', 'danger');
+            deleteButton.onclick = () => deleteIncome(originalIndex); actionsCell.appendChild(deleteButton);
         });
     }
-    searchIncomeInput.addEventListener('input', renderIncomesTable); // Re-render on search
+    searchIncomeInput.addEventListener('input', renderIncomesTable);
 
-    /**
-     * Loads an income's data into the form for editing.
-     * @param {number} index - The index of the income in `currentBackupData.incomes`.
-     */
     function loadIncomeForEdit(index) {
         const income = currentBackupData.incomes[index];
         incomeNameInput.value = income.name;
@@ -1343,9 +1051,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isUnico = income.frequency === 'Único';
         incomeOngoingCheckbox.disabled = isUnico;
         if (isUnico) {
-            incomeOngoingCheckbox.checked = false;
-            incomeEndDateInput.value = '';
-            incomeEndDateInput.disabled = true;
+            incomeOngoingCheckbox.checked = false; incomeEndDateInput.value = ''; incomeEndDateInput.disabled = true;
         } else {
             incomeOngoingCheckbox.checked = !income.end_date;
             incomeEndDateInput.value = income.end_date ? getISODateString(new Date(income.end_date)) : '';
@@ -1362,27 +1068,20 @@ document.addEventListener('DOMContentLoaded', () => {
             incomeReimbursementCategoryContainer.style.display = 'none';
         }
 
-        addIncomeButton.textContent = 'Guardar Cambios';
-        cancelEditIncomeButton.style.display = 'inline-block'; // Show cancel button
-        editingIncomeIndex = index; // Set editing state
-        document.getElementById('ingresos').scrollIntoView({ behavior: 'smooth' }); // Scroll to form
+        addIncomeButton.textContent = 'Guardar Cambios'; cancelEditIncomeButton.style.display = 'inline-block';
+        editingIncomeIndex = index; document.getElementById('ingresos').scrollIntoView({ behavior: 'smooth' });
     }
 
-    /**
-     * Deletes an income from `currentBackupData.incomes`.
-     * @param {number} index - The index of the income to delete.
-     */
     function deleteIncome(index) {
         if (confirm(`¿Eliminar ingreso "${currentBackupData.incomes[index].name}"?`)) {
             currentBackupData.incomes.splice(index, 1);
-            renderIncomesTable();
-            renderCashflowTable(); // Recalculate cashflow
+            renderIncomesTable(); renderCashflowTable();
             if (editingIncomeIndex === index) resetIncomeForm();
             else if (editingIncomeIndex !== null && editingIncomeIndex > index) editingIncomeIndex--;
         }
     }
 
-    // --- "GASTOS" (EXPENSES) TAB LOGIC ---
+    // --- LÓGICA PESTAÑA GASTOS ---
     expenseOngoingCheckbox.addEventListener('change', () => {
         expenseEndDateInput.disabled = expenseOngoingCheckbox.checked;
         if (expenseOngoingCheckbox.checked) expenseEndDateInput.value = '';
@@ -1391,86 +1090,58 @@ document.addEventListener('DOMContentLoaded', () => {
         const isUnico = expenseFrequencySelect.value === 'Único';
         expenseOngoingCheckbox.disabled = isUnico;
         expenseEndDateInput.disabled = isUnico || expenseOngoingCheckbox.checked;
-        if (isUnico) {
-            expenseOngoingCheckbox.checked = false;
-            expenseEndDateInput.value = '';
-        }
+        if (isUnico) { expenseOngoingCheckbox.checked = false; expenseEndDateInput.value = ''; }
     });
-    /**
-     * Populates expense category dropdowns (for expenses and budgets).
-     */
     function populateExpenseCategoriesDropdowns() {
         const selects = [expenseCategorySelect, budgetCategorySelect];
         selects.forEach(select => {
             if (!select || !currentBackupData || !currentBackupData.expense_categories) {
-                if(select) select.innerHTML = '<option value="">No hay categorías</option>';
-                return;
+                if (select) select.innerHTML = '<option value="">No hay categorías</option>'; return;
             }
-            const currentValue = select.value; // Preserve selection
+            const currentValue = select.value;
             select.innerHTML = '<option value="">-- Selecciona Categoría --</option>';
             const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
             sortedCategories.forEach(catName => {
                 if (isFirebaseKeySafe(catName)) {
-                    const option = document.createElement('option');
-                    option.value = catName;
-                    option.textContent = catName;
+                    const option = document.createElement('option'); option.value = catName; option.textContent = catName;
                     select.appendChild(option);
                 }
             });
             if (sortedCategories.includes(currentValue)) select.value = currentValue;
-            else if (sortedCategories.length > 0 && select.id === 'expense-category') select.value = sortedCategories[0]; // Default for expense form
+            else if (sortedCategories.length > 0 && select.id === 'expense-category') select.value = sortedCategories[0];
         });
-        updateRemoveCategoryButtonState(); // Update button state based on selection
-        populateIncomeReimbursementCategoriesDropdown(); // Update reimbursement dropdown too
+        updateRemoveCategoryButtonState();
+        populateIncomeReimbursementCategoriesDropdown();
     }
-    /**
-     * Handles adding a new expense category.
-     */
     addCategoryButton.addEventListener('click', () => {
         const newCategoryName = prompt("Nombre de la nueva categoría de gasto:");
         if (newCategoryName && newCategoryName.trim()) {
             const trimmedName = newCategoryName.trim();
             if (!isFirebaseKeySafe(trimmedName)) { alert(`El nombre de categoría "${trimmedName}" contiene caracteres no permitidos: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}.`); return; }
             if (currentBackupData.expense_categories[trimmedName]) { alert(`La categoría "${trimmedName}" ya existe.`); return; }
-
             const categoryType = prompt(`Tipo para "${trimmedName}" (Fijo/Variable):`, "Variable");
             if (categoryType && (categoryType.toLowerCase() === 'fijo' || categoryType.toLowerCase() === 'variable')) {
                 currentBackupData.expense_categories[trimmedName] = categoryType.charAt(0).toUpperCase() + categoryType.slice(1).toLowerCase();
                 if (!currentBackupData.budgets) currentBackupData.budgets = {};
-                currentBackupData.budgets[trimmedName] = 0; // Default budget to 0
-                populateExpenseCategoriesDropdowns();
-                renderBudgetsTable(); // Update budgets table
+                currentBackupData.budgets[trimmedName] = 0;
+                populateExpenseCategoriesDropdowns(); renderBudgetsTable();
                 alert(`Categoría "${trimmedName}" (${currentBackupData.expense_categories[trimmedName]}) agregada.`);
-            } else if (categoryType !== null) { // User provided input but it was invalid
-                alert("Tipo de categoría inválido. Debe ser 'Fijo' o 'Variable'.");
-            }
+            } else if (categoryType !== null) alert("Tipo de categoría inválido. Debe ser 'Fijo' o 'Variable'.");
         }
     });
-    /**
-     * Handles removing an expense category.
-     */
     removeCategoryButton.addEventListener('click', () => {
         const categoryToRemove = expenseCategorySelect.value;
         if (!categoryToRemove) { alert("Selecciona una categoría para eliminar."); return; }
-
-        // Check if category is in use
-        const isInUseByExpense = (currentBackupData.expenses || []).some(exp => exp.category === categoryToRemove);
-        const isInUseByReimbursement = (currentBackupData.incomes || []).some(inc => inc.is_reimbursement && inc.reimbursement_category === categoryToRemove);
-        if (isInUseByExpense) { alert(`Categoría "${categoryToRemove}" en uso por un gasto, no se puede eliminar.`); return; }
-        if (isInUseByReimbursement) { alert(`Categoría "${categoryToRemove}" en uso por un reembolso, no se puede eliminar.`); return; }
-
+        if (currentBackupData.expenses.some(exp => exp.category === categoryToRemove)) { alert(`Categoría "${categoryToRemove}" en uso por un gasto, no se puede eliminar.`); return; }
+        if (currentBackupData.incomes.some(inc => inc.is_reimbursement && inc.reimbursement_category === categoryToRemove)) { alert(`Categoría "${categoryToRemove}" en uso por un reembolso, no se puede eliminar.`); return; }
         if (confirm(`¿Eliminar categoría "${categoryToRemove}" y su presupuesto asociado?`)) {
             delete currentBackupData.expense_categories[categoryToRemove];
             if (currentBackupData.budgets) delete currentBackupData.budgets[categoryToRemove];
-            populateExpenseCategoriesDropdowns();
-            renderBudgetsTable();
+            populateExpenseCategoriesDropdowns(); renderBudgetsTable();
             alert(`Categoría "${categoryToRemove}" eliminada.`);
         }
     });
     expenseCategorySelect.addEventListener('change', updateRemoveCategoryButtonState);
-    /**
-     * Updates the enabled/disabled state of the remove category button.
-     */
     function updateRemoveCategoryButtonState() {
         const selectedCategory = expenseCategorySelect.value;
         if (selectedCategory && currentBackupData && currentBackupData.expense_categories && currentBackupData.expense_categories[selectedCategory]) {
@@ -1485,9 +1156,6 @@ document.addEventListener('DOMContentLoaded', () => {
             removeCategoryButton.title = `Selecciona una categoría válida`;
         }
     }
-    /**
-     * Handles submission of the expense form (add or edit).
-     */
     expenseForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const name = expenseNameInput.value.trim();
@@ -1497,7 +1165,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const startDateValue = expenseStartDateInput.value;
         const endDateValue = expenseEndDateInput.value;
 
-        // Validations
         if (!isFirebaseKeySafe(name)) { alert(`El nombre del gasto "${name}" contiene caracteres no permitidos.`); return; }
         if (!name) { alert("El nombre del gasto no puede estar vacío."); return; }
         if (!category) { alert("Selecciona una categoría."); return; }
@@ -1514,58 +1181,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const expenseType = currentBackupData.expense_categories[category] || "Variable";
         const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal };
 
-        if (editingExpenseIndex !== null) { // Editing existing expense
+        if (editingExpenseIndex !== null) {
             currentBackupData.expenses[editingExpenseIndex] = expenseEntry;
-        } else { // Adding new expense
+        } else {
             if (!currentBackupData.expenses) currentBackupData.expenses = [];
             currentBackupData.expenses.push(expenseEntry);
         }
-        renderExpensesTable();
-        renderCashflowTable(); // Recalculate cashflow
-        resetExpenseForm();
+        renderExpensesTable(); renderCashflowTable(); resetExpenseForm();
     });
-    /**
-     * Resets the expense form to its default state.
-     */
     function resetExpenseForm() {
         expenseForm.reset();
-        expenseOngoingCheckbox.checked = true;
-        expenseEndDateInput.disabled = true;
-        expenseEndDateInput.value = '';
-        expenseFrequencySelect.value = 'Único'; // Default frequency
-        expenseIsRealCheckbox.checked = false; // Default not real
-
-        // Auto-select first category if available
+        expenseOngoingCheckbox.checked = true; expenseEndDateInput.disabled = true; expenseEndDateInput.value = '';
+        expenseFrequencySelect.value = 'Único'; expenseIsRealCheckbox.checked = false;
         if (expenseCategorySelect.options.length > 0 && expenseCategorySelect.value === "") {
             if (expenseCategorySelect.options[0].value !== "") expenseCategorySelect.selectedIndex = 0;
             else if (expenseCategorySelect.options.length > 1) expenseCategorySelect.selectedIndex = 1;
         }
-        addExpenseButton.textContent = 'Agregar Gasto';
-        cancelEditExpenseButton.style.display = 'none'; // Hide cancel button
-        editingExpenseIndex = null; // Clear editing state
-
-        // Set default start date
+        addExpenseButton.textContent = 'Agregar Gasto'; cancelEditExpenseButton.style.display = 'none';
+        editingExpenseIndex = null;
         expenseStartDateInput.value = getISODateString(currentBackupData && currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
-        updateRemoveCategoryButtonState(); // Update button state
+        updateRemoveCategoryButtonState();
     }
     cancelEditExpenseButton.addEventListener('click', resetExpenseForm);
-    /**
-     * Renders the expenses table based on `currentBackupData` and search filter.
-     */
     function renderExpensesTable() {
         if (!expensesTableView || !currentBackupData || !currentBackupData.expenses) return;
-        expensesTableView.innerHTML = ''; // Clear existing rows
+        expensesTableView.innerHTML = '';
         const searchTerm = searchExpenseInput.value.toLowerCase();
-
         const filteredExpenses = currentBackupData.expenses.filter(expense =>
             expense.name.toLowerCase().includes(searchTerm) ||
             formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$').toLowerCase().includes(searchTerm) ||
             expense.category.toLowerCase().includes(searchTerm) ||
             expense.frequency.toLowerCase().includes(searchTerm)
         );
-
         filteredExpenses.forEach((expense) => {
-            const originalIndex = currentBackupData.expenses.indexOf(expense); // Get original index
+            const originalIndex = currentBackupData.expenses.findIndex(exp => exp === expense);
             const row = expensesTableView.insertRow();
             row.insertCell().textContent = expense.name;
             row.insertCell().textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$');
@@ -1574,78 +1223,48 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A';
             row.insertCell().textContent = expense.end_date ? getISODateString(new Date(expense.end_date)) : (expense.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
             row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
-
             const actionsCell = row.insertCell();
-            const editButton = document.createElement('button');
-            editButton.textContent = 'Editar';
-            editButton.classList.add('small-button');
-            editButton.onclick = () => loadExpenseForEdit(originalIndex);
-            actionsCell.appendChild(editButton);
-
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Eliminar';
-            deleteButton.classList.add('small-button', 'danger');
-            deleteButton.onclick = () => deleteExpense(originalIndex);
-            actionsCell.appendChild(deleteButton);
+            const editButton = document.createElement('button'); editButton.textContent = 'Editar'; editButton.classList.add('small-button');
+            editButton.onclick = () => loadExpenseForEdit(originalIndex); actionsCell.appendChild(editButton);
+            const deleteButton = document.createElement('button'); deleteButton.textContent = 'Eliminar'; deleteButton.classList.add('small-button', 'danger');
+            deleteButton.onclick = () => deleteExpense(originalIndex); actionsCell.appendChild(deleteButton);
         });
     }
-    searchExpenseInput.addEventListener('input', renderExpensesTable); // Re-render on search
-    /**
-     * Loads an expense's data into the form for editing.
-     * @param {number} index - The index of the expense in `currentBackupData.expenses`.
-     */
+    searchExpenseInput.addEventListener('input', renderExpensesTable);
     function loadExpenseForEdit(index) {
         const expense = currentBackupData.expenses[index];
-        expenseNameInput.value = expense.name;
-        expenseAmountInput.value = expense.amount;
-        expenseCategorySelect.value = expense.category;
-        expenseFrequencySelect.value = expense.frequency;
+        expenseNameInput.value = expense.name; expenseAmountInput.value = expense.amount;
+        expenseCategorySelect.value = expense.category; expenseFrequencySelect.value = expense.frequency;
         expenseStartDateInput.value = expense.start_date ? getISODateString(new Date(expense.start_date)) : '';
         expenseIsRealCheckbox.checked = expense.is_real || false;
-
         const isUnico = expense.frequency === 'Único';
         expenseOngoingCheckbox.disabled = isUnico;
         if (isUnico) {
-            expenseOngoingCheckbox.checked = false;
-            expenseEndDateInput.value = '';
-            expenseEndDateInput.disabled = true;
+            expenseOngoingCheckbox.checked = false; expenseEndDateInput.value = ''; expenseEndDateInput.disabled = true;
         } else {
             expenseOngoingCheckbox.checked = !expense.end_date;
             expenseEndDateInput.value = expense.end_date ? getISODateString(new Date(expense.end_date)) : '';
             expenseEndDateInput.disabled = expenseOngoingCheckbox.checked;
         }
-        addExpenseButton.textContent = 'Guardar Cambios';
-        cancelEditExpenseButton.style.display = 'inline-block';
-        editingExpenseIndex = index;
-        document.getElementById('gastos').scrollIntoView({ behavior: 'smooth' });
+        addExpenseButton.textContent = 'Guardar Cambios'; cancelEditExpenseButton.style.display = 'inline-block';
+        editingExpenseIndex = index; document.getElementById('gastos').scrollIntoView({ behavior: 'smooth' });
         updateRemoveCategoryButtonState();
     }
-    /**
-     * Deletes an expense from `currentBackupData.expenses`.
-     * @param {number} index - The index of the expense to delete.
-     */
     function deleteExpense(index) {
         if (confirm(`¿Eliminar gasto "${currentBackupData.expenses[index].name}"?`)) {
             currentBackupData.expenses.splice(index, 1);
-            renderExpensesTable();
-            renderCashflowTable();
+            renderExpensesTable(); renderCashflowTable();
             if (editingExpenseIndex === index) resetExpenseForm();
             else if (editingExpenseIndex !== null && editingExpenseIndex > index) editingExpenseIndex--;
         }
     }
 
-    // --- "PRESUPUESTOS" (BUDGETS) TAB LOGIC ---
-    /**
-     * Resets the budget form.
-     */
+    // --- LÓGICA PESTAÑA PRESUPUESTOS ---
     function resetBudgetForm() {
         budgetForm.reset();
         if (budgetCategorySelect.options.length > 0) budgetCategorySelect.selectedIndex = 0;
         budgetAmountInput.value = '';
     }
-    /**
-     * Handles submission of the budget form.
-     */
     budgetForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const category = budgetCategorySelect.value;
@@ -1653,24 +1272,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!category) { alert("Selecciona una categoría."); return; }
         if (isNaN(amount) || amount < 0) { alert("Ingresa un monto válido."); return; }
         if (!isFirebaseKeySafe(category)) { alert(`Categoría "${category}" con nombre no permitido.`); return; }
-
         if (!currentBackupData.budgets) currentBackupData.budgets = {};
         currentBackupData.budgets[category] = amount;
-        renderBudgetsTable();
-        renderBudgetSummaryTable();
-        renderCashflowTable();
+        renderBudgetsTable(); renderBudgetSummaryTable(); renderCashflowTable();
         alert(`Presupuesto para "${category}" guardado como ${formatCurrencyJS(amount, currentBackupData.display_currency_symbol || '$')}.`);
     });
-    /**
-     * Updates the budget amount input when a category is selected.
-     */
     budgetCategorySelect.addEventListener('change', () => {
         const selectedCategory = budgetCategorySelect.value;
         budgetAmountInput.value = (selectedCategory && currentBackupData && currentBackupData.budgets) ? (currentBackupData.budgets[selectedCategory] || '0') : '0';
     });
-    /**
-     * Renders the table of budgets per category.
-     */
     function renderBudgetsTable() {
         if (!budgetsTableView || !currentBackupData || !currentBackupData.expense_categories) return;
         budgetsTableView.innerHTML = '';
@@ -1682,57 +1292,37 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = catName;
             row.insertCell().textContent = catType;
             row.insertCell().textContent = formatCurrencyJS(budgetAmount, currentBackupData.display_currency_symbol || '$');
-            row.addEventListener('click', () => { // Click row to populate form for editing
-                budgetCategorySelect.value = catName;
-                budgetAmountInput.value = budgetAmount;
-            });
+            row.addEventListener('click', () => { budgetCategorySelect.value = catName; budgetAmountInput.value = budgetAmount; });
         });
     }
-    /**
-     * Renders the budget summary table (spent vs. budget).
-     */
     function renderBudgetSummaryTable() {
         if (!budgetSummaryTableBody || !currentBackupData) return;
         budgetSummaryTableBody.innerHTML = '';
-
         if (!currentBackupData.analysis_start_date || !currentBackupData.expenses || !currentBackupData.budgets || !currentBackupData.expense_categories) {
             const row = budgetSummaryTableBody.insertRow();
             const cell = row.insertCell(); cell.colSpan = 5; cell.textContent = "Datos insuficientes."; cell.style.textAlign = "center";
             return;
         }
-
         const analysisStartDate = new Date(currentBackupData.analysis_start_date);
         const currentMonth = analysisStartDate.getUTCMonth();
         const currentYear = analysisStartDate.getUTCFullYear();
         const expensesThisMonth = {};
-
-        // Calculate expenses for the "current" month (based on analysis_start_date)
         (currentBackupData.expenses || []).forEach(exp => {
             if (!exp.start_date) return;
             const expStartDate = new Date(exp.start_date);
             let amountForSummary = 0;
-
-            if (exp.frequency === "Único") {
-                if (expStartDate.getUTCFullYear() === currentYear && expStartDate.getUTCMonth() === currentMonth) {
-                    amountForSummary = exp.amount;
-                }
-            } else if (exp.frequency === "Mensual") {
-                if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) &&
-                    (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) {
-                    amountForSummary = exp.amount;
-                }
-            } else if (exp.frequency === "Semanal") {
-                if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) &&
-                    (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) {
-                    amountForSummary = exp.amount * (52 / 12); // Approximate
-                }
-            } else if (exp.frequency === "Bi-semanal") {
+            if (exp.frequency === "Único") { if (expStartDate.getUTCFullYear() === currentYear && expStartDate.getUTCMonth() === currentMonth) amountForSummary = exp.amount; }
+            else if (exp.frequency === "Mensual") { if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) amountForSummary = exp.amount; }
+            else if (exp.frequency === "Semanal") { if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) amountForSummary = exp.amount * (52 / 12); } 
+            else if (exp.frequency === "Bi-semanal") { 
                 let paydays_in_month = 0;
                 let current_pay_date = new Date(expStartDate.getTime());
                 const month_start_date = new Date(Date.UTC(currentYear, currentMonth, 1));
                 const month_end_date = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
                 while (current_pay_date <= month_end_date && (!exp.end_date || current_pay_date <= new Date(exp.end_date))) {
-                    if (current_pay_date >= month_start_date) paydays_in_month++;
+                    if (current_pay_date >= month_start_date) {
+                        paydays_in_month++;
+                    }
                     current_pay_date = addWeeks(current_pay_date, 2);
                 }
                 amountForSummary = exp.amount * paydays_in_month;
@@ -1740,101 +1330,69 @@ document.addEventListener('DOMContentLoaded', () => {
             if (amountForSummary > 0) expensesThisMonth[exp.category] = (expensesThisMonth[exp.category] || 0) + amountForSummary;
         });
 
-        // Apply reimbursements for the "current" month
         (currentBackupData.incomes || []).forEach(reimbInc => {
             if (!reimbInc.is_reimbursement || !reimbInc.reimbursement_category || !reimbInc.start_date) return;
             const reimbStartDate = new Date(reimbInc.start_date);
             if (reimbStartDate.getUTCFullYear() === currentYear && reimbStartDate.getUTCMonth() === currentMonth) {
                 let amountToReimburse = reimbInc.net_monthly;
-                if (reimbInc.frequency === "Semanal") amountToReimburse = reimbInc.net_monthly * (52/12);
+                if (reimbInc.frequency === "Semanal") amountToReimburse = reimbInc.net_monthly * (52 / 12);
                 else if (reimbInc.frequency === "Bi-semanal") {
-                     let paydays_in_month = 0;
+                    let paydays_in_month = 0;
                     let current_pay_date = new Date(reimbStartDate.getTime());
                     const month_start_date = new Date(Date.UTC(currentYear, currentMonth, 1));
                     const month_end_date = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
                     while (current_pay_date <= month_end_date && (!reimbInc.end_date || current_pay_date <= new Date(reimbInc.end_date))) {
-                        if (current_pay_date >= month_start_date) paydays_in_month++;
+                        if (current_pay_date >= month_start_date) {
+                            paydays_in_month++;
+                        }
                         current_pay_date = addWeeks(current_pay_date, 2);
                     }
                     amountToReimburse = reimbInc.net_monthly * paydays_in_month;
                 }
+
                 if (expensesThisMonth[reimbInc.reimbursement_category]) {
                     expensesThisMonth[reimbInc.reimbursement_category] = Math.max(0, expensesThisMonth[reimbInc.reimbursement_category] - amountToReimburse);
                 }
             }
         });
 
+
         const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
         sortedCategories.forEach(catName => {
             const budget = currentBackupData.budgets[catName] || 0;
             const spent = expensesThisMonth[catName] || 0;
             const difference = budget - spent;
-            const percentageSpent = budget > 0 ? (spent / budget * 100) : (spent > 0 ? 100 : 0) ;
-
+            const percentageSpent = budget > 0 ? (spent / budget * 100) : 0;
             const row = budgetSummaryTableBody.insertRow();
             row.insertCell().textContent = catName;
             row.insertCell().textContent = formatCurrencyJS(budget, currentBackupData.display_currency_symbol);
             row.insertCell().textContent = formatCurrencyJS(spent, currentBackupData.display_currency_symbol);
-
             const diffCell = row.insertCell(); diffCell.textContent = formatCurrencyJS(difference, currentBackupData.display_currency_symbol);
-            diffCell.classList.toggle('text-red', difference < 0);
-            diffCell.classList.toggle('text-green', difference > 0 && budget > 0);
-
+            diffCell.classList.toggle('text-red', difference < 0); diffCell.classList.toggle('text-green', difference > 0 && budget > 0);
             const percCell = row.insertCell(); percCell.textContent = `${percentageSpent.toFixed(1)}%`;
-            if (budget > 0) {
-                if (percentageSpent > 100) percCell.classList.add('text-red');
-                else if (percentageSpent >= 80) percCell.classList.add('text-orange');
-                else percCell.classList.add('text-green');
-            } else if (spent > 0) {
-                percCell.classList.add('text-red');
-            }
+            if (budget > 0) { if (percentageSpent > 100) percCell.classList.add('text-red'); else if (percentageSpent >= 80) percCell.classList.add('text-orange'); else percCell.classList.add('text-green'); }
         });
     }
 
-    // --- "REGISTRO PAGOS" (PAYMENT LOG) TAB LOGIC ---
-    /**
-     * Sets up the period selectors (year, month, week) for the payment log.
-     */
-     function setupPaymentPeriodSelectors() {
+    // --- LÓGICA PESTAÑA REGISTRO PAGOS ---
+    function setupPaymentPeriodSelectors() {
         currentPaymentViewDate = (currentBackupData && currentBackupData.analysis_start_date) ? new Date(currentBackupData.analysis_start_date) : new Date();
-
         const analysisStartDate = new Date(currentPaymentViewDate);
-        // Calculate analysis end date based on duration and periodicity
-        let analysisEndDate;
-        if (currentBackupData) {
-            if (currentBackupData.analysis_periodicity === "Semanal") {
-                analysisEndDate = addWeeks(new Date(analysisStartDate), currentBackupData.analysis_duration);
-            } else { // Mensual
-                analysisEndDate = addMonths(new Date(analysisStartDate), currentBackupData.analysis_duration);
-            }
-        } else {
-            analysisEndDate = addMonths(new Date(analysisStartDate), 12); // Default duration
-        }
-
-
+        const analysisEndDate = addMonths(new Date(analysisStartDate), (currentBackupData ? currentBackupData.analysis_duration : 12));
         paymentYearSelect.innerHTML = '';
         const startYear = Math.min(analysisStartDate.getUTCFullYear(), new Date().getUTCFullYear()) - 2;
         const endYear = Math.max(analysisEndDate.getUTCFullYear(), new Date().getUTCFullYear()) + 5;
         for (let y = startYear; y <= endYear; y++) { const option = document.createElement('option'); option.value = y; option.textContent = y; paymentYearSelect.appendChild(option); }
         paymentYearSelect.value = currentPaymentViewDate.getUTCFullYear();
-
         paymentMonthSelect.innerHTML = '';
         MONTH_NAMES_FULL_ES.forEach((monthName, index) => { const option = document.createElement('option'); option.value = index; option.textContent = monthName; paymentMonthSelect.appendChild(option); });
         paymentMonthSelect.value = currentPaymentViewDate.getUTCMonth();
-
         paymentWeekSelect.innerHTML = '';
         for (let w = 1; w <= 53; w++) { const option = document.createElement('option'); option.value = w; option.textContent = `Semana ${w}`; paymentWeekSelect.appendChild(option); }
         const [, currentIsoWeek] = getWeekNumber(currentPaymentViewDate); paymentWeekSelect.value = currentIsoWeek;
-
         updatePaymentPeriodSelectorVisibility();
-        [paymentYearSelect, paymentMonthSelect, paymentWeekSelect].forEach(sel => {
-            sel.removeEventListener('change', renderPaymentsTableForCurrentPeriod);
-            sel.addEventListener('change', renderPaymentsTableForCurrentPeriod);
-        });
+        [paymentYearSelect, paymentMonthSelect, paymentWeekSelect].forEach(sel => { sel.removeEventListener('change', renderPaymentsTableForCurrentPeriod); sel.addEventListener('change', renderPaymentsTableForCurrentPeriod); });
     }
-    /**
-     * Shows/hides month/week selectors based on analysis periodicity.
-     */
     function updatePaymentPeriodSelectorVisibility() {
         const isWeekly = currentBackupData && currentBackupData.analysis_periodicity === "Semanal";
         paymentsTabTitle.textContent = isWeekly ? "Registro de Pagos Semanales" : "Registro de Pagos Mensuales";
@@ -1843,10 +1401,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     prevPeriodButton.addEventListener('click', () => navigatePaymentPeriod(-1));
     nextPeriodButton.addEventListener('click', () => navigatePaymentPeriod(1));
-    /**
-     * Navigates to the previous/next payment period.
-     * @param {number} direction - -1 for previous, 1 for next.
-     */
     function navigatePaymentPeriod(direction) {
         const isWeekly = currentBackupData.analysis_periodicity === "Semanal";
         let year = parseInt(paymentYearSelect.value);
@@ -1863,290 +1417,110 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         renderPaymentsTableForCurrentPeriod();
     }
-    /**
-     * Renders the payment log table for the currently selected period.
-     */
     function renderPaymentsTableForCurrentPeriod() {
-        if (!paymentsTableView || !currentBackupData || !currentBackupData.expenses) {
-            if(paymentsTableView) paymentsTableView.innerHTML = '<tr><td colspan="6">No hay datos de gastos.</td></tr>';
-            return;
-        }
+        if (!paymentsTableView || !currentBackupData || !currentBackupData.expenses) { if (paymentsTableView) paymentsTableView.innerHTML = '<tr><td colspan="6">No hay datos de gastos.</td></tr>'; return; }
         updatePaymentPeriodSelectorVisibility();
-
         const isWeeklyView = currentBackupData.analysis_periodicity === "Semanal";
         const year = parseInt(paymentYearSelect.value);
         let periodStart, periodEnd, paymentLogPeriodKeyPart;
-
         if (isWeeklyView) {
             const week = parseInt(paymentWeekSelect.value);
-            periodStart = getMondayOfWeek(year, week);
-            periodEnd = addWeeks(new Date(periodStart), 1);
-            periodEnd.setUTCDate(periodEnd.getUTCDate() - 1);
+            periodStart = getMondayOfWeek(year, week); periodEnd = addWeeks(new Date(periodStart), 1); periodEnd.setUTCDate(periodEnd.getUTCDate() - 1);
             paymentLogPeriodKeyPart = week;
         } else {
             const monthIndex = parseInt(paymentMonthSelect.value);
-            periodStart = new Date(Date.UTC(year, monthIndex, 1));
-            periodEnd = new Date(Date.UTC(year, monthIndex + 1, 0));
+            periodStart = new Date(Date.UTC(year, monthIndex, 1)); periodEnd = new Date(Date.UTC(year, monthIndex + 1, 0));
             paymentLogPeriodKeyPart = monthIndex + 1;
         }
         currentPaymentViewDate = periodStart;
-
         paymentsTableView.innerHTML = ''; let expensesInPeriodFound = false;
         currentBackupData.expenses.forEach(expense => {
             if (!expense.start_date) return;
-            const expStartDate = new Date(expense.start_date);
-            const expEndDate = expense.end_date ? new Date(expense.end_date) : null;
+            const expStartDate = new Date(expense.start_date); const expEndDate = expense.end_date ? new Date(expense.end_date) : null;
             let occursInPeriod = false;
-
-            if (expense.frequency === "Único") {
-                if (expStartDate >= periodStart && expStartDate <= periodEnd) occursInPeriod = true;
-            } else if (expense.frequency === "Mensual") {
-                if (isWeeklyView) {
-                    const payDay = expStartDate.getUTCDate();
-                    const payDateThisMonth = new Date(Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth(), payDay));
-                    if (payDateThisMonth >= periodStart && payDateThisMonth <= periodEnd) occursInPeriod = true;
-                } else {
-                   if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true;
-                }
-            } else if (expense.frequency === "Semanal") {
-                if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true;
-            } else if (expense.frequency === "Bi-semanal") {
-                if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) {
-                    let paymentDate = new Date(expStartDate.getTime());
-                    while(paymentDate <= periodEnd) {
-                        if (paymentDate >= periodStart && (!expEndDate || paymentDate <= expEndDate)) {
-                            occursInPeriod = true;
-                            break;
-                        }
-                        paymentDate = addWeeks(paymentDate, 2);
-                        // Safety break for potential infinite loop with incorrect date logic
-                        if (paymentDate < expStartDate && expStartDate > addWeeks(paymentDate, -2)) {
-                            console.warn("Bi-semanal payment loop safety break triggered for expense:", expense.name);
-                            break;
-                        }
-                    }
-                }
-            }
-
+            if (expense.frequency === "Único") { if (expStartDate >= periodStart && expStartDate <= periodEnd) occursInPeriod = true; }
+            else if (expense.frequency === "Mensual") { if (isWeeklyView) { const payDay = expStartDate.getUTCDate(); const payDateThisMonth = new Date(Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth(), payDay)); if (payDateThisMonth >= periodStart && payDateThisMonth <= periodEnd) occursInPeriod = true; } else { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true; } }
+            else if (expense.frequency === "Semanal") { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true; } 
+            else if (expense.frequency === "Bi-semanal") { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) { let paymentDate = new Date(expStartDate.getTime()); while (paymentDate <= periodEnd) { if (paymentDate >= periodStart) { occursInPeriod = true; break; } paymentDate = addWeeks(paymentDate, 2); } } }
             if (occursInPeriod) {
                 expensesInPeriodFound = true; const row = paymentsTableView.insertRow();
-                row.insertCell().textContent = expense.name;
-                row.insertCell().textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol);
-                row.insertCell().textContent = expense.category;
-                row.insertCell().textContent = currentBackupData.expense_categories[expense.category] || 'Variable';
+                row.insertCell().textContent = expense.name; row.insertCell().textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol);
+                row.insertCell().textContent = expense.category; row.insertCell().textContent = currentBackupData.expense_categories[expense.category] || 'Variable';
                 row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
-
                 const paidCell = row.insertCell(); const checkbox = document.createElement('input'); checkbox.type = 'checkbox';
                 const paymentKey = `${expense.name}|${year}|${paymentLogPeriodKeyPart}`;
                 checkbox.checked = currentBackupData.payments && currentBackupData.payments[paymentKey] === true;
                 checkbox.dataset.paymentKey = paymentKey;
-                checkbox.addEventListener('change', (e) => {
-                    if (!currentBackupData.payments) currentBackupData.payments = {};
-                    currentBackupData.payments[e.target.dataset.paymentKey] = e.target.checked;
-                });
+                checkbox.addEventListener('change', (e) => { if (!currentBackupData.payments) currentBackupData.payments = {}; currentBackupData.payments[e.target.dataset.paymentKey] = e.target.checked; });
                 paidCell.appendChild(checkbox);
             }
         });
         if (!expensesInPeriodFound) { const row = paymentsTableView.insertRow(); const cell = row.insertCell(); cell.colSpan = 6; cell.textContent = "No hay gastos programados para este período."; cell.style.textAlign = "center"; }
     }
 
-    // --- "FLUJO DE CAJA" (CASHFLOW) TAB LOGIC ---
-    /**
-     * Renders the cashflow table.
-     */
+    // --- LÓGICA PESTAÑA FLUJO DE CAJA ---
     function renderCashflowTable() {
         if (!currentBackupData || !cashflowTableBody || !cashflowTableHead) return;
         cashflowTableHead.innerHTML = ''; cashflowTableBody.innerHTML = '';
-
         let analysisStartDateObj = currentBackupData.analysis_start_date;
-        if (typeof analysisStartDateObj === 'string') {
-            analysisStartDateObj = new Date(analysisStartDateObj + 'T00:00:00Z');
-        }
-        if (!(analysisStartDateObj instanceof Date) || isNaN(analysisStartDateObj)) {
-            cashflowTableBody.innerHTML = '<tr><td colspan="2">Error: Fecha de inicio inválida.</td></tr>';
-            return;
-        }
-
-        const tempCalcData = {
-            ...currentBackupData,
-            analysis_start_date: analysisStartDateObj,
-            incomes: (currentBackupData.incomes || []).map(inc => ({
-                ...inc,
-                start_date: inc.start_date ? new Date(inc.start_date) : null,
-                end_date: inc.end_date ? new Date(inc.end_date) : null
-            })),
-            expenses: (currentBackupData.expenses || []).map(exp => ({
-                ...exp,
-                start_date: exp.start_date ? new Date(exp.start_date) : null,
-                end_date: exp.end_date ? new Date(exp.end_date) : null
-            })),
-        };
-
+        if (typeof analysisStartDateObj === 'string') analysisStartDateObj = new Date(analysisStartDateObj + 'T00:00:00Z');
+        if (!(analysisStartDateObj instanceof Date) || isNaN(analysisStartDateObj)) { cashflowTableBody.innerHTML = '<tr><td colspan="2">Error: Fecha de inicio inválida.</td></tr>'; return; }
+        const tempCalcData = { ...currentBackupData, analysis_start_date: analysisStartDateObj, incomes: (currentBackupData.incomes || []).map(inc => ({ ...inc, start_date: inc.start_date ? new Date(inc.start_date) : null, end_date: inc.end_date ? new Date(inc.end_date) : null })), expenses: (currentBackupData.expenses || []).map(exp => ({ ...exp, start_date: exp.start_date ? new Date(exp.start_date) : null, end_date: exp.end_date ? new Date(exp.end_date) : null })), };
         const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData);
-
-        if (!periodDates || periodDates.length === 0) {
-            cashflowTableBody.innerHTML = '<tr><td colspan="2">No hay datos para el período.</td></tr>';
-            if (cashflowChartInstance) cashflowChartInstance.destroy(); cashflowChartInstance = null;
-            if (chartMessage) chartMessage.textContent = "No hay datos para graficar.";
-            return;
-        }
-
-        const symbol = currentBackupData.display_currency_symbol || "$";
-        const periodicity = currentBackupData.analysis_periodicity;
-        const initialBalance = parseFloat(currentBackupData.analysis_initial_balance);
-
-        const startQDate = analysisStartDateObj;
-        const startStr = `${('0' + startQDate.getUTCDate()).slice(-2)}/${('0' + (startQDate.getUTCMonth() + 1)).slice(-2)}/${startQDate.getUTCFullYear()}`;
-        const durationUnit = periodicity === "Semanal" ? "Semanas" : "Meses";
-        cashflowTitle.textContent = `Proyección Flujo de Caja (${currentBackupData.analysis_duration} ${durationUnit} desde ${startStr})`;
-
-        const headerRow = cashflowTableHead.insertRow();
-        const thConcept = document.createElement('th'); thConcept.textContent = 'Categoría / Concepto'; headerRow.appendChild(thConcept);
-        periodDates.forEach(d => {
-            const th = document.createElement('th');
-            if (periodicity === "Semanal") {
-                const [year, week] = getWeekNumber(d);
-                const mondayOfWeek = getMondayOfWeek(year, week);
-                th.innerHTML = `Sem ${week} (${DATE_WEEK_START_FORMAT(mondayOfWeek)})<br>${year}`;
-            } else {
-                th.innerHTML = `${MONTH_NAMES_ES[d.getUTCMonth()]}<br>${d.getUTCFullYear()}`;
-            }
-            headerRow.appendChild(th);
-        });
-
-        const cf_row_definitions = [
-            { key: 'START_BALANCE', label: "Saldo Inicial", isBold: true, isHeaderBg: true },
-            { key: 'NET_INCOME', label: "Ingreso Total Neto", isBold: true },
-        ];
+        if (!periodDates || periodDates.length === 0) { cashflowTableBody.innerHTML = '<tr><td colspan="2">No hay datos para el período.</td></tr>'; if (cashflowChartInstance) cashflowChartInstance.destroy(); cashflowChartInstance = null; if (chartMessage) chartMessage.textContent = "No hay datos para graficar."; return; }
+        const symbol = currentBackupData.display_currency_symbol || "$"; const periodicity = currentBackupData.analysis_periodicity; const initialBalance = parseFloat(currentBackupData.analysis_initial_balance);
+        const startQDate = analysisStartDateObj; const startStr = `${('0' + startQDate.getUTCDate()).slice(-2)}/${('0' + (startQDate.getUTCMonth() + 1)).slice(-2)}/${startQDate.getUTCFullYear()}`;
+        const durationUnit = periodicity === "Semanal" ? "Semanas" : "Meses"; cashflowTitle.textContent = `Proyección Flujo de Caja (${currentBackupData.analysis_duration} ${durationUnit} desde ${startStr})`;
+        const headerRow = cashflowTableHead.insertRow(); const thConcept = document.createElement('th'); thConcept.textContent = 'Categoría / Concepto'; headerRow.appendChild(thConcept);
+        periodDates.forEach(d => { const th = document.createElement('th'); if (periodicity === "Semanal") { const [year, week] = getWeekNumber(d); const mondayOfWeek = getMondayOfWeek(year, week); th.innerHTML = `Sem ${week} (${DATE_WEEK_START_FORMAT(mondayOfWeek)})<br>${year}`; } else { th.innerHTML = `${MONTH_NAMES_ES[d.getUTCMonth()]}<br>${d.getUTCFullYear()}`; } headerRow.appendChild(th); });
+        const cf_row_definitions = [{ key: 'START_BALANCE', label: "Saldo Inicial", isBold: true, isHeaderBg: true }, { key: 'NET_INCOME', label: "Ingreso Total Neto", isBold: true },];
         const fixedCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === "Fijo").sort() : [];
         const variableCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === "Variable").sort() : [];
-
-        fixedCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat }));
-        cf_row_definitions.push({ key: 'FIXED_EXP_TOTAL', label: "Total Gastos Fijos", isBold: true, isHeaderBg: true });
-
-        variableCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat }));
-        cf_row_definitions.push({ key: 'VAR_EXP_TOTAL', label: "Total Gastos Variables", isBold: true, isHeaderBg: true });
-
-        cf_row_definitions.push({ key: 'NET_FLOW', label: "Flujo Neto del Período", isBold: true });
-        cf_row_definitions.push({ key: 'END_BALANCE', label: "Saldo Final Estimado", isBold: true, isHeaderBg: true });
-
+        fixedCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat })); cf_row_definitions.push({ key: 'FIXED_EXP_TOTAL', label: "Total Gastos Fijos", isBold: true, isHeaderBg: true });
+        variableCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat })); cf_row_definitions.push({ key: 'VAR_EXP_TOTAL', label: "Total Gastos Variables", isBold: true, isHeaderBg: true });
+        cf_row_definitions.push({ key: 'NET_FLOW', label: "Flujo Neto del Período", isBold: true }); cf_row_definitions.push({ key: 'END_BALANCE', label: "Saldo Final Estimado", isBold: true, isHeaderBg: true });
         cf_row_definitions.forEach((def, rowIndex) => {
-            const tr = cashflowTableBody.insertRow();
-            const tdLabel = tr.insertCell();
-            tdLabel.textContent = def.isIndent ? `  ${def.label}` : def.label;
-            if (def.isBold) tdLabel.classList.add('bold');
-            if (def.isHeaderBg) tr.classList.add('bg-header');
-            else if (rowIndex % 2 !== 0 && !def.isHeaderBg) tr.classList.add('bg-alt-row');
-
+            const tr = cashflowTableBody.insertRow(); const tdLabel = tr.insertCell(); tdLabel.textContent = def.isIndent ? `  ${def.label}` : def.label;
+            if (def.isBold) tdLabel.classList.add('bold'); if (def.isHeaderBg) tr.classList.add('bg-header'); else if (rowIndex % 2 !== 0 && !def.isHeaderBg) tr.classList.add('bg-alt-row');
             for (let i = 0; i < periodDates.length; i++) {
-                const tdValue = tr.insertCell();
-                let value;
-                let colorClass = '';
+                const tdValue = tr.insertCell(); let value; let colorClass = '';
                 switch (def.key) {
-                    case 'START_BALANCE': value = (i === 0) ? initialBalance : end_bal_p[i - 1]; break;
-                    case 'NET_INCOME':    value = income_p[i]; break;
-                    case 'FIXED_EXP_TOTAL': value = -fixed_exp_p[i]; break;
-                    case 'VAR_EXP_TOTAL': value = -var_exp_p[i]; break;
-                    case 'NET_FLOW':      value = net_flow_p[i]; break;
-                    case 'END_BALANCE':   value = end_bal_p[i]; colorClass = value >= 0 ? 'text-blue' : 'text-red'; break;
-                    default:
-                        value = (def.category && expenses_by_cat_p[i]) ? -(expenses_by_cat_p[i][def.category] || 0) : 0;
+                    case 'START_BALANCE': value = (i === 0) ? initialBalance : end_bal_p[i - 1]; break; case 'NET_INCOME': value = income_p[i]; break;
+                    case 'FIXED_EXP_TOTAL': value = -fixed_exp_p[i]; break; case 'VAR_EXP_TOTAL': value = -var_exp_p[i]; break;
+                    case 'NET_FLOW': value = net_flow_p[i]; break; case 'END_BALANCE': value = end_bal_p[i]; colorClass = value >= 0 ? 'text-blue' : 'text-red'; break;
+                    default: value = (def.category && expenses_by_cat_p[i]) ? -(expenses_by_cat_p[i][def.category] || 0) : 0;
                 }
-                tdValue.textContent = formatCurrencyJS(value, symbol);
-                if (colorClass) tdValue.classList.add(colorClass);
-                if (def.isBold) tdValue.classList.add('bold');
+                tdValue.textContent = formatCurrencyJS(value, symbol); if (colorClass) tdValue.classList.add(colorClass); if (def.isBold) tdValue.classList.add('bold');
             }
         });
-        renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p);
-        renderBudgetSummaryTable();
+        renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p); renderBudgetSummaryTable();
     }
-    /**
-     * Calculates cashflow data based on current settings, incomes, and expenses.
-     * @param {object} data - The current backup data with Date objects for dates.
-     * @returns {object} An object containing arrays of cashflow data per period.
-     */
+
     function calculateCashFlowData(data) {
-        const startDate = data.analysis_start_date;
-        const duration = parseInt(data.analysis_duration, 10);
-        const periodicity = data.analysis_periodicity;
-        const initialBalance = parseFloat(data.analysis_initial_balance);
-
-        let periodDates = [];
-        let income_p = Array(duration).fill(0.0);
-        let fixed_exp_p = Array(duration).fill(0.0);
-        let var_exp_p = Array(duration).fill(0.0);
-        let net_flow_p = Array(duration).fill(0.0);
-        let end_bal_p = Array(duration).fill(0.0);
-        let expenses_by_cat_p = Array(duration).fill(null).map(() => ({}));
-
-        let currentDate = new Date(startDate.getTime());
-        let currentBalance = initialBalance;
-
+        const startDate = data.analysis_start_date; const duration = parseInt(data.analysis_duration, 10); const periodicity = data.analysis_periodicity; const initialBalance = parseFloat(data.analysis_initial_balance);
+        let periodDates = []; let income_p = Array(duration).fill(0.0); let fixed_exp_p = Array(duration).fill(0.0); let var_exp_p = Array(duration).fill(0.0); let net_flow_p = Array(duration).fill(0.0); let end_bal_p = Array(duration).fill(0.0); let expenses_by_cat_p = Array(duration).fill(null).map(() => ({}));
+        let currentDate = new Date(startDate.getTime()); let currentBalance = initialBalance;
         const fixedCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Fijo").sort() : [];
         const variableCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Variable").sort() : [];
         const orderedCategories = [...fixedCategories, ...variableCategories];
-
-        orderedCategories.forEach(cat => {
-            for (let i = 0; i < duration; i++) {
-                expenses_by_cat_p[i][cat] = 0.0;
-            }
-        });
+        orderedCategories.forEach(cat => { for (let i = 0; i < duration; i++) { expenses_by_cat_p[i][cat] = 0.0; } });
 
         for (let i = 0; i < duration; i++) {
-            const p_start = new Date(currentDate.getTime());
-            let p_end;
-            if (periodicity === "Mensual") {
-                p_end = addMonths(new Date(p_start.getTime()), 1);
-                p_end.setUTCDate(p_end.getUTCDate() - 1);
-            } else {
-                p_end = addWeeks(new Date(p_start.getTime()), 1);
-                p_end.setUTCDate(p_end.getUTCDate() - 1);
-            }
-            periodDates.push(p_start);
+            const p_start = new Date(currentDate.getTime()); let p_end;
+            if (periodicity === "Mensual") { p_end = addMonths(new Date(p_start.getTime()), 1); p_end.setUTCDate(p_end.getUTCDate() - 1); } else { p_end = addWeeks(new Date(p_start.getTime()), 1); p_end.setUTCDate(p_end.getUTCDate() - 1); }
+            periodDates.push(p_start); let p_inc_total = 0.0;
 
-            let p_inc_total = 0.0;
             (data.incomes || []).forEach(inc => {
                 if (!inc.start_date) return;
-                if (inc.is_reimbursement) return;
+                if (inc.is_reimbursement) return; // Exclude reimbursements from direct income calculation here
 
-                const inc_start = inc.start_date;
-                const inc_end = inc.end_date;
-                const net_amount = parseFloat(inc.net_monthly || 0);
-                const inc_freq = inc.frequency || "Mensual";
-
-                const isActiveRange = (inc_start <= p_end && (inc_end === null || inc_end >= p_start));
-                if (!isActiveRange) return;
-
+                const inc_start = inc.start_date; const inc_end = inc.end_date; const net_amount = parseFloat(inc.net_monthly || 0); const inc_freq = inc.frequency || "Mensual";
+                const isActiveRange = (inc_start <= p_end && (inc_end === null || inc_end >= p_start)); if (!isActiveRange) return;
                 let income_to_add = 0.0;
-                if (inc_freq === "Mensual") {
-                    if (periodicity === "Mensual") income_to_add = net_amount;
-                    else if (periodicity === "Semanal") {
-                        const payDay = inc_start.getUTCDate();
-                        const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay));
-                        if (p_start <= payDate && payDate <= p_end) income_to_add = net_amount;
-                    }
-                } else if (inc_freq === "Único") {
-                    if (p_start <= inc_start && inc_start <= p_end) income_to_add = net_amount;
-                } else if (inc_freq === "Semanal") {
-                    if (periodicity === "Semanal") income_to_add = net_amount;
-                    else if (periodicity === "Mensual") income_to_add = net_amount * (52 / 12);
-                } else if (inc_freq === "Bi-semanal") {
-                    if (periodicity === "Semanal") {
-                        let paymentDate = new Date(inc_start.getTime());
-                        while(paymentDate <= p_end && (!inc_end || paymentDate <= inc_end)) {
-                            if (paymentDate >= p_start) { income_to_add = net_amount; break; }
-                            paymentDate = addWeeks(paymentDate, 2);
-                        }
-                    } else if (periodicity === "Mensual") {
-                        let paydays_in_month = 0;
-                        let current_pay_date = new Date(inc_start.getTime());
-                        while (current_pay_date <= p_end && (!inc_end || current_pay_date <= inc_end)) {
-                            if (current_pay_date >= p_start) paydays_in_month++;
-                            current_pay_date = addWeeks(current_pay_date, 2);
-                        }
-                        income_to_add = net_amount * paydays_in_month;
-                    }
-                }
+                if (inc_freq === "Mensual") { if (periodicity === "Mensual") income_to_add = net_amount; else if (periodicity === "Semanal") { const payDay = inc_start.getUTCDate(); const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay)); if (p_start <= payDate && payDate <= p_end) income_to_add = net_amount; } }
+                else if (inc_freq === "Único") { if (p_start <= inc_start && inc_start <= p_end) income_to_add = net_amount; }
+                else if (inc_freq === "Semanal") { if (periodicity === "Semanal") income_to_add = net_amount; else if (periodicity === "Mensual") income_to_add = net_amount * (52 / 12); }
+                else if (inc_freq === "Bi-semanal") { if (periodicity === "Semanal") { let paymentDate = new Date(inc_start.getTime()); while (paymentDate <= p_end && (!inc_end || paymentDate <= inc_end)) { if (paymentDate >= p_start) { income_to_add = net_amount; break; } paymentDate = addWeeks(paymentDate, 2); } } else if (periodicity === "Mensual") { let paydays_in_month = 0; let current_pay_date = new Date(inc_start.getTime()); while (current_pay_date <= p_end && (!inc_end || current_pay_date <= inc_end)) { if (current_pay_date >= p_start) paydays_in_month++; current_pay_date = addWeeks(current_pay_date, 2); } income_to_add = net_amount * paydays_in_month; } }
                 p_inc_total += income_to_add;
             });
             income_p[i] = p_inc_total;
@@ -2155,53 +1529,21 @@ document.addEventListener('DOMContentLoaded', () => {
             let p_var_exp_total_for_period = 0.0;
 
             (data.expenses || []).forEach(exp => {
-                if (!exp.start_date) return;
-                const e_start = exp.start_date;
-                const e_end = exp.end_date;
-                const amt_raw = parseFloat(exp.amount || 0);
-                const freq = exp.frequency || "Mensual";
-                const cat = exp.category;
-
+                if (!exp.start_date) return; const e_start = exp.start_date; const e_end = exp.end_date; const amt_raw = parseFloat(exp.amount || 0); const freq = exp.frequency || "Mensual"; const typ = exp.type || (data.expense_categories && data.expense_categories[exp.category]) || "Variable"; const cat = exp.category;
                 if (amt_raw < 0 || !cat || !orderedCategories.includes(cat)) return;
-
-                const isActiveRange = (e_start <= p_end && (e_end === null || e_end >= p_start));
-                if (!isActiveRange) return;
-
+                const isActiveRange = (e_start <= p_end && (e_end === null || e_end >= p_start)); if (!isActiveRange) return;
                 let exp_add_this_period = 0.0;
-                if (freq === "Mensual") {
-                    if (periodicity === "Mensual") exp_add_this_period = amt_raw;
-                    else if (periodicity === "Semanal") {
-                        const payDay = e_start.getUTCDate();
-                        const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay));
-                        if (p_start <= payDate && payDate <= p_end) exp_add_this_period = amt_raw;
-                    }
-                } else if (freq === "Único") {
-                    if (p_start <= e_start && e_start <= p_end) exp_add_this_period = amt_raw;
-                } else if (freq === "Semanal") {
-                    if (periodicity === "Semanal") exp_add_this_period = amt_raw;
-                    else if (periodicity === "Mensual") exp_add_this_period = amt_raw * (52 / 12);
-                } else if (freq === "Bi-semanal") {
-                     if (periodicity === "Semanal") {
-                        let paymentDate = new Date(e_start.getTime());
-                        while(paymentDate <= p_end && (!e_end || paymentDate <= e_end)) {
-                            if (paymentDate >= p_start) { exp_add_this_period = amt_raw; break; }
-                            paymentDate = addWeeks(paymentDate, 2);
-                        }
-                    } else if (periodicity === "Mensual") {
-                        let paydays_in_month = 0;
-                        let current_pay_date = new Date(e_start.getTime());
-                        while (current_pay_date <= p_end && (!e_end || current_pay_date <= e_end)) {
-                            if (current_pay_date >= p_start) paydays_in_month++;
-                            current_pay_date = addWeeks(current_pay_date, 2);
-                        }
-                        exp_add_this_period = amt_raw * paydays_in_month;
-                    }
-                }
+                if (freq === "Mensual") { if (periodicity === "Mensual") exp_add_this_period = amt_raw; else if (periodicity === "Semanal") { const payDay = e_start.getUTCDate(); const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay)); if (p_start <= payDate && payDate <= p_end) exp_add_this_period = amt_raw; } }
+                else if (freq === "Único") { if (p_start <= e_start && e_start <= p_end) exp_add_this_period = amt_raw; }
+                else if (freq === "Semanal") { if (periodicity === "Semanal") exp_add_this_period = amt_raw; else if (periodicity === "Mensual") exp_add_this_period = amt_raw * (52 / 12); }
+                else if (freq === "Bi-semanal") { if (periodicity === "Semanal") { let paymentDate = new Date(e_start.getTime()); while (paymentDate <= p_end && (!e_end || paymentDate <= e_end)) { if (paymentDate >= p_start) { exp_add_this_period = amt_raw; break; } paymentDate = addWeeks(paymentDate, 2); } } else if (periodicity === "Mensual") { let paydays_in_month = 0; let current_pay_date = new Date(e_start.getTime()); while (current_pay_date <= p_end && (!e_end || current_pay_date <= e_end)) { if (current_pay_date >= p_start) paydays_in_month++; current_pay_date = addWeeks(current_pay_date, 2); } exp_add_this_period = amt_raw * paydays_in_month; } }
                 if (exp_add_this_period > 0) {
                     expenses_by_cat_p[i][cat] = (expenses_by_cat_p[i][cat] || 0) + exp_add_this_period;
+                    // Totals will be recalculated after reimbursements
                 }
             });
 
+            // Apply reimbursements to expenses of this period
             (data.incomes || []).forEach(reimbInc => {
                 if (!reimbInc.is_reimbursement || !reimbInc.reimbursement_category || !reimbInc.start_date) return;
 
@@ -2252,7 +1594,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     expenses_by_cat_p[i][reimb_cat] = Math.max(0, expenses_by_cat_p[i][reimb_cat] - amount_of_reimbursement_in_this_period);
                 }
             });
-
+            
+            // Recalculate total fixed/variable expenses after reimbursements
             p_fix_exp_total_for_period = 0;
             p_var_exp_total_for_period = 0;
             for (const cat_name_final in expenses_by_cat_p[i]) {
@@ -2268,180 +1611,44 @@ document.addEventListener('DOMContentLoaded', () => {
             fixed_exp_p[i] = p_fix_exp_total_for_period;
             var_exp_p[i] = p_var_exp_total_for_period;
 
-            const net_flow = p_inc_total - (fixed_exp_p[i] + var_exp_p[i]);
-            net_flow_p[i] = net_flow;
-            const end_bal = currentBalance + net_flow;
-            end_bal_p[i] = end_bal;
-            currentBalance = end_bal;
-            currentDate = (periodicity === "Mensual") ? addMonths(currentDate, 1) : addWeeks(currentDate, 1);
+            const net_flow = p_inc_total - (fixed_exp_p[i] + var_exp_p[i]); net_flow_p[i] = net_flow;
+            const end_bal = currentBalance + net_flow; end_bal_p[i] = end_bal;
+            currentBalance = end_bal; currentDate = (periodicity === "Mensual") ? addMonths(currentDate, 1) : addWeeks(currentDate, 1);
         }
         return { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p };
     }
 
-    // --- "GRÁFICO" (CHART) TAB LOGIC ---
-    /**
-     * Renders the cashflow chart using Chart.js.
-     * @param {Date[]} periodDates - Array of dates for the x-axis.
-     * @param {number[]} incomes - Array of income data.
-     * @param {number[]} totalExpenses - Array of total expense data.
-     * @param {number[]} netFlows - Array of net flow data.
-     * @param {number[]} endBalances - Array of end balance data.
-     */
+    // --- LÓGICA PESTAÑA GRÁFICO ---
     function renderCashflowChart(periodDates, incomes, totalExpenses, netFlows, endBalances) {
-        if (!cashflowChartCanvas) return;
-        if (cashflowChartInstance) cashflowChartInstance.destroy(); // Destroy previous chart instance
-
-        if (!periodDates || periodDates.length === 0) {
-            if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja.";
-            return;
-        }
-        if (chartMessage) chartMessage.textContent = ""; // Clear message if data is present
-
-        const labels = periodDates.map(date =>
-            currentBackupData.analysis_periodicity === "Semanal" ?
-            `Sem ${getWeekNumber(date)[1]} ${getWeekNumber(date)[0]}` : // Week number and year
-            `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}` // Month and year
-        );
-
+        if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
+        if (!periodDates || periodDates.length === 0) { if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
+        if (chartMessage) chartMessage.textContent = "";
+        const labels = periodDates.map(date => currentBackupData.analysis_periodicity === "Semanal" ? `Sem ${getWeekNumber(date)[1]} ${getWeekNumber(date)[0]}` : `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`);
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
             type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Saldo Final Estimado',
-                        data: endBalances,
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                        tension: 0.1,
-                        fill: false,
-                        pointRadius: 4,
-                        pointBackgroundColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 2,
-                        order: 1,
-                    },
-                    {
-                        label: 'Ingreso Total Neto',
-                        data: incomes,
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 1)',
-                        type: 'scatter',
-                        showLine: false,
-                        pointRadius: 6,
-                        pointStyle: 'circle',
-                        order: 2,
-                    },
-                    {
-                        label: 'Gasto Total',
-                        data: totalExpenses.map(e => -e),
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        backgroundColor: 'rgba(255, 99, 132, 1)',
-                        type: 'scatter',
-                        showLine: false,
-                        pointRadius: 6,
-                        pointStyle: 'rectRot',
-                        order: 2,
-                    },
-                    {
-                        label: 'Flujo Neto del Período',
-                        data: netFlows,
-                        borderColor: 'rgba(255, 206, 86, 1)',
-                        backgroundColor: 'rgba(255, 206, 86, 1)',
-                        type: 'scatter',
-                        showLine: false,
-                        pointRadius: 6,
-                        pointStyle: 'triangle',
-                        order: 2,
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        title: {
-                            display: true,
-                            text: `Saldo / Flujos (${currentBackupData.display_currency_symbol || '$'})`
-                        }
-                    }
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (label) label += ': ';
-                                if (context.parsed.y !== null) {
-                                    label += formatCurrencyJS(context.parsed.y, currentBackupData.display_currency_symbol || '$');
-                                }
-                                return label;
-                            }
-                        }
-                    },
-                    legend: { position: 'top' }
-                }
-            }
+            data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { type: 'linear', display: true, position: 'left', title: { display: true, text: `Saldo / Flujos (${currentBackupData.display_currency_symbol || '$'})` } } }, plugins: { tooltip: { callbacks: { label: function (context) { let label = context.dataset.label || ''; if (label) label += ': '; if (context.parsed.y !== null) label += formatCurrencyJS(context.parsed.y, currentBackupData.display_currency_symbol || '$'); return label; } } }, legend: { position: 'top' } } }
         });
     }
 
-    // --- "BABY STEPS" TAB LOGIC ---
-    /**
-     * Renders the Baby Steps content based on `BABY_STEPS_DATA_JS` and `currentBackupData`.
-     */
+    // --- LÓGICA PESTAÑA BABY STEPS ---
     function renderBabySteps() {
         if (!babyStepsContainer || !currentBackupData || !currentBackupData.baby_steps_status) return;
         babyStepsContainer.innerHTML = '';
-
         BABY_STEPS_DATA_JS.forEach((stepData, stepIndex) => {
-            const stepDiv = document.createElement('div');
-            stepDiv.classList.add('baby-step');
-
-            const title = document.createElement('h3');
-            title.textContent = stepData.title;
-            stepDiv.appendChild(title);
-
-            const description = document.createElement('p');
-            description.innerHTML = stepData.description.replace(/\n/g, '<br>');
-            stepDiv.appendChild(description);
-
+            const stepDiv = document.createElement('div'); stepDiv.classList.add('baby-step');
+            const title = document.createElement('h3'); title.textContent = stepData.title; stepDiv.appendChild(title);
+            const description = document.createElement('p'); description.innerHTML = stepData.description.replace(/\n/g, '<br>'); stepDiv.appendChild(description);
             ['dos', 'donts'].forEach(listType => {
                 if (stepData[listType] && stepData[listType].length > 0) {
-                    const listTitle = document.createElement('h4');
-                    listTitle.textContent = listType === 'dos' ? "✅ Qué haces:" : "❌ Qué no haces:";
-                    stepDiv.appendChild(listTitle);
-
+                    const listTitle = document.createElement('h4'); listTitle.textContent = listType === 'dos' ? "✅ Qué haces:" : "❌ Qué no haces:"; stepDiv.appendChild(listTitle);
                     const ul = document.createElement('ul');
                     stepData[listType].forEach((itemText, itemIndex) => {
-                        const li = document.createElement('li');
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.id = `step-${stepIndex}-${listType}-${itemIndex}`;
-
-                        if (currentBackupData.baby_steps_status[stepIndex] &&
-                            currentBackupData.baby_steps_status[stepIndex][listType]) {
-                            checkbox.checked = currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] || false;
-                        } else {
-                            checkbox.checked = false;
-                        }
-
-                        checkbox.addEventListener('change', (e) => {
-                            if (!currentBackupData.baby_steps_status[stepIndex]) currentBackupData.baby_steps_status[stepIndex] = { dos: [], donts: [] };
-                            if (!currentBackupData.baby_steps_status[stepIndex][listType]) currentBackupData.baby_steps_status[stepIndex][listType] = new Array(stepData[listType].length).fill(false);
-
-                            currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] = e.target.checked;
-                        });
-
-                        const label = document.createElement('label');
-                        label.htmlFor = checkbox.id;
-                        label.textContent = itemText;
-
-                        li.appendChild(checkbox);
-                        li.appendChild(label);
-                        ul.appendChild(li);
+                        const li = document.createElement('li'); const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.id = `step-${stepIndex}-${listType}-${itemIndex}`;
+                        if (currentBackupData.baby_steps_status[stepIndex] && currentBackupData.baby_steps_status[stepIndex][listType]) checkbox.checked = currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] || false; else checkbox.checked = false;
+                        checkbox.addEventListener('change', (e) => { if (currentBackupData.baby_steps_status[stepIndex] && currentBackupData.baby_steps_status[stepIndex][listType]) currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] = e.target.checked; });
+                        const label = document.createElement('label'); label.htmlFor = checkbox.id; label.textContent = itemText;
+                        li.appendChild(checkbox); li.appendChild(label); ul.appendChild(li);
                     });
                     stepDiv.appendChild(ul);
                 }
@@ -2450,72 +1657,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- "RECORDATORIOS" (REMINDERS) TAB LOGIC ---
-    /**
-     * Resets the reminder form.
-     */
+    // --- LÓGICA PESTAÑA RECORDATORIOS ---
     function resetReminderForm() { reminderForm.reset(); }
-    /**
-     * Handles submission of the reminder form.
-     */
     reminderForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const text = reminderTextInput.value.trim();
+        e.preventDefault(); const text = reminderTextInput.value.trim();
         if (!text) { alert("Ingresa el texto del recordatorio."); return; }
         if (!currentBackupData.reminders_todos) currentBackupData.reminders_todos = [];
         currentBackupData.reminders_todos.push({ text: text, completed: false });
-        renderReminders();
-        resetReminderForm();
+        renderReminders(); resetReminderForm();
     });
-    /**
-     * Renders the lists of pending and completed reminders.
-     */
     function renderReminders() {
         if (!pendingRemindersList || !completedRemindersList || !currentBackupData) return;
-        pendingRemindersList.innerHTML = '';
-        completedRemindersList.innerHTML = '';
+        pendingRemindersList.innerHTML = ''; completedRemindersList.innerHTML = '';
         (currentBackupData.reminders_todos || []).forEach((reminder, index) => {
-            const li = document.createElement('li');
-            li.textContent = reminder.text;
-            li.dataset.index = index;
-
-            const toggleButton = document.createElement('button');
-            toggleButton.textContent = reminder.completed ? 'Marcar Pendiente' : 'Marcar Completado';
-            toggleButton.classList.add('small-button');
-            toggleButton.addEventListener('click', () => {
-                reminder.completed = !reminder.completed;
-                renderReminders();
-            });
-
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Eliminar';
-            deleteButton.classList.add('small-button', 'danger');
-            deleteButton.addEventListener('click', () => {
-                if (confirm(`¿Eliminar recordatorio "${reminder.text}"?`)) {
-                    currentBackupData.reminders_todos.splice(index, 1);
-                    renderReminders();
-                }
-            });
-
-            const buttonContainer = document.createElement('div');
-            buttonContainer.classList.add('reminder-actions');
-            buttonContainer.appendChild(toggleButton);
-            buttonContainer.appendChild(deleteButton);
-            li.appendChild(buttonContainer);
-
-            if (reminder.completed) {
-                li.classList.add('completed');
-                completedRemindersList.appendChild(li);
-            } else {
-                pendingRemindersList.appendChild(li);
-            }
+            const li = document.createElement('li'); li.textContent = reminder.text; li.dataset.index = index;
+            const toggleButton = document.createElement('button'); toggleButton.textContent = reminder.completed ? 'Marcar Pendiente' : 'Marcar Completado'; toggleButton.classList.add('small-button');
+            toggleButton.addEventListener('click', () => { reminder.completed = !reminder.completed; renderReminders(); });
+            const deleteButton = document.createElement('button'); deleteButton.textContent = 'Eliminar'; deleteButton.classList.add('small-button', 'danger');
+            deleteButton.addEventListener('click', () => { if (confirm(`¿Eliminar recordatorio "${reminder.text}"?`)) { currentBackupData.reminders_todos.splice(index, 1); renderReminders(); } });
+            const buttonContainer = document.createElement('div'); buttonContainer.classList.add('reminder-actions'); buttonContainer.appendChild(toggleButton); buttonContainer.appendChild(deleteButton); li.appendChild(buttonContainer);
+            if (reminder.completed) { li.classList.add('completed'); completedRemindersList.appendChild(li); } else { pendingRemindersList.appendChild(li); }
         });
     }
 
-    // --- "LOG" TAB LOGIC ---
-    /**
-     * Renders the change log tab with entries from `changeLogEntries`.
-     */
+    // --- LÓGICA PESTAÑA LOG (ACTUALIZADA) ---
     function renderLogTab() {
         if (!changeLogList) return;
         changeLogList.innerHTML = '';
@@ -2567,29 +1732,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- UTILITY FUNCTIONS (Dates and Formatting) ---
+
+    // --- FUNCIONES AUXILIARES DE FECHAS Y FORMATO ---
     function formatCurrencyJS(value, symbol = '$') { if (value === null || typeof value !== 'number' || isNaN(value)) return `${symbol}0`; return `${symbol}${Math.round(value).toLocaleString('es-CL')}`; }
     function addMonths(date, months) { const d = new Date(date.getTime()); d.setUTCMonth(d.getUTCMonth() + months); return d; }
     function addWeeks(date, weeks) { const d = new Date(date.getTime()); d.setUTCDate(d.getUTCDate() + (weeks * 7)); return d; }
     function getISODateString(date) { if (!(date instanceof Date) || isNaN(date.getTime())) return ''; return date.getUTCFullYear() + '-' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date.getUTCDate()).slice(-2); }
-    function getWeekNumber(d) { const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7)); const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1)); const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7); return [date.getUTCFullYear(), weekNo]; }
+    function getWeekNumber(d) { const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7)); const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1)); const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7); return [date.getUTCFullYear(), weekNo]; }
     function getMondayOfWeek(year, week) { const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7)); const dayOfWeek = simple.getUTCDay(); const isoDayOfWeek = ((dayOfWeek + 6) % 7) + 1; const diff = isoDayOfWeek - 1; simple.setUTCDate(simple.getUTCDate() - diff); return simple; }
-    // function getDaysInMonth(year, month) { return new Date(year, month + 1, 0).getUTCDate(); } // Not currently used, but kept for potential future use
+    function getDaysInMonth(year, month) { return new Date(year, month + 1, 0).getUTCDate(); }
 
 
-    // --- INITIALIZATION ---
-    showLoginScreen(); // Start by showing the login screen
-
-    // Set default dates for input fields
+    // --- INICIALIZACIÓN ---
+    showLoginScreen();
     const today = new Date();
     const todayISO = getISODateString(today);
     incomeStartDateInput.value = todayISO;
     expenseStartDateInput.value = todayISO;
     analysisStartDateInput.value = todayISO;
-
-    // Default states for checkboxes and related inputs
     incomeEndDateInput.disabled = true;
     expenseEndDateInput.disabled = true;
-    updateAnalysisDurationLabel(); // Set initial label for duration
-    incomeReimbursementCategoryContainer.style.display = 'none'; // Hide reimbursement category by default
+    updateAnalysisDurationLabel();
+    // updateUsdClpInfoLabel(); // No longer needed here, called by activateTab or showMainContentScreen
+    incomeReimbursementCategoryContainer.style.display = 'none';
 });
