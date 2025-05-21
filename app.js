@@ -323,7 +323,6 @@ document.addEventListener('DOMContentLoaded', () => {
             "0ceYKka1nbZfyftQlVE0jFRUeY73": "PAPAS",
             "y0kGbOIqurc0kDmdWzl6YHWQ9IX2": "PAPAS",
             "d4GAITAu8iP75h8aUqaDXeqMoc02": "VICENTE"
-            "R9NBQQt73nUPvJlGLQhIgmaYFJk2": "SS-USA" // <-- Agrega esta línea
         };
 
         const userSubPath = userPaths[user.uid];
