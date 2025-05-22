@@ -556,77 +556,104 @@ document.addEventListener('DOMContentLoaded', () => {
     function generateDetailedChangeLog(prevData, currentData) {
         const details = [];
         const symbol = currentData.display_currency_symbol || '$';
-
+    
         if (!prevData) {
             details.push("Versión inicial de datos creada.");
             (currentData.incomes || []).forEach(inc => details.push(`Ingreso agregado: ${inc.name} (${formatCurrencyJS(inc.net_monthly, symbol)})${inc.is_reimbursement ? ' (Reembolso)' : ''}`));
             (currentData.expenses || []).forEach(exp => details.push(`Gasto agregado: ${exp.name} (${formatCurrencyJS(exp.amount, symbol)}, Cat: ${exp.category})`));
             return details;
         }
-
+    
+        // Log settings changes
         if (prevData.analysis_periodicity !== currentData.analysis_periodicity) details.push(`Ajuste: Periodicidad cambiada de '${prevData.analysis_periodicity}' a '${currentData.analysis_periodicity}'.`);
         if (prevData.analysis_duration !== currentData.analysis_duration) details.push(`Ajuste: Duración cambiada de ${prevData.analysis_duration} a ${currentData.analysis_duration}.`);
         if (getISODateString(new Date(prevData.analysis_start_date)) !== getISODateString(new Date(currentData.analysis_start_date))) details.push(`Ajuste: Fecha de inicio cambiada de ${getISODateString(new Date(prevData.analysis_start_date))} a ${getISODateString(new Date(currentData.analysis_start_date))}.`);
         if (prevData.analysis_initial_balance !== currentData.analysis_initial_balance) details.push(`Ajuste: Saldo inicial cambiado de ${formatCurrencyJS(prevData.analysis_initial_balance, symbol)} a ${formatCurrencyJS(currentData.analysis_initial_balance, symbol)}.`);
         if (prevData.display_currency_symbol !== currentData.display_currency_symbol) details.push(`Ajuste: Símbolo de moneda cambiado de '${prevData.display_currency_symbol}' a '${currentData.display_currency_symbol}'.`);
-        // No longer tracking usd_clp_rate in data model
-        // if (prevData.usd_clp_rate !== currentData.usd_clp_rate) details.push(`Ajuste: Tasa USD/CLP cambiada de ${prevData.usd_clp_rate || 'N/A'} a ${currentData.usd_clp_rate || 'N/A'}.`);
-
-
+    
+        // --- Income Change Detection ---
         const prevIncomes = prevData.incomes || [];
         const currentIncomes = currentData.incomes || [];
+        let remainingPrevIncomes = [...prevIncomes]; 
+    
         currentIncomes.forEach(currentInc => {
-            const prevInc = prevIncomes.find(pInc => pInc.name === currentInc.name); // Simple find by name for now
-            if (!prevInc) {
-                details.push(`Ingreso agregado: ${currentInc.name} (${formatCurrencyJS(currentInc.net_monthly, symbol)}, ${currentInc.frequency}, Inicio: ${getISODateString(new Date(currentInc.start_date))}${currentInc.end_date ? ', Fin: ' + getISODateString(new Date(currentInc.end_date)) : ''})${currentInc.is_reimbursement ? ` (Reembolso de ${currentInc.reimbursement_category || 'N/A'})` : ''}.`);
-            } else {
+            let matchedPrevIncIndex = -1;
+            for (let i = 0; i < remainingPrevIncomes.length; i++) {
+                const pInc = remainingPrevIncomes[i];
+                if (pInc.name === currentInc.name &&
+                    getISODateString(new Date(pInc.start_date)) === getISODateString(new Date(currentInc.start_date)) &&
+                    pInc.frequency === currentInc.frequency &&
+                    (pInc.is_reimbursement || false) === (currentInc.is_reimbursement || false)
+                   ) {
+                    matchedPrevIncIndex = i;
+                    break;
+                }
+            }
+    
+            if (matchedPrevIncIndex !== -1) {
+                const prevInc = remainingPrevIncomes[matchedPrevIncIndex];
                 let mods = [];
                 if (prevInc.net_monthly !== currentInc.net_monthly) mods.push(`Monto: ${formatCurrencyJS(prevInc.net_monthly, symbol)} -> ${formatCurrencyJS(currentInc.net_monthly, symbol)}`);
-                if (prevInc.frequency !== currentInc.frequency) mods.push(`Frecuencia: ${prevInc.frequency} -> ${currentInc.frequency}`);
-                if (getISODateString(new Date(prevInc.start_date)) !== getISODateString(new Date(currentInc.start_date))) mods.push(`Fecha Inicio: ${getISODateString(new Date(prevInc.start_date))} -> ${getISODateString(new Date(currentInc.start_date))}`);
                 const prevEndDateStr = prevInc.end_date ? getISODateString(new Date(prevInc.end_date)) : null;
                 const currentEndDateStr = currentInc.end_date ? getISODateString(new Date(currentInc.end_date)) : null;
                 if (prevEndDateStr !== currentEndDateStr) mods.push(`Fecha Fin: ${prevEndDateStr || 'N/A'} -> ${currentEndDateStr || 'N/A'}`);
-                if ((prevInc.is_reimbursement || false) !== (currentInc.is_reimbursement || false)) {
-                    mods.push(`Es Reembolso: ${prevInc.is_reimbursement ? 'Sí' : 'No'} -> ${currentInc.is_reimbursement ? 'Sí' : 'No'}`);
-                }
-                if (prevInc.reimbursement_category !== currentInc.reimbursement_category) {
+                if (currentInc.is_reimbursement && prevInc.reimbursement_category !== currentInc.reimbursement_category) {
                     mods.push(`Categoría Reembolso: ${prevInc.reimbursement_category || 'N/A'} -> ${currentInc.reimbursement_category || 'N/A'}`);
                 }
-                if (mods.length > 0) details.push(`Ingreso modificado '${currentInc.name}': ${mods.join(', ')}.`);
+                if (mods.length > 0) {
+                    details.push(`Ingreso modificado '${currentInc.name}' (Inicio: ${getISODateString(new Date(currentInc.start_date))}, Freq: ${currentInc.frequency}${currentInc.is_reimbursement ? ', Reembolso' : ''}): ${mods.join(', ')}.`);
+                }
+                remainingPrevIncomes.splice(matchedPrevIncIndex, 1); 
+            } else {
+                details.push(`Ingreso agregado: ${currentInc.name} (${formatCurrencyJS(currentInc.net_monthly, symbol)}, ${currentInc.frequency}, Inicio: ${getISODateString(new Date(currentInc.start_date))}${currentInc.end_date ? ', Fin: ' + getISODateString(new Date(currentInc.end_date)) : ''})${currentInc.is_reimbursement ? ` (Reembolso de ${currentInc.reimbursement_category || 'N/A'})` : ''}.`);
             }
         });
-        prevIncomes.forEach(prevInc => {
-            if (!currentIncomes.find(cInc => cInc.name === prevInc.name)) {
-                details.push(`Ingreso eliminado: ${prevInc.name} (${formatCurrencyJS(prevInc.net_monthly, symbol)}).`);
-            }
+    
+        remainingPrevIncomes.forEach(prevInc => {
+            details.push(`Ingreso eliminado: ${prevInc.name} (${formatCurrencyJS(prevInc.net_monthly, symbol)}, Inicio: ${getISODateString(new Date(prevInc.start_date))}${prevInc.is_reimbursement ? ', Reembolso' : ''}).`);
         });
-
+    
+        // --- Expense Change Detection ---
         const prevExpenses = prevData.expenses || [];
         const currentExpenses = currentData.expenses || [];
+        let remainingPrevExpenses = [...prevExpenses]; 
+    
         currentExpenses.forEach(currentExp => {
-            const prevExp = prevExpenses.find(pExp => pExp.name === currentExp.name); // Simple find by name
-            if (!prevExp) {
-                details.push(`Gasto agregado: ${currentExp.name} (${formatCurrencyJS(currentExp.amount, symbol)}, Cat: ${currentExp.category}, ${currentExp.frequency}, Inicio: ${getISODateString(new Date(currentExp.start_date))}).`);
-            } else {
+            let matchedPrevExpIndex = -1;
+            for (let i = 0; i < remainingPrevExpenses.length; i++) {
+                const pExp = remainingPrevExpenses[i];
+                if (pExp.name === currentExp.name &&
+                    getISODateString(new Date(pExp.start_date)) === getISODateString(new Date(currentExp.start_date)) &&
+                    pExp.frequency === currentExp.frequency &&
+                    pExp.category === currentExp.category
+                   ) {
+                    matchedPrevExpIndex = i;
+                    break;
+                }
+            }
+    
+            if (matchedPrevExpIndex !== -1) {
+                const prevExp = remainingPrevExpenses[matchedPrevExpIndex];
                 let mods = [];
                 if (prevExp.amount !== currentExp.amount) mods.push(`Monto: ${formatCurrencyJS(prevExp.amount, symbol)} -> ${formatCurrencyJS(currentExp.amount, symbol)}`);
-                if (prevExp.category !== currentExp.category) mods.push(`Categoría: ${prevExp.category} -> ${currentExp.category}`);
-                if (prevExp.frequency !== currentExp.frequency) mods.push(`Frecuencia: ${prevExp.frequency} -> ${currentExp.frequency}`);
-                if (getISODateString(new Date(prevExp.start_date)) !== getISODateString(new Date(currentExp.start_date))) mods.push(`Fecha Inicio: ${getISODateString(new Date(prevExp.start_date))} -> ${getISODateString(new Date(currentExp.start_date))}`);
                 const prevEndDateStr = prevExp.end_date ? getISODateString(new Date(prevExp.end_date)) : null;
                 const currentEndDateStr = currentExp.end_date ? getISODateString(new Date(currentExp.end_date)) : null;
                 if (prevEndDateStr !== currentEndDateStr) mods.push(`Fecha Fin: ${prevEndDateStr || 'N/A'} -> ${currentEndDateStr || 'N/A'}`);
                 if ((prevExp.is_real || false) !== (currentExp.is_real || false)) mods.push(`Es Real: ${prevExp.is_real ? 'Sí' : 'No'} -> ${currentExp.is_real ? 'Sí' : 'No'}`);
-                if (mods.length > 0) details.push(`Gasto modificado '${currentExp.name}': ${mods.join(', ')}.`);
+                if (mods.length > 0) {
+                    details.push(`Gasto modificado '${currentExp.name}' (Cat: ${currentExp.category}, Inicio: ${getISODateString(new Date(currentExp.start_date))}, Freq: ${currentExp.frequency}): ${mods.join(', ')}.`);
+                }
+                remainingPrevExpenses.splice(matchedPrevExpIndex, 1);
+            } else {
+                details.push(`Gasto agregado: ${currentExp.name} (${formatCurrencyJS(currentExp.amount, symbol)}, Cat: ${currentExp.category}, ${currentExp.frequency}, Inicio: ${getISODateString(new Date(currentExp.start_date))}).`);
             }
         });
-        prevExpenses.forEach(prevExp => {
-            if (!currentExpenses.find(cExp => cExp.name === prevExp.name)) {
-                details.push(`Gasto eliminado: ${prevExp.name} (${formatCurrencyJS(prevExp.amount, symbol)}).`);
-            }
+    
+        remainingPrevExpenses.forEach(prevExp => {
+            details.push(`Gasto eliminado: ${prevExp.name} (${formatCurrencyJS(prevExp.amount, symbol)}, Cat: ${prevExp.category}, Inicio: ${getISODateString(new Date(prevExp.start_date))}).`);
         });
-
+    
+        // --- Category, Budget, Reminder, etc. ---
         const prevCategories = prevData.expense_categories || {};
         const currentCategories = currentData.expense_categories || {};
         Object.keys(currentCategories).forEach(catName => {
@@ -641,29 +668,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 details.push(`Categoría eliminada: ${catName}.`);
             }
         });
-
+    
         const prevBudgets = prevData.budgets || {};
         const currentBudgets = currentData.budgets || {};
-        Object.keys(currentCategories).forEach(catName => {
-            const prevAmount = prevBudgets[catName] !== undefined ? prevBudgets[catName] : 0;
-            const currentAmount = currentBudgets[catName] !== undefined ? currentBudgets[catName] : 0;
-            if (prevAmount !== currentAmount) {
-                if (prevBudgets[catName] === undefined && currentAmount !== 0) {
+        Object.keys(currentCategories).forEach(catName => { // Iterate current categories to capture new and modified budgets
+            const prevAmount = prevBudgets[catName]; // Can be undefined
+            const currentAmount = currentBudgets[catName]; // Can be undefined
+    
+            if (currentAmount !== undefined && prevAmount !== currentAmount) { // Only log if current is defined and different
+                 if (prevAmount === undefined && currentAmount !== 0) { // New budget for existing or new category
                     details.push(`Presupuesto para '${catName}' establecido a: ${formatCurrencyJS(currentAmount, symbol)}.`);
-                } else {
+                } else if (prevAmount !== undefined) { // Modified budget for existing category
                     details.push(`Presupuesto para '${catName}' cambiado de ${formatCurrencyJS(prevAmount, symbol)} a ${formatCurrencyJS(currentAmount, symbol)}.`);
+                } else if (prevAmount === undefined && currentAmount === 0 && !prevCategories[catName]) {
+                    // This case means a new category was added, and its budget is implicitly 0.
+                    // We don't need to log "budget set to 0" if the category is new and budget is 0.
+                    // The category addition itself is logged above.
                 }
             }
         });
-        Object.keys(prevBudgets).forEach(catName => {
-            if (!currentCategories[catName] && prevBudgets[catName] !== 0) {
-                details.push(`Presupuesto para categoría eliminada '${catName}' (era ${formatCurrencyJS(prevBudgets[catName], symbol)}) removido.`);
+         Object.keys(prevBudgets).forEach(catName => {
+            if (currentBudgets[catName] === undefined && prevBudgets[catName] !== 0) { // Budget removed for a category that might still exist or was removed
+                if (currentCategories[catName]) { // Category still exists, budget explicitly removed (set to 0 or undefined)
+                     details.push(`Presupuesto para '${catName}' cambiado de ${formatCurrencyJS(prevBudgets[catName], symbol)} a ${formatCurrencyJS(0, symbol)}.`);
+                } else { // Category was removed, and it had a budget
+                    details.push(`Presupuesto para categoría eliminada '${catName}' (era ${formatCurrencyJS(prevBudgets[catName], symbol)}) removido.`);
+                }
             }
         });
-
+    
         const prevReminders = prevData.reminders_todos || [];
         const currentReminders = currentData.reminders_todos || [];
-        currentReminders.forEach((currentRem, idx) => {
+        currentReminders.forEach((currentRem) => {
             const prevRem = prevReminders.find(pRem => pRem.text === currentRem.text);
             if (!prevRem) {
                 details.push(`Recordatorio agregado: "${currentRem.text}" (${currentRem.completed ? 'Completado' : 'Pendiente'}).`);
@@ -678,15 +714,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 details.push(`Recordatorio eliminado: "${prevRem.text}".`);
             }
         });
-
+    
         if (JSON.stringify(prevData.baby_steps_status) !== JSON.stringify(currentData.baby_steps_status)) {
             details.push("Estado de Baby Steps modificado.");
         }
-
+    
         if (JSON.stringify(prevData.payments) !== JSON.stringify(currentData.payments)) {
             details.push("Registros de pagos modificados.");
         }
-
+    
         if (details.length === 0) {
             details.push("No se detectaron cambios significativos en los datos.");
         }
