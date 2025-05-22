@@ -1769,23 +1769,79 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!babyStepsContainer || !currentBackupData || !currentBackupData.baby_steps_status) return;
         babyStepsContainer.innerHTML = '';
         BABY_STEPS_DATA_JS.forEach((stepData, stepIndex) => {
-            const stepDiv = document.createElement('div'); stepDiv.classList.add('baby-step');
-            const title = document.createElement('h3'); title.textContent = stepData.title; stepDiv.appendChild(title);
-            const description = document.createElement('p'); description.innerHTML = stepData.description.replace(/\n/g, '<br>'); stepDiv.appendChild(description);
+            const stepDiv = document.createElement('div');
+            stepDiv.classList.add('baby-step');
+
+            const titleElement = document.createElement('h3');
+            titleElement.classList.add('baby-step-title');
+            titleElement.textContent = stepData.title;
+            stepDiv.appendChild(titleElement);
+
+            const detailsDiv = document.createElement('div');
+            detailsDiv.classList.add('baby-step-details');
+            detailsDiv.style.display = 'none'; // Hidden by default
+
+            const description = document.createElement('p');
+            description.innerHTML = stepData.description.replace(/\n/g, '<br>');
+            detailsDiv.appendChild(description);
+
             ['dos', 'donts'].forEach(listType => {
                 if (stepData[listType] && stepData[listType].length > 0) {
-                    const listTitle = document.createElement('h4'); listTitle.textContent = listType === 'dos' ? "✅ Qué haces:" : "❌ Qué no haces:"; stepDiv.appendChild(listTitle);
+                    const listTitle = document.createElement('h4');
+                    listTitle.textContent = listType === 'dos' ? "✅ Qué haces:" : "❌ Qué no haces:";
+                    detailsDiv.appendChild(listTitle);
+
                     const ul = document.createElement('ul');
                     stepData[listType].forEach((itemText, itemIndex) => {
-                        const li = document.createElement('li'); const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.id = `step-${stepIndex}-${listType}-${itemIndex}`;
-                        if (currentBackupData.baby_steps_status[stepIndex] && currentBackupData.baby_steps_status[stepIndex][listType]) checkbox.checked = currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] || false; else checkbox.checked = false;
-                        checkbox.addEventListener('change', (e) => { if (currentBackupData.baby_steps_status[stepIndex] && currentBackupData.baby_steps_status[stepIndex][listType]) currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] = e.target.checked; });
-                        const label = document.createElement('label'); label.htmlFor = checkbox.id; label.textContent = itemText;
-                        li.appendChild(checkbox); li.appendChild(label); ul.appendChild(li);
+                        const li = document.createElement('li');
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.id = `step-${stepIndex}-${listType}-${itemIndex}`;
+
+                        if (currentBackupData.baby_steps_status[stepIndex] &&
+                            currentBackupData.baby_steps_status[stepIndex][listType]) {
+                            checkbox.checked = currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] || false;
+                        } else {
+                            checkbox.checked = false;
+                        }
+
+                        checkbox.addEventListener('change', (e) => {
+                            if (currentBackupData.baby_steps_status[stepIndex] &&
+                                currentBackupData.baby_steps_status[stepIndex][listType]) {
+                                currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] = e.target.checked;
+                            }
+                        });
+
+                        const label = document.createElement('label');
+                        label.htmlFor = checkbox.id;
+                        label.textContent = itemText;
+
+                        li.appendChild(checkbox);
+                        li.appendChild(label);
+                        ul.appendChild(li);
                     });
-                    stepDiv.appendChild(ul);
+                    detailsDiv.appendChild(ul);
                 }
             });
+
+            // Quiz button was here, removed as per requirements.
+            stepDiv.appendChild(detailsDiv);
+
+            titleElement.addEventListener('click', () => {
+                // Toggle expanded class on the title
+                titleElement.classList.toggle('expanded');
+                // Toggle display of details
+                if (detailsDiv.style.maxHeight && detailsDiv.style.maxHeight !== '0px') {
+                    detailsDiv.style.maxHeight = '0px';
+                    detailsDiv.style.paddingTop = '0'; // Remove padding when collapsed
+                    detailsDiv.style.marginTop = '0'; // Remove margin when collapsed
+                } else {
+                    detailsDiv.style.maxHeight = detailsDiv.scrollHeight + "px"; // Set max-height to content height
+                    detailsDiv.style.paddingTop = '15px'; // Add padding when expanded
+                    detailsDiv.style.marginTop = '10px'; // Add margin when expanded
+                }
+            });
+
             babyStepsContainer.appendChild(stepDiv);
         });
     }

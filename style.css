@@ -896,3 +896,60 @@ td.reimbursement-income {
   to { opacity: 1; transform: translateY(0); }
 }
 #login-form, #logout-area { width: 100%; }
+
+/* Added Styles for Baby Steps Interactivity */
+.baby-step h3.baby-step-title {
+    cursor: pointer;
+    position: relative;
+    padding-right: 30px; /* Space for the indicator */
+    padding-top: 10px;
+    padding-bottom: 10px;
+    transition: background-color 0.2s ease-in-out;
+    border-radius: var(--radius);
+    margin-bottom: 0; /* Remove default h3 margin-bottom */
+    /* Retains existing .baby-step h3 styles like font-size, color */
+    /* Ensures border-bottom from h3 general style is not shown unless not expanded */
+    border-bottom: 1px solid var(--border-color); 
+}
+
+.baby-step h3.baby-step-title.expanded {
+    border-bottom-color: transparent; /* Hide bottom border when expanded as details will have a top border */
+}
+
+
+.baby-step h3.baby-step-title:hover {
+    background-color: var(--row-hover-bg); /* Consistent hover */
+}
+
+.baby-step h3.baby-step-title::after {
+    content: '+';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.75rem;
+    font-weight: bold;
+    line-height: 1;
+    color: var(--primary-color);
+    transition: transform 0.3s ease-in-out;
+}
+
+.baby-step h3.baby-step-title.expanded::after {
+    content: '−';
+}
+
+.baby-step-details {
+    max-height: 0; /* Collapsed by default, JS sets to scrollHeight */
+    overflow: hidden;
+    transition: max-height 0.4s ease-in-out, padding-top 0.4s ease-in-out, margin-top 0.4s ease-in-out, border-top-width 0.4s ease-in-out;
+    /* padding-top and margin-top are set via JS */
+    border-top: 0px solid transparent; /* Start with 0px width, transition to 1px */
+}
+
+.baby-step h3.baby-step-title.expanded + .baby-step-details {
+    border-top-width: 1px; /* Set border-top width when expanded */
+    border-top-color: var(--border-color); /* Make border visible */
+    /* JS handles paddingTop and marginTop for smooth animation based on content height */
+}
+
+/* End of Added Styles for Baby Steps Interactivity */
