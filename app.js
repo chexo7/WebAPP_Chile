@@ -1312,14 +1312,25 @@ document.addEventListener('DOMContentLoaded', () => {
         renderExpensesTable(); renderCashflowTable(); resetExpenseForm();
     });
     function resetExpenseForm() {
-        expenseForm.reset();
-        expenseOngoingCheckbox.checked = true; expenseEndDateInput.disabled = true; expenseEndDateInput.value = '';
-        expenseFrequencySelect.value = 'Único'; expenseIsRealCheckbox.checked = false;
+    expenseForm.reset(); // This might trigger a change event on expenseFrequencySelect if its value changes
+
+    // Set frequency to 'Único' first
+    expenseFrequencySelect.value = 'Único'; 
+
+    // Now, explicitly set the state for 'Único' frequency
+    expenseOngoingCheckbox.checked = false;
+    expenseOngoingCheckbox.disabled = true;
+    expenseEndDateInput.disabled = true; 
+    expenseEndDateInput.value = '';
+    expenseIsRealCheckbox.checked = false;
+
+    // ... (rest of the function, e.g., setting default category, button text, etc.)
         if (expenseCategorySelect.options.length > 0 && expenseCategorySelect.value === "") {
             if (expenseCategorySelect.options[0].value !== "") expenseCategorySelect.selectedIndex = 0;
             else if (expenseCategorySelect.options.length > 1) expenseCategorySelect.selectedIndex = 1;
         }
-        addExpenseButton.textContent = 'Agregar Gasto'; cancelEditExpenseButton.style.display = 'none';
+    addExpenseButton.textContent = 'Agregar Gasto'; 
+    cancelEditExpenseButton.style.display = 'none';
         editingExpenseIndex = null;
         expenseStartDateInput.value = getISODateString(currentBackupData && currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
         updateRemoveCategoryButtonState();
@@ -1877,4 +1888,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAnalysisDurationLabel();
     // updateUsdClpInfoLabel(); // No longer needed here, called by activateTab or showMainContentScreen
     incomeReimbursementCategoryContainer.style.display = 'none';
-});
+
+    // Trigger change event on expense frequency select to apply initial state
+    expenseFrequencySelect.dispatchEvent(new Event('change')); 
+}); // This is the closing of DOMContentLoaded
