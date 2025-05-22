@@ -1779,7 +1779,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const detailsDiv = document.createElement('div');
             detailsDiv.classList.add('baby-step-details');
-            detailsDiv.style.display = 'none'; // Hidden by default
+            // detailsDiv.style.display = 'none'; // Removed: Initial collapse handled by CSS max-height: 0
 
             const description = document.createElement('p');
             description.innerHTML = stepData.description.replace(/\n/g, '<br>');
