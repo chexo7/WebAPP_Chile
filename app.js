@@ -1768,24 +1768,97 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderBabySteps() {
         if (!babyStepsContainer || !currentBackupData || !currentBackupData.baby_steps_status) return;
         babyStepsContainer.innerHTML = '';
+
+        const MAX_EXPANDED_HEIGHT_PX = 300;
+
         BABY_STEPS_DATA_JS.forEach((stepData, stepIndex) => {
-            const stepDiv = document.createElement('div'); stepDiv.classList.add('baby-step');
-            const title = document.createElement('h3'); title.textContent = stepData.title; stepDiv.appendChild(title);
-            const description = document.createElement('p'); description.innerHTML = stepData.description.replace(/\n/g, '<br>'); stepDiv.appendChild(description);
+            const stepDiv = document.createElement('div');
+            stepDiv.classList.add('baby-step');
+
+            const titleElement = document.createElement('h3');
+            titleElement.classList.add('baby-step-title');
+            titleElement.textContent = stepData.title;
+            stepDiv.appendChild(titleElement);
+
+            const detailsDiv = document.createElement('div');
+            detailsDiv.classList.add('baby-step-details');
+            // detailsDiv.style.display = 'none'; // Removed: Initial collapse handled by CSS max-height: 0
+
+            const description = document.createElement('p');
+            description.innerHTML = stepData.description.replace(/\n/g, '<br>');
+            detailsDiv.appendChild(description);
+
             ['dos', 'donts'].forEach(listType => {
                 if (stepData[listType] && stepData[listType].length > 0) {
-                    const listTitle = document.createElement('h4'); listTitle.textContent = listType === 'dos' ? "✅ Qué haces:" : "❌ Qué no haces:"; stepDiv.appendChild(listTitle);
+                    const listTitle = document.createElement('h4');
+                    listTitle.textContent = listType === 'dos' ? "✅ Qué haces:" : "❌ Qué no haces:";
+                    detailsDiv.appendChild(listTitle);
+
                     const ul = document.createElement('ul');
                     stepData[listType].forEach((itemText, itemIndex) => {
-                        const li = document.createElement('li'); const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.id = `step-${stepIndex}-${listType}-${itemIndex}`;
-                        if (currentBackupData.baby_steps_status[stepIndex] && currentBackupData.baby_steps_status[stepIndex][listType]) checkbox.checked = currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] || false; else checkbox.checked = false;
-                        checkbox.addEventListener('change', (e) => { if (currentBackupData.baby_steps_status[stepIndex] && currentBackupData.baby_steps_status[stepIndex][listType]) currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] = e.target.checked; });
-                        const label = document.createElement('label'); label.htmlFor = checkbox.id; label.textContent = itemText;
-                        li.appendChild(checkbox); li.appendChild(label); ul.appendChild(li);
+                        const li = document.createElement('li');
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.id = `step-${stepIndex}-${listType}-${itemIndex}`;
+
+                        if (currentBackupData.baby_steps_status[stepIndex] &&
+                            currentBackupData.baby_steps_status[stepIndex][listType]) {
+                            checkbox.checked = currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] || false;
+                        } else {
+                            checkbox.checked = false;
+                        }
+
+                        checkbox.addEventListener('change', (e) => {
+                            if (currentBackupData.baby_steps_status[stepIndex] &&
+                                currentBackupData.baby_steps_status[stepIndex][listType]) {
+                                currentBackupData.baby_steps_status[stepIndex][listType][itemIndex] = e.target.checked;
+                            }
+                        });
+
+                        const label = document.createElement('label');
+                        label.htmlFor = checkbox.id;
+                        label.textContent = itemText;
+
+                        li.appendChild(checkbox);
+                        li.appendChild(label);
+                        ul.appendChild(li);
                     });
-                    stepDiv.appendChild(ul);
+                    detailsDiv.appendChild(ul);
                 }
             });
+
+            // Quiz button was here, removed as per requirements.
+            stepDiv.appendChild(detailsDiv);
+
+            titleElement.addEventListener('click', () => {
+                // Toggle expanded class on the title
+                titleElement.classList.toggle('expanded');
+                // Toggle display of details
+                if (detailsDiv.style.maxHeight && detailsDiv.style.maxHeight !== '0px') {
+                    // Collapse
+                    detailsDiv.style.overflowY = 'hidden'; // Set overflow to hidden before collapsing
+                    detailsDiv.style.maxHeight = '0px';
+                    detailsDiv.style.paddingTop = '0';
+                    detailsDiv.style.marginTop = '0';
+                } else {
+                    // Expand
+                    // Temporarily set overflow to hidden to correctly calculate scrollHeight without interference from potential scrollbars
+                    detailsDiv.style.overflowY = 'hidden'; 
+                    
+                    const currentScrollHeight = detailsDiv.scrollHeight;
+
+                    if (currentScrollHeight > MAX_EXPANDED_HEIGHT_PX) {
+                        detailsDiv.style.maxHeight = MAX_EXPANDED_HEIGHT_PX + 'px';
+                        detailsDiv.style.overflowY = 'auto'; // Allow scrolling if content exceeds max height
+                    } else {
+                        detailsDiv.style.maxHeight = currentScrollHeight + 'px';
+                        detailsDiv.style.overflowY = 'hidden';
+                    }
+                    detailsDiv.style.paddingTop = '15px';
+                    detailsDiv.style.marginTop = '10px';
+                }
+            });
+
             babyStepsContainer.appendChild(stepDiv);
         });
     }
