@@ -1768,6 +1768,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderBabySteps() {
         if (!babyStepsContainer || !currentBackupData || !currentBackupData.baby_steps_status) return;
         babyStepsContainer.innerHTML = '';
+
+        const MAX_EXPANDED_HEIGHT_PX = 300;
+
         BABY_STEPS_DATA_JS.forEach((stepData, stepIndex) => {
             const stepDiv = document.createElement('div');
             stepDiv.classList.add('baby-step');
@@ -1832,13 +1835,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 titleElement.classList.toggle('expanded');
                 // Toggle display of details
                 if (detailsDiv.style.maxHeight && detailsDiv.style.maxHeight !== '0px') {
+                    // Collapse
+                    detailsDiv.style.overflowY = 'hidden'; // Set overflow to hidden before collapsing
                     detailsDiv.style.maxHeight = '0px';
-                    detailsDiv.style.paddingTop = '0'; // Remove padding when collapsed
-                    detailsDiv.style.marginTop = '0'; // Remove margin when collapsed
+                    detailsDiv.style.paddingTop = '0';
+                    detailsDiv.style.marginTop = '0';
                 } else {
-                    detailsDiv.style.maxHeight = detailsDiv.scrollHeight + "px"; // Set max-height to content height
-                    detailsDiv.style.paddingTop = '15px'; // Add padding when expanded
-                    detailsDiv.style.marginTop = '10px'; // Add margin when expanded
+                    // Expand
+                    // Temporarily set overflow to hidden to correctly calculate scrollHeight without interference from potential scrollbars
+                    detailsDiv.style.overflowY = 'hidden'; 
+                    
+                    const currentScrollHeight = detailsDiv.scrollHeight;
+
+                    if (currentScrollHeight > MAX_EXPANDED_HEIGHT_PX) {
+                        detailsDiv.style.maxHeight = MAX_EXPANDED_HEIGHT_PX + 'px';
+                        detailsDiv.style.overflowY = 'auto'; // Allow scrolling if content exceeds max height
+                    } else {
+                        detailsDiv.style.maxHeight = currentScrollHeight + 'px';
+                        detailsDiv.style.overflowY = 'hidden';
+                    }
+                    detailsDiv.style.paddingTop = '15px';
+                    detailsDiv.style.marginTop = '10px';
                 }
             });
 
