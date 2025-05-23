@@ -1660,6 +1660,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let p_fix_exp_total_for_period = 0.0;
             let p_var_exp_total_for_period = 0.0;
+            let p_total_reimbursements_as_income_for_period = 0.0;
 
             (data.expenses || []).forEach(exp => {
                 if (!exp.start_date) return; const e_start = exp.start_date; const e_end = exp.end_date; const amt_raw = parseFloat(exp.amount || 0); const freq = exp.frequency || "Mensual"; const typ = exp.type || (data.expense_categories && data.expense_categories[exp.category]) || "Variable"; const cat = exp.category;
@@ -1723,11 +1724,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                if (amount_of_reimbursement_in_this_period > 0 && expenses_by_cat_p[i][reimb_cat] !== undefined) {
-                    expenses_by_cat_p[i][reimb_cat] = Math.max(0, expenses_by_cat_p[i][reimb_cat] - amount_of_reimbursement_in_this_period);
+                if (amount_of_reimbursement_in_this_period > 0) {
+                    if (expenses_by_cat_p[i][reimb_cat] && expenses_by_cat_p[i][reimb_cat] > 0) {
+                        const offset_amount = Math.min(expenses_by_cat_p[i][reimb_cat], amount_of_reimbursement_in_this_period);
+                        expenses_by_cat_p[i][reimb_cat] -= offset_amount;
+                        const remaining_reimbursement = amount_of_reimbursement_in_this_period - offset_amount;
+                        p_total_reimbursements_as_income_for_period += remaining_reimbursement;
+                    } else {
+                        p_total_reimbursements_as_income_for_period += amount_of_reimbursement_in_this_period;
+                    }
+                    // Old line removed: expenses_by_cat_p[i][reimb_cat] = Math.max(0, expenses_by_cat_p[i][reimb_cat] - amount_of_reimbursement_in_this_period);
                 }
             });
             
+            income_p[i] += p_total_reimbursements_as_income_for_period;
+
             // Recalculate total fixed/variable expenses after reimbursements
             p_fix_exp_total_for_period = 0;
             p_var_exp_total_for_period = 0;
@@ -1744,7 +1755,9 @@ document.addEventListener('DOMContentLoaded', () => {
             fixed_exp_p[i] = p_fix_exp_total_for_period;
             var_exp_p[i] = p_var_exp_total_for_period;
 
-            const net_flow = p_inc_total - (fixed_exp_p[i] + var_exp_p[i]); net_flow_p[i] = net_flow;
+            // Note: p_inc_total was calculated before reimbursements were added to income_p[i].
+            // The net_flow calculation needs to use the updated income_p[i] that includes reimbursements as income.
+            const net_flow = income_p[i] - (fixed_exp_p[i] + var_exp_p[i]); net_flow_p[i] = net_flow;
             const end_bal = currentBalance + net_flow; end_bal_p[i] = end_bal;
             currentBalance = end_bal; currentDate = (periodicity === "Mensual") ? addMonths(currentDate, 1) : addWeeks(currentDate, 1);
         }
