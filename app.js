@@ -1636,12 +1636,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const fixedCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Fijo").sort() : [];
         const variableCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Variable").sort() : [];
         const orderedCategories = [...fixedCategories, ...variableCategories];
-        orderedCategories.forEach(cat => { for (let i = 0; i < duration; i++) { expenses_by_cat_p[i][cat] = 0.0; } });
+        // Initialize expenses_by_cat_p for all categories to 0.0 for each period later, inside the loop
 
         for (let i = 0; i < duration; i++) {
             const p_start = new Date(currentDate.getTime()); let p_end;
             if (periodicity === "Mensual") { p_end = addMonths(new Date(p_start.getTime()), 1); p_end.setUTCDate(p_end.getUTCDate() - 1); } else { p_end = addWeeks(new Date(p_start.getTime()), 1); p_end.setUTCDate(p_end.getUTCDate() - 1); }
             periodDates.push(p_start); let p_inc_total = 0.0;
+            
+            // Initialize all categories to 0.0 for the current period i
+            if (!expenses_by_cat_p[i]) expenses_by_cat_p[i] = {}; // Should already be an object from the map
+            orderedCategories.forEach(cat => {
+                expenses_by_cat_p[i][cat] = 0.0;
+            });
 
             (data.incomes || []).forEach(inc => {
                 if (!inc.start_date) return;
@@ -1660,7 +1666,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let p_fix_exp_total_for_period = 0.0;
             let p_var_exp_total_for_period = 0.0;
-            let p_total_reimbursements_as_income_for_period = 0.0;
+            // Removed: let p_total_reimbursements_as_income_for_period = 0.0;
 
             (data.expenses || []).forEach(exp => {
                 if (!exp.start_date) return; const e_start = exp.start_date; const e_end = exp.end_date; const amt_raw = parseFloat(exp.amount || 0); const freq = exp.frequency || "Mensual"; const typ = exp.type || (data.expense_categories && data.expense_categories[exp.category]) || "Variable"; const cat = exp.category;
@@ -1725,19 +1731,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (amount_of_reimbursement_in_this_period > 0) {
-                    if (expenses_by_cat_p[i][reimb_cat] && expenses_by_cat_p[i][reimb_cat] > 0) {
-                        const offset_amount = Math.min(expenses_by_cat_p[i][reimb_cat], amount_of_reimbursement_in_this_period);
-                        expenses_by_cat_p[i][reimb_cat] -= offset_amount;
-                        const remaining_reimbursement = amount_of_reimbursement_in_this_period - offset_amount;
-                        p_total_reimbursements_as_income_for_period += remaining_reimbursement;
-                    } else {
-                        p_total_reimbursements_as_income_for_period += amount_of_reimbursement_in_this_period;
+                    if (typeof expenses_by_cat_p[i][reimb_cat] === 'undefined') {
+                        expenses_by_cat_p[i][reimb_cat] = 0.0;
                     }
-                    // Old line removed: expenses_by_cat_p[i][reimb_cat] = Math.max(0, expenses_by_cat_p[i][reimb_cat] - amount_of_reimbursement_in_this_period);
+                    expenses_by_cat_p[i][reimb_cat] -= amount_of_reimbursement_in_this_period;
+                    // Reimbursements no longer contribute to income_p[i] or p_total_reimbursements_as_income_for_period
                 }
             });
             
-            income_p[i] += p_total_reimbursements_as_income_for_period;
+            // Removed: income_p[i] += p_total_reimbursements_as_income_for_period;
 
             // Recalculate total fixed/variable expenses after reimbursements
             p_fix_exp_total_for_period = 0;
@@ -1755,8 +1757,8 @@ document.addEventListener('DOMContentLoaded', () => {
             fixed_exp_p[i] = p_fix_exp_total_for_period;
             var_exp_p[i] = p_var_exp_total_for_period;
 
-            // Note: p_inc_total was calculated before reimbursements were added to income_p[i].
-            // The net_flow calculation needs to use the updated income_p[i] that includes reimbursements as income.
+            // The net_flow calculation uses income_p[i] which now correctly EXCLUDES reimbursements.
+            // Expenses (fixed_exp_p[i] + var_exp_p[i]) will correctly reflect negative category values if reimbursements exceed expenses.
             const net_flow = income_p[i] - (fixed_exp_p[i] + var_exp_p[i]); net_flow_p[i] = net_flow;
             const end_bal = currentBalance + net_flow; end_bal_p[i] = end_bal;
             currentBalance = end_bal; currentDate = (periodicity === "Mensual") ? addMonths(currentDate, 1) : addWeeks(currentDate, 1);
