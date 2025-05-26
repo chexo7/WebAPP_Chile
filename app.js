@@ -1,4 +1,15 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // --- DEBOUNCE FUNCTION ---
+    function debounce(func, delay) {
+        let timeoutId;
+        return function(...args) {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                func.apply(this, args);
+            }, delay);
+        };
+    }
+
     // --- ELEMENTOS GLOBALES ---
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
@@ -260,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showMainContentScreen() {
         mainContentContainer.style.display = 'block';
         activateTab('gastos'); // Activate a default tab
-        fetchAndUpdateUSDCLPRate(); // Fetch USD/CLP rate when main content is shown
+        debouncedFetchAndUpdateUSDCLPRate(); // Fetch USD/CLP rate when main content is shown
     }
 
     function clearAllDataViews() {
@@ -301,7 +312,8 @@ document.addEventListener('DOMContentLoaded', () => {
         authStatus.textContent = "Ingresando...";
         auth.signInWithEmailAndPassword(email, password)
             .catch(error => {
-                authStatus.textContent = `Error: ${error.message}`;
+                authStatus.textContent = "Error al iniciar sesión. Revisa tus credenciales o inténtalo más tarde.";
+                console.error("Login error:", error.message, error);
             });
     });
     logoutButton.addEventListener('click', () => { auth.signOut(); });
@@ -371,8 +383,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadingMessage.style.display = 'none';
             })
             .catch(error => {
-                console.error("Error fetching backups:", error);
-                authStatus.textContent = `Error cargando versiones: ${error.message}`;
+                console.error("Error fetching backups:", error.message, error); // Log specific message and full error
+                authStatus.textContent = "Error al cargar la lista de versiones. Inténtalo más tarde.";
                 loadingMessage.textContent = "Error al cargar versiones.";
                 loadLatestVersionButton.disabled = true;
             });
@@ -404,7 +416,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadSpecificBackup(key) {
         const userRef = getUserDataRef();
         if (!userRef) {
-            alert("Error: No se pudo obtener la referencia de datos del usuario para cargar el backup.");
+            alert("Error al preparar la carga de datos. Por favor, reintenta.");
+            console.error("Error in loadSpecificBackup: Could not get user data reference.");
             return;
         }
 
@@ -528,8 +541,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadingMessage.style.display = 'none';
             })
             .catch(error => {
-                console.error("Error loading backup data:", error);
-                alert(`Error al cargar datos de la versión: ${error.message}`);
+                console.error("Error loading backup data:", error.message, error); // Log specific message and full error
+                alert("Error al cargar los datos de la versión seleccionada. Por favor, intenta con otra versión o más tarde.");
                 loadingMessage.textContent = "Error al cargar datos.";
                 currentBackupData = null;
                 originalLoadedData = null;
@@ -749,7 +762,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const userRef = getUserDataRef(); // OBTENER LA REFERENCIA DEL USUARIO
         if (!userRef) {
-            alert("Error: No se pudo obtener la referencia de datos del usuario para guardar.");
+            alert("Error al preparar el guardado de datos. Por favor, reintenta.");
+            console.error("Error in saveChangesButton: Could not get user data reference for saving.");
             return;
         }
 
@@ -924,8 +938,8 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(error => {
                 loadingMessage.style.display = 'none';
-                console.error("Error saving new version:", error);
-                alert(`Error al guardar la nueva versión: ${error.message}`);
+                console.error("Error saving new version:", error.message, error); // Log specific message and full error
+                alert("Error al guardar la nueva versión. Por favor, inténtalo de nuevo.");
                 changeLogEntries.shift();
             });
     });
@@ -947,7 +961,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); renderPaymentsTableForCurrentPeriod(); }
         if (tabId === 'ajustes') {
             populateSettingsForm();
-            fetchAndUpdateUSDCLPRate(); // Fetch rate when adjustments tab is activated
+            debouncedFetchAndUpdateUSDCLPRate(); // Fetch rate when adjustments tab is activated
         }
         if (tabId === 'log') renderLogTab();
     }
@@ -956,7 +970,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- LÓGICA PESTAÑA AJUSTES ---
-    async function fetchAndUpdateUSDCLPRate() {
+    const debouncedFetchAndUpdateUSDCLPRate = debounce(async () => {
         if (!usdClpInfoLabel) return;
         usdClpInfoLabel.innerHTML = `1 USD = $CLP (Obteniendo...) <span class="loading-dots"></span>`;
         const API_URL = "https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=clp";
@@ -973,9 +987,18 @@ document.addEventListener('DOMContentLoaded', () => {
             usdClpInfoLabel.textContent = `1 USD = ${clpRate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Fuente: CoinGecko)`;
         } catch (error) {
             console.warn("No se pudo actualizar el USD/CLP:", error);
-            usdClpInfoLabel.innerHTML = `<b>1 USD = N/D</b> <small>(Error al obtener tasa)</small>`;
+            if (usdClpInfoLabel) { // Check if element exists
+                usdClpInfoLabel.innerHTML = ''; // Clear previous content
+                const b = document.createElement('b');
+                b.textContent = '1 USD = N/D';
+                const small = document.createElement('small');
+                small.textContent = ' (Error al obtener tasa)';
+                usdClpInfoLabel.appendChild(b);
+                usdClpInfoLabel.appendChild(document.createTextNode(' ')); // Add space
+                usdClpInfoLabel.appendChild(small);
+            }
         }
-    }
+    }, 500); // 500ms delay
 
 
     function populateSettingsForm() {
@@ -1148,7 +1171,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const typeCell = row.insertCell();
             if (income.is_reimbursement) {
-                typeCell.innerHTML = `Reembolso <span class="reimbursement-icon" title="Reembolso de ${income.reimbursement_category || 'N/A'}">↺</span>`;
+                typeCell.textContent = 'Reembolso '; // Add leading text
+                const iconSpan = document.createElement('span');
+                iconSpan.classList.add('reimbursement-icon');
+                iconSpan.setAttribute('title', `Reembolso de ${income.reimbursement_category || 'N/A'}`);
+                iconSpan.textContent = '↺';
+                typeCell.appendChild(iconSpan);
                 typeCell.classList.add('reimbursement-income');
             } else {
                 typeCell.textContent = 'Ingreso Regular';
