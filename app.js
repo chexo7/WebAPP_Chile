@@ -1639,9 +1639,14 @@ document.addEventListener('DOMContentLoaded', () => {
         orderedCategories.forEach(cat => { for (let i = 0; i < duration; i++) { expenses_by_cat_p[i][cat] = 0.0; } });
 
         for (let i = 0; i < duration; i++) {
-            const p_start = new Date(currentDate.getTime()); let p_end;
-            if (periodicity === "Mensual") { p_end = addMonths(new Date(p_start.getTime()), 1); p_end.setUTCDate(p_end.getUTCDate() - 1); } else { p_end = addWeeks(new Date(p_start.getTime()), 1); p_end.setUTCDate(p_end.getUTCDate() - 1); }
-            periodDates.push(p_start); let p_inc_total = 0.0;
+            // const p_start = new Date(currentDate.getTime()); let p_end; // OLD LOGIC
+            // if (periodicity === "Mensual") { p_end = addMonths(new Date(p_start.getTime()), 1); p_end.setUTCDate(p_end.getUTCDate() - 1); } else { p_end = addWeeks(new Date(p_start.getTime()), 1); p_end.setUTCDate(p_end.getUTCDate() - 1); }
+            // periodDates.push(p_start); let p_inc_total = 0.0; // OLD LOGIC
+
+            const p_start = getPeriodStartDate(currentDate, periodicity);
+            const p_end = getPeriodEndDate(currentDate, periodicity);
+            periodDates.push(p_start);
+            let p_inc_total = 0.0;
 
             (data.incomes || []).forEach(inc => {
                 if (!inc.start_date) return;
@@ -1649,11 +1654,79 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const inc_start = inc.start_date; const inc_end = inc.end_date; const net_amount = parseFloat(inc.net_monthly || 0); const inc_freq = inc.frequency || "Mensual";
                 const isActiveRange = (inc_start <= p_end && (inc_end === null || inc_end >= p_start)); if (!isActiveRange) return;
+                
                 let income_to_add = 0.0;
-                if (inc_freq === "Mensual") { if (periodicity === "Mensual") income_to_add = net_amount; else if (periodicity === "Semanal") { const payDay = inc_start.getUTCDate(); const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay)); if (p_start <= payDate && payDate <= p_end) income_to_add = net_amount; } }
-                else if (inc_freq === "Único") { if (p_start <= inc_start && inc_start <= p_end) income_to_add = net_amount; }
-                else if (inc_freq === "Semanal") { if (periodicity === "Semanal") income_to_add = net_amount; else if (periodicity === "Mensual") income_to_add = net_amount * (52 / 12); }
-                else if (inc_freq === "Bi-semanal") { if (periodicity === "Semanal") { let paymentDate = new Date(inc_start.getTime()); while (paymentDate <= p_end && (!inc_end || paymentDate <= inc_end)) { if (paymentDate >= p_start) { income_to_add = net_amount; break; } paymentDate = addWeeks(paymentDate, 2); } } else if (periodicity === "Mensual") { let paydays_in_month = 0; let current_pay_date = new Date(inc_start.getTime()); while (current_pay_date <= p_end && (!inc_end || current_pay_date <= inc_end)) { if (current_pay_date >= p_start) paydays_in_month++; current_pay_date = addWeeks(current_pay_date, 2); } income_to_add = net_amount * paydays_in_month; } }
+
+                if (inc_freq === "Único") {
+                    if (inc_start >= p_start && inc_start <= p_end) {
+                        income_to_add = net_amount;
+                    }
+                } else if (inc_freq === "Mensual") {
+                    const currentPeriodYear = p_start.getUTCFullYear();
+                    const currentPeriodMonth = p_start.getUTCMonth();
+                    const paymentDay = inc_start.getUTCDate();
+                    const daysInMonth = getDaysInMonth(currentPeriodYear, currentPeriodMonth);
+                    const actualPaymentDay = Math.min(paymentDay, daysInMonth);
+                    const potential_payment_date = new Date(Date.UTC(currentPeriodYear, currentPeriodMonth, actualPaymentDay));
+
+                    if (potential_payment_date >= p_start && potential_payment_date <= p_end) {
+                         // Ensure the payment date is also within the income's active range (it should be due to isActiveRange, but double check)
+                        if (inc_start <= potential_payment_date && (inc_end === null || inc_end >= potential_payment_date)) {
+                            income_to_add = net_amount;
+                        }
+                    }
+                } else if (inc_freq === "Semanal") {
+                    if (periodicity === "Semanal") {
+                        // If analysis is weekly, and item is active in this period, add amount
+                        income_to_add = net_amount;
+                    } else { // Analysis periodicity is "Mensual"
+                        let occurrences = 0;
+                        let dayIterator = new Date(p_start.getTime());
+                        const incomePaymentUTCDay = inc_start.getUTCDay(); // Day of week for the income's start_date
+
+                        while (dayIterator <= p_end) {
+                            if (dayIterator.getUTCDay() === incomePaymentUTCDay) {
+                                // Check if the income item is active on this specific dayIterator occurrence
+                                if (inc_start <= dayIterator && (inc_end === null || inc_end >= dayIterator)) {
+                                    occurrences++;
+                                }
+                            }
+                            dayIterator.setUTCDate(dayIterator.getUTCDate() + 1);
+                        }
+                        income_to_add = net_amount * occurrences;
+                    }
+                } else if (inc_freq === "Bi-semanal") {
+                    let current_payment_date = new Date(inc_start.getTime());
+                    // Ensure first payment is not before inc_start, adjust if p_start is much later.
+                    // This loop correctly finds the first payment date that is >= inc_start.
+                    // We need to find the first payment date that is also >= p_start for the current period.
+                    
+                    // Adjust current_payment_date to be the first relevant payment date for this period
+                    // The first loop `while (current_payment_date < p_start && current_payment_date < inc_start)` was redundant
+                    // because current_payment_date is initialized from inc_start, so current_payment_date < inc_start is never true.
+                     // If the income starts mid-period, ensure we catch up to the first payment date
+                    // that is also on or after the period start.
+                    while (current_payment_date < p_start) {
+                        current_payment_date = addWeeks(current_payment_date, 2);
+                        if (inc_end && current_payment_date > inc_end) break;
+                    }
+
+
+                    while (current_payment_date <= p_end) {
+                        if (inc_end && current_payment_date > inc_end) {
+                            break; // Stop if we've passed the income's end date
+                        }
+                        // Check if this specific payment date is within the income's overall active range
+                        // (inc_start to inc_end) AND within the current period (p_start to p_end).
+                        // The loop condition current_payment_date <= p_end handles the upper bound of the period.
+                        // The isActiveRange check at the beginning handles the general overlap.
+                        // This specific check ensures we only count payments that fall within the item's own lifecycle.
+                        if (current_payment_date >= inc_start) { // Payment must be on or after income start
+                           income_to_add += net_amount;
+                        }
+                        current_payment_date = addWeeks(current_payment_date, 2);
+                    }
+                }
                 p_inc_total += income_to_add;
             });
             income_p[i] = p_inc_total;
@@ -1665,11 +1738,66 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!exp.start_date) return; const e_start = exp.start_date; const e_end = exp.end_date; const amt_raw = parseFloat(exp.amount || 0); const freq = exp.frequency || "Mensual"; const typ = exp.type || (data.expense_categories && data.expense_categories[exp.category]) || "Variable"; const cat = exp.category;
                 if (amt_raw < 0 || !cat || !orderedCategories.includes(cat)) return;
                 const isActiveRange = (e_start <= p_end && (e_end === null || e_end >= p_start)); if (!isActiveRange) return;
+                
                 let exp_add_this_period = 0.0;
-                if (freq === "Mensual") { if (periodicity === "Mensual") exp_add_this_period = amt_raw; else if (periodicity === "Semanal") { const payDay = e_start.getUTCDate(); const payDate = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay)); if (p_start <= payDate && payDate <= p_end) exp_add_this_period = amt_raw; } }
-                else if (freq === "Único") { if (p_start <= e_start && e_start <= p_end) exp_add_this_period = amt_raw; }
-                else if (freq === "Semanal") { if (periodicity === "Semanal") exp_add_this_period = amt_raw; else if (periodicity === "Mensual") exp_add_this_period = amt_raw * (52 / 12); }
-                else if (freq === "Bi-semanal") { if (periodicity === "Semanal") { let paymentDate = new Date(e_start.getTime()); while (paymentDate <= p_end && (!e_end || paymentDate <= e_end)) { if (paymentDate >= p_start) { exp_add_this_period = amt_raw; break; } paymentDate = addWeeks(paymentDate, 2); } } else if (periodicity === "Mensual") { let paydays_in_month = 0; let current_pay_date = new Date(e_start.getTime()); while (current_pay_date <= p_end && (!e_end || current_pay_date <= e_end)) { if (current_pay_date >= p_start) paydays_in_month++; current_pay_date = addWeeks(current_pay_date, 2); } exp_add_this_period = amt_raw * paydays_in_month; } }
+
+                if (freq === "Único") {
+                    if (e_start >= p_start && e_start <= p_end) {
+                        exp_add_this_period = amt_raw;
+                    }
+                } else if (freq === "Mensual") {
+                    const currentPeriodYear = p_start.getUTCFullYear();
+                    const currentPeriodMonth = p_start.getUTCMonth();
+                    const paymentDay = e_start.getUTCDate();
+                    const daysInMonth = getDaysInMonth(currentPeriodYear, currentPeriodMonth);
+                    const actualPaymentDay = Math.min(paymentDay, daysInMonth);
+                    const potential_payment_date = new Date(Date.UTC(currentPeriodYear, currentPeriodMonth, actualPaymentDay));
+
+                    if (potential_payment_date >= p_start && potential_payment_date <= p_end) {
+                        if (e_start <= potential_payment_date && (e_end === null || e_end >= potential_payment_date)) {
+                             exp_add_this_period = amt_raw;
+                        }
+                    }
+                } else if (freq === "Semanal") {
+                    if (periodicity === "Semanal") {
+                        exp_add_this_period = amt_raw;
+                    } else { // Analysis periodicity is "Mensual"
+                        let occurrences = 0;
+                        let dayIterator = new Date(p_start.getTime());
+                        const expensePaymentUTCDay = e_start.getUTCDay();
+
+                        while (dayIterator <= p_end) {
+                            if (dayIterator.getUTCDay() === expensePaymentUTCDay) {
+                                if (e_start <= dayIterator && (e_end === null || e_end >= dayIterator)) {
+                                    occurrences++;
+                                }
+                            }
+                            dayIterator.setUTCDate(dayIterator.getUTCDate() + 1);
+                        }
+                        exp_add_this_period = amt_raw * occurrences;
+                    }
+                } else if (freq === "Bi-semanal") {
+                    let current_payment_date = new Date(e_start.getTime());
+
+                    // Adjust current_payment_date to be the first relevant payment date for this period
+                    // The first loop `while (current_payment_date < p_start && current_payment_date < e_start)` was redundant
+                    // because current_payment_date is initialized from e_start, so current_payment_date < e_start is never true.
+                    while (current_payment_date < p_start) {
+                        current_payment_date = addWeeks(current_payment_date, 2);
+                        if (e_end && current_payment_date > e_end) break;
+                    }
+
+                    while (current_payment_date <= p_end) {
+                        if (e_end && current_payment_date > e_end) {
+                            break; 
+                        }
+                        if (current_payment_date >= e_start) { 
+                            exp_add_this_period += amt_raw;
+                        }
+                        current_payment_date = addWeeks(current_payment_date, 2);
+                    }
+                }
+
                 if (exp_add_this_period > 0) {
                     expenses_by_cat_p[i][cat] = (expenses_by_cat_p[i][cat] || 0) + exp_add_this_period;
                     // Totals will be recalculated after reimbursements
@@ -1690,36 +1818,61 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!isActiveRange) return;
 
                 let amount_of_reimbursement_in_this_period = 0.0;
-                if (reimb_freq === "Mensual") {
-                    if (periodicity === "Mensual") { amount_of_reimbursement_in_this_period = reimb_amount_raw; }
-                    else if (periodicity === "Semanal") {
-                        const payDay = reimb_start.getUTCDate();
-                        const payDateForReimb = new Date(Date.UTC(p_start.getUTCFullYear(), p_start.getUTCMonth(), payDay));
-                        if (payDateForReimb >= p_start && payDateForReimb <= p_end) {
+
+                if (reimb_freq === "Único") {
+                    if (reimb_start >= p_start && reimb_start <= p_end) {
+                        amount_of_reimbursement_in_this_period = reimb_amount_raw;
+                    }
+                } else if (reimb_freq === "Mensual") {
+                    const currentPeriodYear = p_start.getUTCFullYear();
+                    const currentPeriodMonth = p_start.getUTCMonth();
+                    const paymentDay = reimb_start.getUTCDate();
+                    const daysInMonth = getDaysInMonth(currentPeriodYear, currentPeriodMonth);
+                    const actualPaymentDay = Math.min(paymentDay, daysInMonth);
+                    const potential_payment_date = new Date(Date.UTC(currentPeriodYear, currentPeriodMonth, actualPaymentDay));
+
+                    if (potential_payment_date >= p_start && potential_payment_date <= p_end) {
+                        if (reimb_start <= potential_payment_date && (reimb_end === null || reimb_end >= potential_payment_date)) {
                             amount_of_reimbursement_in_this_period = reimb_amount_raw;
                         }
                     }
-                } else if (reimb_freq === "Único") {
-                    if (p_start <= reimb_start && reimb_start <= p_end) { amount_of_reimbursement_in_this_period = reimb_amount_raw; }
                 } else if (reimb_freq === "Semanal") {
-                    if (periodicity === "Semanal") { amount_of_reimbursement_in_this_period = reimb_amount_raw; }
-                    else if (periodicity === "Mensual") {
-                        amount_of_reimbursement_in_this_period = reimb_amount_raw * (52 / 12);
-                    }
-                } else if (reimb_freq === "Bi-semanal") {
                     if (periodicity === "Semanal") {
-                        let paymentDate = new Date(reimb_start.getTime());
-                        while (paymentDate <= p_end && (!reimb_end || paymentDate <= reimb_end)) {
-                            if (paymentDate >= p_start) { amount_of_reimbursement_in_this_period = reimb_amount_raw; break; }
-                            paymentDate = addWeeks(paymentDate, 2);
-                        }
-                    } else if (periodicity === "Mensual") {
-                        let occurrences = 0; let checkDate = new Date(reimb_start.getTime());
-                        while (checkDate <= p_end && (!reimb_end || checkDate <= reimb_end)) {
-                            if (checkDate >= p_start) occurrences++;
-                            checkDate = addWeeks(checkDate, 2);
+                        amount_of_reimbursement_in_this_period = reimb_amount_raw;
+                    } else { // Analysis periodicity is "Mensual"
+                        let occurrences = 0;
+                        let dayIterator = new Date(p_start.getTime());
+                        const reimbursementPaymentUTCDay = reimb_start.getUTCDay();
+
+                        while (dayIterator <= p_end) {
+                            if (dayIterator.getUTCDay() === reimbursementPaymentUTCDay) {
+                                if (reimb_start <= dayIterator && (reimb_end === null || reimb_end >= dayIterator)) {
+                                    occurrences++;
+                                }
+                            }
+                            dayIterator.setUTCDate(dayIterator.getUTCDate() + 1);
                         }
                         amount_of_reimbursement_in_this_period = reimb_amount_raw * occurrences;
+                    }
+                } else if (reimb_freq === "Bi-semanal") {
+                    let current_payment_date = new Date(reimb_start.getTime());
+
+                    // Adjust current_payment_date to be the first relevant payment date for this period
+                    // The first loop `while (current_payment_date < p_start && current_payment_date < reimb_start)` was redundant
+                    // because current_payment_date is initialized from reimb_start, so current_payment_date < reimb_start is never true.
+                     while (current_payment_date < p_start) {
+                        current_payment_date = addWeeks(current_payment_date, 2);
+                        if (reimb_end && current_payment_date > reimb_end) break;
+                    }
+                    
+                    while (current_payment_date <= p_end) {
+                        if (reimb_end && current_payment_date > reimb_end) {
+                            break;
+                        }
+                        if (current_payment_date >= reimb_start) { // Payment must be on or after reimbursement start
+                           amount_of_reimbursement_in_this_period += reimb_amount_raw;
+                        }
+                        current_payment_date = addWeeks(current_payment_date, 2);
                     }
                 }
 
@@ -1945,8 +2098,76 @@ document.addEventListener('DOMContentLoaded', () => {
     function addWeeks(date, weeks) { const d = new Date(date.getTime()); d.setUTCDate(d.getUTCDate() + (weeks * 7)); return d; }
     function getISODateString(date) { if (!(date instanceof Date) || isNaN(date.getTime())) return ''; return date.getUTCFullYear() + '-' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date.getUTCDate()).slice(-2); }
     function getWeekNumber(d) { const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7)); const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1)); const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7); return [date.getUTCFullYear(), weekNo]; }
-    function getMondayOfWeek(year, week) { const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7)); const dayOfWeek = simple.getUTCDay(); const isoDayOfWeek = ((dayOfWeek + 6) % 7) + 1; const diff = isoDayOfWeek - 1; simple.setUTCDate(simple.getUTCDate() - diff); return simple; }
+function getMondayOfWeek(year, week) {
+    // Create a date for Jan 4th of the year. Jan 4th is always in week 1.
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    // Get the day of the week for Jan 4th (0=Sun, 1=Mon, ..., 6=Sat). Adjust Sunday to be 7 for ISO 8601 weekday.
+    const jan4DayOfWeek = jan4.getUTCDay() || 7; 
+    // Calculate the date of the first Monday of the year.
+    const firstMondayOfYear = new Date(jan4.getTime());
+    firstMondayOfYear.setUTCDate(jan4.getUTCDate() - (jan4DayOfWeek - 1));
+
+    // Add (week - 1) * 7 days to the first Monday to get the Monday of the target week.
+    const targetMonday = new Date(firstMondayOfYear.getTime());
+    targetMonday.setUTCDate(firstMondayOfYear.getUTCDate() + (week - 1) * 7);
+    return targetMonday;
+}
     function getDaysInMonth(year, month) { return new Date(year, month + 1, 0).getUTCDate(); }
+
+    /**
+     * Calculates the start date of a period (month or week) based on a given date and periodicity.
+     * Uses UTC date components for all calculations.
+     * @param {Date} date The date to determine the period start from.
+     * @param {string} periodicity "Mensual" or "Semanal".
+     * @returns {Date} A new Date object representing the first day of the period at UTC midnight.
+     */
+    function getPeriodStartDate(date, periodicity) {
+        const year = date.getUTCFullYear();
+        const month = date.getUTCMonth();
+        let periodStart;
+
+        if (periodicity === "Mensual") {
+            periodStart = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+        } else if (periodicity === "Semanal") {
+        // getWeekNumber returns [year, weekNumber] for the week the date is in.
+        // This year might be different from date.getUTCFullYear() for dates at year boundaries.
+        const [isoYearForWeek, weekNumber] = getWeekNumber(date);
+        const monday = getMondayOfWeek(isoYearForWeek, weekNumber); 
+            periodStart = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate(), 0, 0, 0, 0));
+        } else {
+            throw new Error("Invalid periodicity provided to getPeriodStartDate. Must be 'Mensual' or 'Semanal'.");
+        }
+        return periodStart;
+    }
+
+    /**
+     * Calculates the end date of a period (month or week) based on a given date and periodicity.
+     * The time is set to UTC midnight (00:00:00.000Z) of the last day of the period.
+     * Uses UTC date components for all calculations.
+     * @param {Date} date The date to determine the period end from.
+     * @param {string} periodicity "Mensual" or "Semanal".
+     * @returns {Date} A new Date object representing the last day of the period at UTC midnight.
+     */
+    function getPeriodEndDate(date, periodicity) {
+        const year = date.getUTCFullYear();
+        const month = date.getUTCMonth();
+        let periodEnd;
+
+        if (periodicity === "Mensual") {
+            // First day of next month, then subtract one day (which gives last day of current month)
+            // Set to UTC midnight of that last day.
+            periodEnd = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0, 0)); // First day of next month
+            periodEnd.setUTCDate(periodEnd.getUTCDate() - 1); // Last day of current month
+        } else if (periodicity === "Semanal") {
+        const [isoYearForWeek, weekNumber] = getWeekNumber(date);
+        const monday = getMondayOfWeek(isoYearForWeek, weekNumber); // Monday of the current week (UTC midnight)
+            // Sunday is Monday + 6 days
+            periodEnd = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 6, 0, 0, 0, 0));
+        } else {
+            throw new Error("Invalid periodicity provided to getPeriodEndDate. Must be 'Mensual' or 'Semanal'.");
+        }
+        return periodEnd;
+    }
 
 
     // --- INICIALIZACIÓN ---
