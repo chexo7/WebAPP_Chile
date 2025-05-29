@@ -1662,17 +1662,36 @@ document.addEventListener('DOMContentLoaded', () => {
                         income_to_add = net_amount;
                     }
                 } else if (inc_freq === "Mensual") {
-                    const currentPeriodYear = p_start.getUTCFullYear();
-                    const currentPeriodMonth = p_start.getUTCMonth();
-                    const paymentDay = inc_start.getUTCDate();
-                    const daysInMonth = getDaysInMonth(currentPeriodYear, currentPeriodMonth);
-                    const actualPaymentDay = Math.min(paymentDay, daysInMonth);
-                    const potential_payment_date = new Date(Date.UTC(currentPeriodYear, currentPeriodMonth, actualPaymentDay));
+                    const itemPaymentDay = inc_start.getUTCDate();
+                    let paymentOccurred = false;
 
-                    if (potential_payment_date >= p_start && potential_payment_date <= p_end) {
-                         // Ensure the payment date is also within the income's active range (it should be due to isActiveRange, but double check)
-                        if (inc_start <= potential_payment_date && (inc_end === null || inc_end >= potential_payment_date)) {
+                    // Check for payment in p_start's month
+                    const p_start_year = p_start.getUTCFullYear();
+                    const p_start_month = p_start.getUTCMonth();
+                    const daysInPStartMonth = getDaysInMonth(p_start_year, p_start_month);
+                    const actualPaymentDayInPStartMonth = Math.min(itemPaymentDay, daysInPStartMonth);
+                    const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
+
+                    if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
+                        if (inc_start <= paymentDateInPStartMonth && (inc_end === null || inc_end >= paymentDateInPStartMonth)) {
                             income_to_add = net_amount;
+                            paymentOccurred = true;
+                        }
+                    }
+
+                    // If period spans months and payment not yet counted, check p_end's month
+                    if (!paymentOccurred) {
+                        const p_end_year = p_end.getUTCFullYear();
+                        const p_end_month = p_end.getUTCMonth();
+                        if (p_start_month !== p_end_month) { // Check if the period actually spans different months
+                            const daysInPEndMonth = getDaysInMonth(p_end_year, p_end_month);
+                            const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
+                            const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
+                            if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
+                                if (inc_start <= paymentDateInPEndMonth && (inc_end === null || inc_end >= paymentDateInPEndMonth)) {
+                                    income_to_add = net_amount;
+                                }
+                            }
                         }
                     }
                 } else if (inc_freq === "Semanal") {
@@ -1746,16 +1765,36 @@ document.addEventListener('DOMContentLoaded', () => {
                         exp_add_this_period = amt_raw;
                     }
                 } else if (freq === "Mensual") {
-                    const currentPeriodYear = p_start.getUTCFullYear();
-                    const currentPeriodMonth = p_start.getUTCMonth();
-                    const paymentDay = e_start.getUTCDate();
-                    const daysInMonth = getDaysInMonth(currentPeriodYear, currentPeriodMonth);
-                    const actualPaymentDay = Math.min(paymentDay, daysInMonth);
-                    const potential_payment_date = new Date(Date.UTC(currentPeriodYear, currentPeriodMonth, actualPaymentDay));
+                    const itemPaymentDay = e_start.getUTCDate();
+                    let paymentOccurred = false;
 
-                    if (potential_payment_date >= p_start && potential_payment_date <= p_end) {
-                        if (e_start <= potential_payment_date && (e_end === null || e_end >= potential_payment_date)) {
-                             exp_add_this_period = amt_raw;
+                    // Check for payment in p_start's month
+                    const p_start_year = p_start.getUTCFullYear();
+                    const p_start_month = p_start.getUTCMonth();
+                    const daysInPStartMonth = getDaysInMonth(p_start_year, p_start_month);
+                    const actualPaymentDayInPStartMonth = Math.min(itemPaymentDay, daysInPStartMonth);
+                    const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
+
+                    if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
+                        if (e_start <= paymentDateInPStartMonth && (e_end === null || e_end >= paymentDateInPStartMonth)) {
+                            exp_add_this_period = amt_raw;
+                            paymentOccurred = true;
+                        }
+                    }
+
+                    // If period spans months and payment not yet counted, check p_end's month
+                    if (!paymentOccurred) {
+                        const p_end_year = p_end.getUTCFullYear();
+                        const p_end_month = p_end.getUTCMonth();
+                        if (p_start_month !== p_end_month) { // Check if the period actually spans different months
+                            const daysInPEndMonth = getDaysInMonth(p_end_year, p_end_month);
+                            const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
+                            const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
+                            if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
+                                if (e_start <= paymentDateInPEndMonth && (e_end === null || e_end >= paymentDateInPEndMonth)) {
+                                    exp_add_this_period = amt_raw;
+                                }
+                            }
                         }
                     }
                 } else if (freq === "Semanal") {
@@ -1824,16 +1863,36 @@ document.addEventListener('DOMContentLoaded', () => {
                         amount_of_reimbursement_in_this_period = reimb_amount_raw;
                     }
                 } else if (reimb_freq === "Mensual") {
-                    const currentPeriodYear = p_start.getUTCFullYear();
-                    const currentPeriodMonth = p_start.getUTCMonth();
-                    const paymentDay = reimb_start.getUTCDate();
-                    const daysInMonth = getDaysInMonth(currentPeriodYear, currentPeriodMonth);
-                    const actualPaymentDay = Math.min(paymentDay, daysInMonth);
-                    const potential_payment_date = new Date(Date.UTC(currentPeriodYear, currentPeriodMonth, actualPaymentDay));
+                    const itemPaymentDay = reimb_start.getUTCDate();
+                    let paymentOccurred = false;
 
-                    if (potential_payment_date >= p_start && potential_payment_date <= p_end) {
-                        if (reimb_start <= potential_payment_date && (reimb_end === null || reimb_end >= potential_payment_date)) {
+                    // Check for payment in p_start's month
+                    const p_start_year = p_start.getUTCFullYear();
+                    const p_start_month = p_start.getUTCMonth();
+                    const daysInPStartMonth = getDaysInMonth(p_start_year, p_start_month);
+                    const actualPaymentDayInPStartMonth = Math.min(itemPaymentDay, daysInPStartMonth);
+                    const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
+
+                    if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
+                        if (reimb_start <= paymentDateInPStartMonth && (reimb_end === null || reimb_end >= paymentDateInPStartMonth)) {
                             amount_of_reimbursement_in_this_period = reimb_amount_raw;
+                            paymentOccurred = true;
+                        }
+                    }
+
+                    // If period spans months and payment not yet counted, check p_end's month
+                    if (!paymentOccurred) {
+                        const p_end_year = p_end.getUTCFullYear();
+                        const p_end_month = p_end.getUTCMonth();
+                        if (p_start_month !== p_end_month) { // Check if the period actually spans different months
+                            const daysInPEndMonth = getDaysInMonth(p_end_year, p_end_month);
+                            const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
+                            const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
+                            if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
+                                if (reimb_start <= paymentDateInPEndMonth && (reimb_end === null || reimb_end >= paymentDateInPEndMonth)) {
+                                    amount_of_reimbursement_in_this_period = reimb_amount_raw;
+                                }
+                            }
                         }
                     }
                 } else if (reimb_freq === "Semanal") {
