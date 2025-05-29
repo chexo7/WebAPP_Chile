@@ -19,6 +19,18 @@ function assertEquals(expected, actual, message) {
     }
 }
 
+function assertTrue(condition, message) {
+    testsRun++;
+    if (condition) {
+        testsPassed++;
+        testResults.push({ name: message, pass: true });
+    } else {
+        testResults.push({ name: message, pass: false, expected: "true", actual: "false" });
+        console.error(`FAIL: ${message} - Expected: true, Actual: false`);
+    }
+}
+
+
 function runTest(testName, testFunction) {
     console.log(`\n--- Running Test: ${testName} ---`);
     try {
@@ -95,12 +107,7 @@ function getPeriodStartDate(date, periodicity) {
     if (periodicity === "Mensual") {
         periodStart = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
     } else if (periodicity === "Semanal") {
-        const currentYear = date.getUTCFullYear(); // Use year of the input date for getWeekNumber
-        const [, weekNumber] = getWeekNumber(date);
-        // It's possible the week belongs to the previous/next year in ISO 8601.
-        // getMondayOfWeek needs the year the week *belongs* to.
-        // getWeekNumber returns the correct year for the week.
-        const isoYearForWeek = getWeekNumber(date)[0];
+        const [isoYearForWeek, weekNumber] = getWeekNumber(date);
         const monday = getMondayOfWeek(isoYearForWeek, weekNumber); 
         periodStart = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate(), 0, 0, 0, 0));
     } else {
@@ -118,9 +125,7 @@ function getPeriodEndDate(date, periodicity) {
         periodEnd = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0, 0)); 
         periodEnd.setUTCDate(periodEnd.getUTCDate() - 1); 
     } else if (periodicity === "Semanal") {
-        const currentYear = date.getUTCFullYear(); // Use year of the input date
-        const [, weekNumber] = getWeekNumber(date);
-        const isoYearForWeek = getWeekNumber(date)[0];
+        const [isoYearForWeek, weekNumber] = getWeekNumber(date);
         const monday = getMondayOfWeek(isoYearForWeek, weekNumber); 
         periodEnd = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 6, 0, 0, 0, 0));
     } else {
@@ -129,9 +134,7 @@ function getPeriodEndDate(date, periodicity) {
     return periodEnd;
 }
 
-// calculateCashFlowData (Copied and potentially simplified if it has too many DOM dependencies)
-// For now, assuming it's primarily logic and can be copied.
-// Dependencies: getPeriodStartDate, getPeriodEndDate, addMonths, addWeeks, getDaysInMonth
+// calculateCashFlowData (Updated to reflect app.js state after Turn 11 fixes)
 function calculateCashFlowData(data) {
     const startDate = data.analysis_start_date; 
     const duration = parseInt(data.analysis_duration, 10); 
@@ -178,16 +181,31 @@ function calculateCashFlowData(data) {
                     income_to_add = net_amount;
                 }
             } else if (inc_freq === "Mensual") {
-                const currentPeriodYear = p_start.getUTCFullYear();
-                const currentPeriodMonth = p_start.getUTCMonth();
-                const paymentDay = inc_start.getUTCDate();
-                const daysInMonth = getDaysInMonth(currentPeriodYear, currentPeriodMonth);
-                const actualPaymentDay = Math.min(paymentDay, daysInMonth);
-                const potential_payment_date = new Date(Date.UTC(currentPeriodYear, currentPeriodMonth, actualPaymentDay));
-
-                if (potential_payment_date >= p_start && potential_payment_date <= p_end) {
-                    if (inc_start <= potential_payment_date && (inc_end === null || inc_end >= potential_payment_date)) {
+                const itemPaymentDay = inc_start.getUTCDate();
+                let paymentOccurred = false;
+                const p_start_year = p_start.getUTCFullYear();
+                const p_start_month = p_start.getUTCMonth();
+                const daysInPStartMonth = getDaysInMonth(p_start_year, p_start_month);
+                const actualPaymentDayInPStartMonth = Math.min(itemPaymentDay, daysInPStartMonth);
+                const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
+                if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
+                    if (inc_start <= paymentDateInPStartMonth && (inc_end === null || inc_end >= paymentDateInPStartMonth)) {
                         income_to_add = net_amount;
+                        paymentOccurred = true;
+                    }
+                }
+                if (!paymentOccurred) {
+                    const p_end_year = p_end.getUTCFullYear();
+                    const p_end_month = p_end.getUTCMonth();
+                    if (p_start_month !== p_end_month) {
+                        const daysInPEndMonth = getDaysInMonth(p_end_year, p_end_month);
+                        const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
+                        const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
+                        if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
+                            if (inc_start <= paymentDateInPEndMonth && (inc_end === null || inc_end >= paymentDateInPEndMonth)) {
+                                income_to_add = net_amount;
+                            }
+                        }
                     }
                 }
             } else if (inc_freq === "Semanal") {
@@ -197,7 +215,6 @@ function calculateCashFlowData(data) {
                     let occurrences = 0;
                     let dayIterator = new Date(p_start.getTime());
                     const incomePaymentUTCDay = inc_start.getUTCDay(); 
-
                     while (dayIterator <= p_end) {
                         if (dayIterator.getUTCDay() === incomePaymentUTCDay) {
                             if (inc_start <= dayIterator && (inc_end === null || inc_end >= dayIterator)) {
@@ -247,16 +264,31 @@ function calculateCashFlowData(data) {
                     exp_add_this_period = amt_raw;
                 }
             } else if (freq === "Mensual") {
-                const currentPeriodYear = p_start.getUTCFullYear();
-                const currentPeriodMonth = p_start.getUTCMonth();
-                const paymentDay = e_start.getUTCDate();
-                const daysInMonth = getDaysInMonth(currentPeriodYear, currentPeriodMonth);
-                const actualPaymentDay = Math.min(paymentDay, daysInMonth);
-                const potential_payment_date = new Date(Date.UTC(currentPeriodYear, currentPeriodMonth, actualPaymentDay));
-
-                if (potential_payment_date >= p_start && potential_payment_date <= p_end) {
-                    if (e_start <= potential_payment_date && (e_end === null || e_end >= potential_payment_date)) {
-                         exp_add_this_period = amt_raw;
+                const itemPaymentDay = e_start.getUTCDate();
+                let paymentOccurred = false;
+                const p_start_year = p_start.getUTCFullYear();
+                const p_start_month = p_start.getUTCMonth();
+                const daysInPStartMonth = getDaysInMonth(p_start_year, p_start_month);
+                const actualPaymentDayInPStartMonth = Math.min(itemPaymentDay, daysInPStartMonth);
+                const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
+                if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
+                    if (e_start <= paymentDateInPStartMonth && (e_end === null || e_end >= paymentDateInPStartMonth)) {
+                        exp_add_this_period = amt_raw;
+                        paymentOccurred = true;
+                    }
+                }
+                if (!paymentOccurred) {
+                    const p_end_year = p_end.getUTCFullYear();
+                    const p_end_month = p_end.getUTCMonth();
+                    if (p_start_month !== p_end_month) {
+                        const daysInPEndMonth = getDaysInMonth(p_end_year, p_end_month);
+                        const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
+                        const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
+                        if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
+                            if (e_start <= paymentDateInPEndMonth && (e_end === null || e_end >= paymentDateInPEndMonth)) {
+                                exp_add_this_period = amt_raw;
+                            }
+                        }
                     }
                 }
             } else if (freq === "Semanal") {
@@ -315,16 +347,31 @@ function calculateCashFlowData(data) {
                     amount_of_reimbursement_in_this_period = reimb_amount_raw;
                 }
             } else if (reimb_freq === "Mensual") {
-                const currentPeriodYear = p_start.getUTCFullYear();
-                const currentPeriodMonth = p_start.getUTCMonth();
-                const paymentDay = reimb_start.getUTCDate();
-                const daysInMonth = getDaysInMonth(currentPeriodYear, currentPeriodMonth);
-                const actualPaymentDay = Math.min(paymentDay, daysInMonth);
-                const potential_payment_date = new Date(Date.UTC(currentPeriodYear, currentPeriodMonth, actualPaymentDay));
-
-                if (potential_payment_date >= p_start && potential_payment_date <= p_end) {
-                    if (reimb_start <= potential_payment_date && (reimb_end === null || reimb_end >= potential_payment_date)) {
+                const itemPaymentDay = reimb_start.getUTCDate();
+                let paymentOccurred = false;
+                const p_start_year = p_start.getUTCFullYear();
+                const p_start_month = p_start.getUTCMonth();
+                const daysInPStartMonth = getDaysInMonth(p_start_year, p_start_month);
+                const actualPaymentDayInPStartMonth = Math.min(itemPaymentDay, daysInPStartMonth);
+                const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
+                if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
+                    if (reimb_start <= paymentDateInPStartMonth && (reimb_end === null || reimb_end >= paymentDateInPStartMonth)) {
                         amount_of_reimbursement_in_this_period = reimb_amount_raw;
+                        paymentOccurred = true;
+                    }
+                }
+                if (!paymentOccurred) {
+                    const p_end_year = p_end.getUTCFullYear();
+                    const p_end_month = p_end.getUTCMonth();
+                    if (p_start_month !== p_end_month) { 
+                        const daysInPEndMonth = getDaysInMonth(p_end_year, p_end_month);
+                        const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
+                        const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
+                        if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
+                            if (reimb_start <= paymentDateInPEndMonth && (reimb_end === null || reimb_end >= paymentDateInPEndMonth)) {
+                                amount_of_reimbursement_in_this_period = reimb_amount_raw;
+                            }
+                        }
                     }
                 }
             } else if (reimb_freq === "Semanal") {
@@ -483,7 +530,7 @@ runTest("getPeriodEndDate - Semanal - Sunday (Jan 14, 2024)", () => {
 });
 
 // --- calculateCashFlowData Tests ---
-const mockExpenseCategories = { "Food": "Variable", "Salary": "Fijo", "Rent": "Fijo", "Transport": "Variable", "Utilities": "Fijo" };
+const mockExpenseCategories = { "Food": "Variable", "Salary": "Fijo", "Rent": "Fijo", "Transport": "Variable", "Utilities": "Fijo", "TestBugCat": "Variable", "TestMonthlyBugCat": "Variable" };
 
 runTest("calculateCashFlowData - Scenario 1: Monthly Analysis, Monthly Item", () => {
     const data = {
@@ -662,6 +709,136 @@ runTest("calculateCashFlowData - Scenario 9: Year Boundary (Weekly View)", () =>
     assertEquals(100, result.income_p[1], "Scenario 9 - Income (Week Jan 1-7, 2024)");
 });
 
-// --- Trigger test summary ---
+runTest("testWeeklyView_Oct1Expense_AnalysisFromSep24", () => {
+    const mockData = {
+        analysis_start_date: new Date(Date.UTC(2025, 8, 24)), // September 24, 2025 (Wednesday)
+        analysis_periodicity: "Semanal",
+        analysis_duration: 15, 
+        analysis_initial_balance: 0,
+        display_currency_symbol: "$",
+        expense_categories: { "TestBugCat": "Variable" },
+        expenses: [
+            { name: "Oct1Expense", amount: 100, category: "TestBugCat", frequency: "Único", start_date: new Date(Date.UTC(2025, 9, 1)), end_date: null, is_real: false } // October 1, 2025
+        ],
+        incomes: [],
+        payments: {},
+        budgets: {},
+        // Ensure all necessary fields for calculateCashFlowData are present
+        baby_steps_status: [], 
+        reminders_todos: [],
+        change_log: []
+    };
+
+    const { periodDates, expenses_by_cat_p, var_exp_p } = calculateCashFlowData(mockData);
+
+    // Assertions for period dates
+    // Week containing Sep 24, 2025 (Wed): Monday is Sep 22, 2025
+    assertEquals(new Date(Date.UTC(2025, 8, 22)).getTime(), periodDates[0].getTime(), "TestBug: Period 0 (Week of Sep 22) p_start");
+    
+    // Week containing Oct 1, 2025 (Wed): Monday is Sep 29, 2025
+    assertEquals(new Date(Date.UTC(2025, 8, 29)).getTime(), periodDates[1].getTime(), "TestBug: Period 1 (Week of Sep 29) p_start");
+
+    // Week after Oct 1: Monday is Oct 6, 2025
+    assertEquals(new Date(Date.UTC(2025, 9, 6)).getTime(), periodDates[2].getTime(), "TestBug: Period 2 (Week of Oct 6) p_start");
+
+    // Check that the first few periods are not December (sanity check related to bug description)
+    assertTrue(periodDates[0].getUTCMonth() !== 11, "TestBug: Period 0 should not be December"); // Sep
+    assertTrue(periodDates[1].getUTCMonth() !== 11, "TestBug: Period 1 should not be December"); // Sep
+    assertTrue(periodDates[2].getUTCMonth() !== 11, "TestBug: Period 2 should not be December"); // Oct
+
+
+    // Assertions for expense assignment
+    // Period 0: Week of Sep 22 - Sep 28. Oct 1 expense should not be here.
+    assertEquals(0, (expenses_by_cat_p[0]["TestBugCat"] || 0), "TestBug: Oct1Expense should be 0 in week of Sep 22");
+    assertEquals(0, (var_exp_p[0] || 0), "TestBug: Total var_exp_p[0] should be 0 in week of Sep 22");
+
+
+    // Period 1: Week of Sep 29 - Oct 5. Oct 1 expense should be here.
+    assertEquals(100, (expenses_by_cat_p[1]["TestBugCat"] || 0), "TestBug: Oct1Expense should be 100 in week of Sep 29");
+    assertEquals(100, (var_exp_p[1] || 0), "TestBug: Total var_exp_p[1] should be 100 in week of Sep 29");
+
+
+    // Period 2: Week of Oct 6 - Oct 12. Oct 1 expense should not be here.
+    assertEquals(0, (expenses_by_cat_p[2]["TestBugCat"] || 0), "TestBug: Oct1Expense should be 0 in week of Oct 6");
+    assertEquals(0, (var_exp_p[2] || 0), "TestBug: Total var_exp_p[2] should be 0 in week of Oct 6");
+
+});
+
+runTest("testWeeklyView_MonthlyRecurringExpense_Oct1_AnalysisFromSep24", () => {
+    const mockData = {
+        analysis_start_date: new Date(Date.UTC(2025, 8, 24)), // September 24, 2025 (Wednesday)
+        analysis_periodicity: "Semanal",
+        analysis_duration: 15, 
+        analysis_initial_balance: 0,
+        display_currency_symbol: "$",
+        expense_categories: { "TestMonthlyBugCat": "Variable" }, // Corrected category name
+        expenses: [
+            { 
+                name: "Oct1MonthlyRecurringExp", 
+                amount: 100, 
+                category: "TestMonthlyBugCat", 
+                frequency: "Mensual", 
+                start_date: new Date(Date.UTC(2025, 9, 1)), // October 1, 2025
+                end_date: null, 
+                is_real: false 
+            }
+        ],
+        incomes: [],
+        payments: {},
+        budgets: {},
+        baby_steps_status: [], 
+        reminders_todos: [],
+        change_log: []
+    };
+
+    const { periodDates, expenses_by_cat_p, var_exp_p } = calculateCashFlowData(mockData);
+
+    // 1. Verify Period Dates
+    // Period 0: Week containing Sep 24 (Wed) -> Mon, Sep 22, 2025
+    assertEquals(new Date(Date.UTC(2025, 8, 22)).getTime(), periodDates[0].getTime(), "TestMonthlyBug: Period 0 (Week of Sep 22) p_start");
+    // Period 1: Week containing Oct 1 (Wed) -> Mon, Sep 29, 2025
+    assertEquals(new Date(Date.UTC(2025, 8, 29)).getTime(), periodDates[1].getTime(), "TestMonthlyBug: Period 1 (Week of Sep 29) p_start");
+    
+    // Sanity check for early periods not being December
+    assertTrue(periodDates[0].getUTCMonth() === 8, "TestMonthlyBug: Period 0 Month should be September"); 
+    assertTrue(periodDates[1].getUTCMonth() === 8, "TestMonthlyBug: Period 1 Month should be September");
+
+
+    // 2. Verify Expense Assignment
+    // October 1, 2025 is a Wednesday.
+    // Expense payment day is the 1st of the month.
+
+    // Period 0 (Week of Sep 22-28): Expense should be 0
+    assertEquals(0, (expenses_by_cat_p[0]["TestMonthlyBugCat"] || 0), "TestMonthlyBug: Expense should be 0 in week of Sep 22");
+    assertEquals(0, (var_exp_p[0] || 0), "TestMonthlyBug: Total var_exp_p[0] for Sep 22 week");
+
+    // Period 1 (Week of Sep 29 - Oct 5): Contains Oct 1st. Expense should be 100.
+    assertEquals(100, (expenses_by_cat_p[1]["TestMonthlyBugCat"] || 0), "TestMonthlyBug: Expense should be 100 in week of Sep 29 (for Oct 1 payment)");
+    assertEquals(100, (var_exp_p[1] || 0), "TestMonthlyBug: Total var_exp_p[1] for Sep 29 week");
+    
+    // Check other weeks in October - should be 0
+    // Period 2: Oct 6 - Oct 12
+    if (periodDates.length > 2) {
+      assertEquals(0, (expenses_by_cat_p[2]["TestMonthlyBugCat"] || 0), "TestMonthlyBug: Expense should be 0 in week of Oct 6");
+    }
+
+
+    // November 1, 2025 is a Saturday. Week is Oct 27 - Nov 2.
+    const weekOfNov1ExpectedStart = new Date(Date.UTC(2025, 9, 27)); // Monday Oct 27
+    const idxNov = periodDates.findIndex(p => p.getTime() === weekOfNov1ExpectedStart.getTime());
+    assertTrue(idxNov !== -1, `TestMonthlyBug: Find period index for week starting ${getISODateString(weekOfNov1ExpectedStart)}. Found indices: ${periodDates.map((pd,ix) => `${ix}:${getISODateString(pd)}`).join(', ')}`);
+    if (idxNov !== -1) {
+        assertEquals(100, (expenses_by_cat_p[idxNov]["TestMonthlyBugCat"] || 0), "TestMonthlyBug: Expense should be 100 in week of Nov 1 (Oct 27 - Nov 2)");
+    }
+
+    // December 1, 2025 is a Monday. Week is Dec 1 - Dec 7.
+    const weekOfDec1ExpectedStart = new Date(Date.UTC(2025, 11, 1)); // Monday Dec 1
+    const idxDec = periodDates.findIndex(p => p.getTime() === weekOfDec1ExpectedStart.getTime());
+    assertTrue(idxDec !== -1, `TestMonthlyBug: Find period index for week starting ${getISODateString(weekOfDec1ExpectedStart)}`);
+    if (idxDec !== -1) {
+        assertEquals(100, (expenses_by_cat_p[idxDec]["TestMonthlyBugCat"] || 0), "TestMonthlyBug: Expense should be 100 in week of Dec 1");
+    }
+});
+// Ensure summarizeTests() is the last call.
 summarizeTests();
 // End of test_app_logic.js
