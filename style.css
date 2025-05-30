@@ -549,8 +549,8 @@ td.reimbursement-income {
 /* Estilos para Pestaña Gráfico */
 .chart-container {
     width: 100%;
-    max-width: 800px;
-    height: 400px;
+    max-width: 95%; /* Changed from 800px */
+    height: 60vh;   /* Changed from 400px */
     margin: 20px auto;
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
