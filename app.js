@@ -92,6 +92,51 @@ document.addEventListener('DOMContentLoaded', () => {
     const cashflowChartCanvas = document.getElementById('cashflow-chart');
     const chartMessage = document.getElementById('chart-message');
     let cashflowChartInstance = null;
+    let isChartInZoomMode = false;
+
+    if (cashflowChartCanvas) { // Ensure canvas exists
+        cashflowChartCanvas.addEventListener('dblclick', () => {
+            isChartInZoomMode = !isChartInZoomMode;
+            if (isChartInZoomMode) {
+                console.log("Chart zoom mode ENABLED");
+                if (cashflowChartCanvas && cashflowChartCanvas.parentElement) {
+                    cashflowChartCanvas.parentElement.classList.add('zoom-active');
+                }
+            } else {
+                console.log("Chart zoom mode DISABLED");
+                if (cashflowChartCanvas && cashflowChartCanvas.parentElement) {
+                    cashflowChartCanvas.parentElement.classList.remove('zoom-active');
+                }
+            }
+            // Optional: Update plugin states for pan/drag if we tie them to this mode (Step 4)
+            if (cashflowChartInstance) {
+                cashflowChartInstance.options.plugins.zoom.pan.enabled = isChartInZoomMode;
+                cashflowChartInstance.options.plugins.zoom.zoom.drag.enabled = isChartInZoomMode;
+                // Optional: also control pinch zoom if desired
+                // cashflowChartInstance.options.plugins.zoom.zoom.pinch.enabled = isChartInZoomMode;
+                cashflowChartInstance.update('none'); // Apply option changes without re-animation
+            }
+        });
+
+        cashflowChartCanvas.addEventListener('wheel', (event) => {
+            if (isChartInZoomMode && cashflowChartInstance) {
+                event.preventDefault(); // Stop page scrolling
+
+                // Determine zoom factor (adjust sensitivity as needed)
+                const zoomFactor = event.deltaY > 0 ? 1.1 : 0.9;
+
+                try {
+                    cashflowChartInstance.zoom(zoomFactor);
+                    // No need to call cashflowChartInstance.update() here,
+                    // as chartjs-plugin-zoom handles updates internally after zoom.
+                } catch (error) {
+                    console.error("Error during chart zoom:", error);
+                }
+
+            }
+            // If not in zoom mode, do nothing, allowing default page scroll
+        }, { passive: false }); // Set passive to false to allow preventDefault
+    }
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -1997,19 +2042,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     legend: { position: 'top' },
                     zoom: {
                         pan: {
-                            enabled: true,
+                            enabled: false, // Set to false
                             mode: 'xy',
                             modifierKey: 'ctrl',
                         },
                         zoom: {
                             wheel: {
-                                enabled: true,
+                                enabled: false, // Should already be false from a previous step
                             },
                             pinch: {
-                                enabled: true
+                                enabled: true // Pinch can remain enabled or also be tied to the mode
                             },
                             drag: {
-                                enabled: true,
+                                enabled: false, // Set to false
                                 backgroundColor: 'rgba(0,123,255,0.25)'
                             },
                             mode: 'xy',
@@ -2288,4 +2333,23 @@ function getMondayOfWeek(year, week) {
 
     // Trigger change event on expense frequency select to apply initial state
     expenseFrequencySelect.dispatchEvent(new Event('change')); 
+
+    document.addEventListener('click', (event) => {
+        if (isChartInZoomMode && cashflowChartCanvas && !cashflowChartCanvas.contains(event.target)) {
+            isChartInZoomMode = false;
+            console.log("Chart zoom mode DISABLED by clicking outside");
+            if (cashflowChartCanvas && cashflowChartCanvas.parentElement) {
+                cashflowChartCanvas.parentElement.classList.remove('zoom-active');
+            }
+
+            // Optional: Update plugin states for pan/drag if we tie them to this mode (Step 4)
+            if (cashflowChartInstance) {
+                cashflowChartInstance.options.plugins.zoom.pan.enabled = false;
+                cashflowChartInstance.options.plugins.zoom.zoom.drag.enabled = false;
+                // Optional: also control pinch zoom if desired
+                // cashflowChartInstance.options.plugins.zoom.zoom.pinch.enabled = false;
+                cashflowChartInstance.update('none'); // Apply option changes without re-animation
+            }
+        }
+    }, true); // Use capture phase to catch clicks on other elements reliably
 }); // This is the closing of DOMContentLoaded

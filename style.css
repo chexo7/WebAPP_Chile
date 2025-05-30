@@ -953,3 +953,9 @@ td.reimbursement-income {
 }
 
 /* End of Added Styles for Baby Steps Interactivity */
+
+.chart-container.zoom-active {
+    border: 2px solid var(--accent-color); /* Example: green border */
+    box-shadow: 0 0 10px rgba(32, 191, 107, 0.5); /* Example: subtle green glow */
+    /* You can also add other properties like a slightly different background if desired */
+}
