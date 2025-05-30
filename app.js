@@ -118,24 +118,49 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        cashflowChartCanvas.addEventListener('wheel', (event) => {
-            if (isChartInZoomMode && cashflowChartInstance) {
-                event.preventDefault(); // Stop page scrolling
+// RESTORED AND ENHANCED LISTENER
+if (cashflowChartCanvas) {
+    cashflowChartCanvas.addEventListener('wheel', (event) => {
+        console.log('Wheel event. isChartInZoomMode:', isChartInZoomMode); // Log mode state
+        if (isChartInZoomMode && cashflowChartInstance) {
+            event.preventDefault(); // Now conditional
+            console.log('Zoom mode active, preventDefault called.'); // Now conditional
 
-                // Determine zoom factor (adjust sensitivity as needed)
-                const zoomFactor = event.deltaY > 0 ? 1.1 : 0.9;
+            // Zoom logic (from the successful temporary listener)
+            const zoomDirection = event.deltaY > 0 ? 0.1 : -0.1;
+            const scales = cashflowChartInstance.options.scales;
 
-                try {
-                    cashflowChartInstance.zoom(zoomFactor);
-                    // No need to call cashflowChartInstance.update() here,
-                    // as chartjs-plugin-zoom handles updates internally after zoom.
-                } catch (error) {
-                    console.error("Error during chart zoom:", error);
-                }
-
+            if (!scales.x) {
+                console.error("X-axis scale not found in chart options.");
+                return;
             }
-            // If not in zoom mode, do nothing, allowing default page scroll
-        }, { passive: false }); // Set passive to false to allow preventDefault
+            const currentMinX = scales.x.min !== undefined ? scales.x.min : cashflowChartInstance.scales.x.min;
+            const currentMaxX = scales.x.max !== undefined ? scales.x.max : cashflowChartInstance.scales.x.max;
+            if (currentMinX === undefined || currentMaxX === undefined) {
+                console.error("Cannot determine current min/max for x-axis.");
+                return;
+            }
+            const rangeX = currentMaxX - currentMinX;
+            const newMinX = currentMinX + rangeX * zoomDirection / 2;
+            const newMaxX = currentMaxX - rangeX * zoomDirection / 2;
+
+            if (newMinX < newMaxX && (newMaxX - newMinX) > (rangeX * 0.01) && (newMaxX - newMinX) < (rangeX * 100) ) {
+                scales.x.min = newMinX;
+                scales.x.max = newMaxX;
+                console.log(`Zooming x-axis to min: ${newMinX}, max: ${newMaxX}`);
+            } else {
+                console.log("Zoom limit reached or invalid range for x-axis.");
+            }
+
+            cashflowChartInstance.update('none');
+            console.log('Chart update("none") called after zoom attempt.');
+            // End of zoom logic
+
+        } else {
+            console.log('Zoom mode NOT active or no chart instance. Default scroll behavior expected.'); // Updated log
+        }
+    }, { passive: false });
+}
     }
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
