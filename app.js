@@ -118,46 +118,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-// RESTORED AND ENHANCED LISTENER
+// MODIFIED wheel listener
 if (cashflowChartCanvas) {
     cashflowChartCanvas.addEventListener('wheel', (event) => {
-        console.log('Wheel event. isChartInZoomMode:', isChartInZoomMode); // Log mode state
-        if (isChartInZoomMode && cashflowChartInstance) {
-            event.preventDefault(); // Now conditional
-            console.log('Zoom mode active, preventDefault called.'); // Now conditional
-
-            // Zoom logic (from the successful temporary listener)
-            const zoomDirection = event.deltaY > 0 ? 0.1 : -0.1;
-            const scales = cashflowChartInstance.options.scales;
-
-            if (!scales.x) {
-                console.error("X-axis scale not found in chart options.");
-                return;
-            }
-            const currentMinX = scales.x.min !== undefined ? scales.x.min : cashflowChartInstance.scales.x.min;
-            const currentMaxX = scales.x.max !== undefined ? scales.x.max : cashflowChartInstance.scales.x.max;
-            if (currentMinX === undefined || currentMaxX === undefined) {
-                console.error("Cannot determine current min/max for x-axis.");
-                return;
-            }
-            const rangeX = currentMaxX - currentMinX;
-            const newMinX = currentMinX + rangeX * zoomDirection / 2;
-            const newMaxX = currentMaxX - rangeX * zoomDirection / 2;
-
-            if (newMinX < newMaxX && (newMaxX - newMinX) > (rangeX * 0.01) && (newMaxX - newMinX) < (rangeX * 100) ) {
-                scales.x.min = newMinX;
-                scales.x.max = newMaxX;
-                console.log(`Zooming x-axis to min: ${newMinX}, max: ${newMaxX}`);
-            } else {
-                console.log("Zoom limit reached or invalid range for x-axis.");
-            }
-
-            cashflowChartInstance.update('none');
-            console.log('Chart update("none") called after zoom attempt.');
-            // End of zoom logic
-
+        // console.log('Wheel event. isChartInZoomMode:', isChartInZoomMode); // Optional: keep for debugging
+        if (isChartInZoomMode && cashflowChartInstance) { // Check for instance just in case, though it should exist
+            event.preventDefault();
+            console.log('Zoom mode active, wheel event default prevented. No chart zoom via wheel.'); // Updated log
+            // NO chart zoom logic here anymore.
         } else {
-            console.log('Zoom mode NOT active or no chart instance. Default scroll behavior expected.'); // Updated log
+            // console.log('Zoom mode NOT active. Default scroll behavior expected.'); // Optional: keep for debugging
         }
     }, { passive: false });
 }
