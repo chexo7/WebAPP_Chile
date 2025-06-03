@@ -407,7 +407,7 @@ function calculateCashFlowData(data) {
             }
 
             if (amount_of_reimbursement_in_this_period > 0 && expenses_by_cat_p[i][reimb_cat] !== undefined) {
-                expenses_by_cat_p[i][reimb_cat] = Math.max(0, expenses_by_cat_p[i][reimb_cat] - amount_of_reimbursement_in_this_period);
+                expenses_by_cat_p[i][reimb_cat] = (expenses_by_cat_p[i][reimb_cat] || 0) - amount_of_reimbursement_in_this_period;
             }
         });
         
@@ -727,6 +727,26 @@ runTest("calculateCashFlowData - Scenario 9: Year Boundary (Weekly View)", () =>
     const result = calculateCashFlowData(data);
     assertEquals(0, result.income_p[0], "Scenario 9 - Income (Week Dec 25-31, 2023)");
     assertEquals(100, result.income_p[1], "Scenario 9 - Income (Week Jan 1-7, 2024)");
+});
+
+runTest("calculateCashFlowData - Scenario 10: Reimbursement Exceeds Expense (Weekly)", () => {
+    const data = {
+        analysis_start_date: new Date(Date.UTC(2024, 0, 1)),
+        analysis_duration: 1,
+        analysis_periodicity: "Semanal",
+        analysis_initial_balance: 0,
+        expense_categories: mockExpenseCategories,
+        incomes: [
+            { name: "ReimbBig", net_monthly: 70, frequency: "Único", start_date: new Date(Date.UTC(2024, 0, 2)), end_date: null, is_reimbursement: true, reimbursement_category: "Food" }
+        ],
+        expenses: [
+            { name: "ExpFoodOnce", amount: 50, category: "Food", frequency: "Único", start_date: new Date(Date.UTC(2024, 0, 1)), end_date: null }
+        ]
+    };
+    const result = calculateCashFlowData(data);
+    assertEquals(-20, result.expenses_by_cat_p[0]["Food"], "Scenario 10 - Expense for Food becomes negative (50 - 70)");
+    assertEquals(-20, result.var_exp_p[0], "Scenario 10 - Total Variable Expense negative");
+    assertEquals(20, result.net_flow_p[0], "Scenario 10 - Net flow reflects credit");
 });
 
 runTest("testWeeklyView_Oct1Expense_AnalysisFromSep24", () => {

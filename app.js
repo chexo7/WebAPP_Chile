@@ -1488,8 +1488,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     amountToReimburse = reimbInc.net_monthly * paydays_in_month;
                 }
 
-                if (expensesThisMonth[reimbInc.reimbursement_category]) {
-                    expensesThisMonth[reimbInc.reimbursement_category] = Math.max(0, expensesThisMonth[reimbInc.reimbursement_category] - amountToReimburse);
+                // Allow negative values to reflect reimbursements exceeding expenses
+                if (reimbInc.reimbursement_category) {
+                    const currentExp = expensesThisMonth[reimbInc.reimbursement_category] || 0;
+                    expensesThisMonth[reimbInc.reimbursement_category] = currentExp - amountToReimburse;
                 }
             }
         });
@@ -1940,8 +1942,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
+                // Apply reimbursement even if it exceeds expenses to allow negative balance
                 if (amount_of_reimbursement_in_this_period > 0 && expenses_by_cat_p[i][reimb_cat] !== undefined) {
-                    expenses_by_cat_p[i][reimb_cat] = Math.max(0, expenses_by_cat_p[i][reimb_cat] - amount_of_reimbursement_in_this_period);
+                    expenses_by_cat_p[i][reimb_cat] = (expenses_by_cat_p[i][reimb_cat] || 0) - amount_of_reimbursement_in_this_period;
                 }
             });
             
