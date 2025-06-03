@@ -95,9 +95,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ELEMENTOS PESTAÑA GRÁFICO ---
     const cashflowChartCanvas = document.getElementById('cashflow-chart');
     const chartMessage = document.getElementById('chart-message');
+    const mobileChartStartInput = document.getElementById('mobile-chart-start');
+    const mobileChartEndInput = document.getElementById('mobile-chart-end');
+    const applyMobileChartRangeButton = document.getElementById('apply-mobile-chart-range');
     let cashflowChartInstance = null;
     let chartZoomMode = false;
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    let fullChartData = null;
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -1983,7 +1987,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- LÓGICA PESTAÑA GRÁFICO ---
-    function renderCashflowChart(periodDates, incomes, totalExpenses, netFlows, endBalances) {
+    function renderCashflowChart(periodDates, incomes, totalExpenses, netFlows, endBalances, storeData = true) {
+        if (storeData) {
+            fullChartData = { periodDates, incomes, totalExpenses, netFlows, endBalances };
+            if (isTouchDevice && mobileChartStartInput && mobileChartEndInput && periodDates.length > 0) {
+                mobileChartStartInput.value = getISODateString(periodDates[0]);
+                mobileChartEndInput.value = getISODateString(periodDates[periodDates.length - 1]);
+            }
+        }
         if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
         if (!periodDates || periodDates.length === 0) { if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
         if (chartMessage) chartMessage.textContent = "";
@@ -2312,6 +2323,14 @@ function getMondayOfWeek(year, week) {
     // updateUsdClpInfoLabel(); // No longer needed here, called by activateTab or showMainContentScreen
     incomeReimbursementCategoryContainer.style.display = 'none';
 
+    if (isTouchDevice) {
+        const rangeContainer = document.getElementById('mobile-chart-range');
+        if (rangeContainer) rangeContainer.style.display = 'flex';
+        if (applyMobileChartRangeButton) {
+            applyMobileChartRangeButton.addEventListener('click', applyMobileChartRange);
+        }
+    }
+
     // --- CONFIGURAR ZOOM EN EL GRÁFICO ---
     function enableChartZoom() {
         if (!cashflowChartInstance) return;
@@ -2343,6 +2362,38 @@ function getMondayOfWeek(year, week) {
         if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'zoom-in';
         chartZoomMode = false;
         if (chartMessage) chartMessage.textContent = 'Doble clic en el gráfico para activar el zoom.';
+    }
+
+    function applyMobileChartRange() {
+        if (!isTouchDevice || !fullChartData) return;
+        const startStr = mobileChartStartInput ? mobileChartStartInput.value : '';
+        const endStr = mobileChartEndInput ? mobileChartEndInput.value : '';
+        if (!startStr || !endStr) {
+            renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
+            return;
+        }
+        const startDate = new Date(startStr + 'T00:00:00Z');
+        const endDate = new Date(endStr + 'T00:00:00Z');
+        if (isNaN(startDate) || isNaN(endDate) || startDate > endDate) {
+            renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
+            return;
+        }
+        const fDates = [];
+        const fInc = [];
+        const fExp = [];
+        const fNet = [];
+        const fEnd = [];
+        for (let i = 0; i < fullChartData.periodDates.length; i++) {
+            const d = fullChartData.periodDates[i];
+            if (d >= startDate && d <= endDate) {
+                fDates.push(d);
+                fInc.push(fullChartData.incomes[i]);
+                fExp.push(fullChartData.totalExpenses[i]);
+                fNet.push(fullChartData.netFlows[i]);
+                fEnd.push(fullChartData.endBalances[i]);
+            }
+        }
+        renderCashflowChart(fDates, fInc, fExp, fNet, fEnd, false);
     }
 
     if (cashflowChartCanvas) {
