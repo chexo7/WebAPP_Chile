@@ -2352,19 +2352,9 @@ function getMondayOfWeek(year, week) {
     window.addEventListener('beforeunload', (e) => {
         if (hasUnsavedChanges()) {
             const diffDetails = generateDetailedChangeLog(originalLoadedData, currentBackupData);
-            const logEntry = {
-                timestamp: new Date().toISOString(),
-                message: 'Advertencia: intento de cerrar la página con cambios sin guardar.',
-                details: diffDetails,
-                newVersionKey: null,
-                previousVersionKey: currentBackupKey || null,
-                user: auth.currentUser && auth.currentUser.email ? mapEmailToName(auth.currentUser.email) : 'Sistema'
-            };
-            if (!Array.isArray(changeLogEntries)) changeLogEntries = [];
-            changeLogEntries.unshift(logEntry);
-            renderLogTab();
+            console.warn('Cambios sin guardar detectados:', diffDetails);
             e.preventDefault();
-            e.returnValue = '';
+            e.returnValue = 'Tienes cambios sin guardar que se perderán si cierras la página.';
         }
     });
 }); // This is the closing of DOMContentLoaded
