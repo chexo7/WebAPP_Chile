@@ -314,6 +314,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- CARGA DE VERSIONES (BACKUPS) ---
 
+    // Crea la estructura de backup inicial si el usuario no tiene ninguno
+    function createInitialBackupIfMissing(userRef) {
+        const backupsRef = userRef.child('backups');
+        return backupsRef.once('value').then(snapshot => {
+            if (!snapshot.exists()) {
+                const now = new Date();
+                const key = `backup_${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}` +
+                    `${now.getDate().toString().padStart(2, '0')}T${now.getHours().toString().padStart(2, '0')}` +
+                    `${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+
+                const initialBackup = {
+                    analysis_duration: null,
+                    analysis_initial_balance: null,
+                    analysis_periodicity: "",
+                    analysis_start_date: "",
+                    baby_steps_status: Array.from({ length: 7 }, () => ({ dos: [], donts: [] })),
+                    change_log: [],
+                    display_currency_symbol: "",
+                    expense_categories: {},
+                    version: ""
+                };
+
+                return backupsRef.child(key).set(initialBackup).then(() => key);
+            }
+            return null;
+        });
+    }
 
     function fetchBackups() {
         const userRef = getUserDataRef();
@@ -342,8 +369,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     loadLatestVersionButton.disabled = sortedKeys.length === 0;
                 } else {
-                    backupSelector.innerHTML = '<option value="">No hay versiones disponibles</option>';
-                    loadLatestVersionButton.disabled = true;
+                    // Si no hay backups, crea uno inicial y recarga la lista
+                    loadingMessage.textContent = "Creando datos iniciales...";
+                    createInitialBackupIfMissing(userRef).then(() => {
+                        fetchBackups();
+                    });
+                    return;
                 }
                 loadingMessage.style.display = 'none';
             })
