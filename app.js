@@ -2016,19 +2016,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     legend: { position: 'top' },
                     zoom: {
                         pan: {
-                            enabled: chartZoomMode,
+                            enabled: isTouchDevice ? true : chartZoomMode,
                             mode: 'xy',
-                            modifierKey: 'ctrl',
+                            modifierKey: isTouchDevice ? null : 'ctrl',
                         },
                         zoom: {
                             wheel: {
-                                enabled: chartZoomMode,
+                                enabled: isTouchDevice ? false : chartZoomMode,
                             },
                             pinch: {
-                                enabled: chartZoomMode
+                                enabled: isTouchDevice ? true : chartZoomMode
                             },
                             drag: {
-                                enabled: chartZoomMode,
+                                enabled: isTouchDevice ? false : chartZoomMode,
                                 backgroundColor: 'rgba(0,123,255,0.25)'
                             },
                             mode: 'xy',
@@ -2318,11 +2318,18 @@ function getMondayOfWeek(year, week) {
         chartZoomMode = true;
         if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'move';
         cashflowChartInstance.options.plugins.zoom.pan.enabled = true;
-        cashflowChartInstance.options.plugins.zoom.zoom.wheel.enabled = true;
+        cashflowChartInstance.options.plugins.zoom.pan.modifierKey = isTouchDevice ? null : 'ctrl';
+        cashflowChartInstance.options.plugins.zoom.zoom.wheel.enabled = !isTouchDevice;
         cashflowChartInstance.options.plugins.zoom.zoom.pinch.enabled = true;
-        cashflowChartInstance.options.plugins.zoom.zoom.drag.enabled = true;
+        cashflowChartInstance.options.plugins.zoom.zoom.drag.enabled = !isTouchDevice;
         cashflowChartInstance.update();
-        if (chartMessage) chartMessage.textContent = 'Modo zoom activo. Doble clic fuera del gráfico para salir.';
+        if (chartMessage) {
+            if (isTouchDevice) {
+                chartMessage.textContent = 'Modo zoom activo. Usa dos dedos para hacer zoom o mover el gráfico. Doble tap fuera del gráfico para salir.';
+            } else {
+                chartMessage.textContent = 'Modo zoom activo. Doble clic fuera del gráfico para salir.';
+            }
+        }
     }
 
     function disableChartZoom() {
@@ -2343,6 +2350,13 @@ function getMondayOfWeek(year, week) {
             e.stopPropagation();
             if (!chartZoomMode) enableChartZoom();
         });
+        if (isTouchDevice) {
+            cashflowChartCanvas.addEventListener('touchstart', (e) => {
+                if (e.touches.length > 1) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        }
     }
 
     document.addEventListener('dblclick', (e) => {
