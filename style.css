@@ -556,6 +556,16 @@ td.reimbursement-income {
     border-radius: var(--radius);
     padding: 10px;
 }
+
+#cashflow-chart {
+    width: 100%;
+}
+
+@media (pointer: coarse) {
+    #cashflow-chart {
+        touch-action: none;
+    }
+}
 .centered-text {
     text-align: center;
     margin-top: 20px;

@@ -97,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chartMessage = document.getElementById('chart-message');
     let cashflowChartInstance = null;
     let chartZoomMode = false;
+    const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -2036,8 +2037,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
-        if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'zoom-in';
-        if (chartMessage) chartMessage.textContent = 'Doble clic en el gráfico para activar el zoom.';
+        if (isTouchDevice) {
+            enableChartZoom();
+            if (chartMessage) chartMessage.textContent = 'Usa dos dedos para hacer zoom y mover el gráfico. Doble tap fuera del gráfico para salir.';
+        } else {
+            if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'zoom-in';
+            if (chartMessage) chartMessage.textContent = 'Doble clic en el gráfico para activar el zoom.';
+        }
     }
 
     // --- LÓGICA PESTAÑA BABY STEPS ---
