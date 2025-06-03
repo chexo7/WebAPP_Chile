@@ -747,6 +747,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return names.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
     }
 
+    function hasUnsavedChanges() {
+        if (!originalLoadedData || !currentBackupData) return false;
+        const diffs = generateDetailedChangeLog(originalLoadedData, currentBackupData);
+        if (!diffs || diffs.length === 0) return false;
+        return !(diffs.length === 1 && diffs[0] === "No se detectaron cambios significativos en los datos.");
+    }
+
 
     // --- GUARDAR CAMBIOS (ÚNICO EVENT LISTENER) - MODIFICADO ---
     saveChangesButton.addEventListener('click', () => {
@@ -2341,4 +2348,23 @@ function getMondayOfWeek(year, week) {
     // Trigger change event on expense frequency select to apply initial state
     expenseFrequencySelect.dispatchEvent(new Event('change'));
     if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'zoom-in';
+
+    window.addEventListener('beforeunload', (e) => {
+        if (hasUnsavedChanges()) {
+            const diffDetails = generateDetailedChangeLog(originalLoadedData, currentBackupData);
+            const logEntry = {
+                timestamp: new Date().toISOString(),
+                message: 'Advertencia: intento de cerrar la página con cambios sin guardar.',
+                details: diffDetails,
+                newVersionKey: null,
+                previousVersionKey: currentBackupKey || null,
+                user: auth.currentUser && auth.currentUser.email ? mapEmailToName(auth.currentUser.email) : 'Sistema'
+            };
+            if (!Array.isArray(changeLogEntries)) changeLogEntries = [];
+            changeLogEntries.unshift(logEntry);
+            renderLogTab();
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
 }); // This is the closing of DOMContentLoaded
