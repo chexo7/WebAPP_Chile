@@ -529,6 +529,26 @@ runTest("getPeriodEndDate - Semanal - Sunday (Jan 14, 2024)", () => {
     assertEquals(expected.toISOString(), getPeriodEndDate(date, "Semanal").toISOString(), "Jan 14 (Sun) -> Jan 14 (Sun)");
 });
 
+runTest("getPeriodStartDate - Invalid periodicity throws", () => {
+    let threw = false;
+    try {
+        getPeriodStartDate(new Date(), "Diario");
+    } catch (e) {
+        threw = true;
+    }
+    assertTrue(threw, "getPeriodStartDate should throw on invalid periodicity");
+});
+
+runTest("getPeriodEndDate - Invalid periodicity throws", () => {
+    let threw = false;
+    try {
+        getPeriodEndDate(new Date(), "Diario");
+    } catch (e) {
+        threw = true;
+    }
+    assertTrue(threw, "getPeriodEndDate should throw on invalid periodicity");
+});
+
 // --- calculateCashFlowData Tests ---
 const mockExpenseCategories = { "Food": "Variable", "Salary": "Fijo", "Rent": "Fijo", "Transport": "Variable", "Utilities": "Fijo", "TestBugCat": "Variable", "TestMonthlyBugCat": "Variable" };
 
