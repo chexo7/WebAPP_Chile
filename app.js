@@ -1,4 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Ensure Chart.js zoom plugin is registered
+    if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
+        Chart.register(ChartZoom);
+    }
     // --- ELEMENTOS GLOBALES ---
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
