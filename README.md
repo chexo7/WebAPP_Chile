@@ -76,7 +76,7 @@ Para ejecutar esta aplicación localmente, sigue estos pasos:
     *   Simplemente abre el archivo `index.html` en tu navegador web preferido.
 
 4.  **Uso:**
-    *   **Registro/Inicio de Sesión:** La primera vez, necesitarás que un usuario sea creado en Firebase Authentication, o modificar el código para permitir el registro si la aplicación no lo incluye directamente en la UI (el código actual se enfoca en el login, asumiendo que los usuarios ya existen o son gestionados por un administrador en Firebase). El código actual mapea UIDs de Firebase a sub-rutas específicas (`SS`, `JOSE`, `PAPAS`, etc.) en la base de datos. Deberás ajustar la función `getUserDataRef` en `app.js` para que coincida con los UIDs de tus usuarios y las rutas deseadas, o generalizarla si es necesario.
+    *   **Registro/Inicio de Sesión:** La primera vez, necesitarás que un usuario sea creado en Firebase Authentication, o modificar el código para permitir el registro si la aplicación no lo incluye directamente en la UI (el código actual se enfoca en el login, asumiendo que los usuarios ya existen o son gestionados por un administrador en Firebase). El mapeo de UIDs de Firebase a sub‑rutas específicas (`SS`, `JOSE`, `PAPAS`, etc.) ahora se realiza en `config.js`. Modifica el objeto `USER_PATHS` allí para que coincida con tus usuarios.
     *   **Navegación:** Utiliza las pestañas para acceder a las diferentes funcionalidades (Gastos, Ingresos, Flujo de Caja, etc.).
     *   **Guardar Cambios:** Cualquier modificación en los datos (ingresos, gastos, ajustes) se puede guardar como una nueva versión. Esto crea un backup con fecha y hora en Firebase.
 
@@ -86,7 +86,7 @@ La aplicación utiliza Firebase Realtime Database para almacenar todos los datos
 
 *   **Estructura de Datos Específica por Usuario:**
     *   Los datos de cada "grupo" o "perfil" de usuario (ej. "SS", "JOSE", "PAPAS") se almacenan bajo una ruta específica dentro de `/users/`. Por ejemplo, los datos del perfil "SS" estarían en `/users/SS/`.
-    *   La función `getUserDataRef` en `app.js` contiene un mapeo de UIDs de Firebase a estas sub-rutas (ej., `POurDKWezHXAsAQ9v86zT2KIHNH2` se mapea a `SS`). Esto significa que diferentes usuarios de Firebase pueden ser dirigidos a la misma conjunto de datos si sus UIDs están mapeados a la misma sub-ruta. Esta lógica debe ser adaptada según las necesidades específicas de gestión de acceso.
+    *   El mapeo de UIDs a estas sub‑rutas se define en el objeto `USER_PATHS` dentro de `config.js` (por ejemplo, `POurDKWezHXAsAQ9v86zT2KIHNH2` se mapea a `SS`). Esto permite que diferentes usuarios sean dirigidos al mismo conjunto de datos si comparten la misma sub-ruta.
 
 *   **Versiones (Backups):**
     *   Cada vez que se guardan los cambios, la aplicación crea un nuevo "backup" (una instantánea completa de los datos) bajo la ruta `/users/<USER_SUBPATH>/backups/backup_YYYYMMDDTHHMMSS`.

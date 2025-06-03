@@ -312,35 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     logoutButton.addEventListener('click', () => { auth.signOut(); });
     auth.onAuthStateChanged(user => user ? showDataSelectionScreen(user) : showLoginScreen());
 
-    // --- CARGA DE VERSIONES (BACKUPS) - MODIFICADO ---
-    // NUEVA FUNCIÓN: Obtiene la referencia a la rama de datos del usuario autenticado
-    function getUserDataRef() {
-        const user = firebase.auth().currentUser;
-        if (!user) {
-            console.error("No hay usuario autenticado.");
-            return null;
-        }
-        // Mapea los UID a las sub-rutas específicas (ej. "SS", "JOSE", "PAPAS")
-        const userPaths = {
-            "POurDKWezHXAsAQ9v86zT2KIHNH2": "SS",
-            "eLmByfa8isM6r37aMNUajpp2GG72": "SS",
-            "eqFrOEklfEREaBDYgr761ipHPQK2": "JOSE",
-            "0ceYKka1nbZfyftQlVE0jFRUeY73": "PAPAS",
-            "y0kGbOIqurc0kDmdWzl6YHWQ9IX2": "PAPAS",
-            "d4GAITAu8iP75h8aUqaDXeqMoc02": "VICENTE",
-            "R9NBQQt73nUPvJlGLQhIgmaYFJk2": "SS-USA"
-        };
-
-        const userSubPath = userPaths[user.uid];
-
-        if (!userSubPath) {
-            console.error(`UID ${user.uid} no mapeado a una sub-ruta de usuario específica.`);
-            return null;
-        }
-
-        // Retorna la referencia a la ruta específica del usuario, por ejemplo, `/users/SS`
-        return database.ref(`users/${userSubPath}`);
-    }
+    // --- CARGA DE VERSIONES (BACKUPS) ---
 
 
     function fetchBackups() {
