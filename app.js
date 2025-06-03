@@ -92,6 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cashflowChartCanvas = document.getElementById('cashflow-chart');
     const chartMessage = document.getElementById('chart-message');
     let cashflowChartInstance = null;
+    let chartZoomMode = false;
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -1997,19 +1998,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     legend: { position: 'top' },
                     zoom: {
                         pan: {
-                            enabled: true,
+                            enabled: chartZoomMode,
                             mode: 'xy',
                             modifierKey: 'ctrl',
                         },
                         zoom: {
                             wheel: {
-                                enabled: true,
+                                enabled: chartZoomMode,
                             },
                             pinch: {
-                                enabled: true
+                                enabled: chartZoomMode
                             },
                             drag: {
-                                enabled: true,
+                                enabled: chartZoomMode,
                                 backgroundColor: 'rgba(0,123,255,0.25)'
                             },
                             mode: 'xy',
@@ -2018,6 +2019,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+        if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'zoom-in';
+        if (chartMessage) chartMessage.textContent = 'Doble clic en el gráfico para activar el zoom.';
     }
 
     // --- LÓGICA PESTAÑA BABY STEPS ---
@@ -2286,6 +2289,46 @@ function getMondayOfWeek(year, week) {
     // updateUsdClpInfoLabel(); // No longer needed here, called by activateTab or showMainContentScreen
     incomeReimbursementCategoryContainer.style.display = 'none';
 
+    // --- CONFIGURAR ZOOM EN EL GRÁFICO ---
+    function enableChartZoom() {
+        if (!cashflowChartInstance) return;
+        chartZoomMode = true;
+        if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'move';
+        cashflowChartInstance.options.plugins.zoom.pan.enabled = true;
+        cashflowChartInstance.options.plugins.zoom.zoom.wheel.enabled = true;
+        cashflowChartInstance.options.plugins.zoom.zoom.pinch.enabled = true;
+        cashflowChartInstance.options.plugins.zoom.zoom.drag.enabled = true;
+        cashflowChartInstance.update();
+        if (chartMessage) chartMessage.textContent = 'Modo zoom activo. Doble clic fuera del gráfico para salir.';
+    }
+
+    function disableChartZoom() {
+        if (!cashflowChartInstance) return;
+        cashflowChartInstance.resetZoom && cashflowChartInstance.resetZoom();
+        cashflowChartInstance.options.plugins.zoom.pan.enabled = false;
+        cashflowChartInstance.options.plugins.zoom.zoom.wheel.enabled = false;
+        cashflowChartInstance.options.plugins.zoom.zoom.pinch.enabled = false;
+        cashflowChartInstance.options.plugins.zoom.zoom.drag.enabled = false;
+        cashflowChartInstance.update();
+        if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'zoom-in';
+        chartZoomMode = false;
+        if (chartMessage) chartMessage.textContent = 'Doble clic en el gráfico para activar el zoom.';
+    }
+
+    if (cashflowChartCanvas) {
+        cashflowChartCanvas.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            if (!chartZoomMode) enableChartZoom();
+        });
+    }
+
+    document.addEventListener('dblclick', (e) => {
+        if (chartZoomMode && cashflowChartCanvas && !cashflowChartCanvas.contains(e.target)) {
+            disableChartZoom();
+        }
+    });
+
     // Trigger change event on expense frequency select to apply initial state
-    expenseFrequencySelect.dispatchEvent(new Event('change')); 
+    expenseFrequencySelect.dispatchEvent(new Event('change'));
+    if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'zoom-in';
 }); // This is the closing of DOMContentLoaded
