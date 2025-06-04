@@ -32,6 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const displayCurrencySymbolInput = document.getElementById('display-currency-symbol-input');
     const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
+    const creditCardForm = document.getElementById('credit-card-form');
+    const creditCardNameInput = document.getElementById('credit-card-name');
+    const creditCardCutoffInput = document.getElementById('credit-card-cutoff');
+    const creditCardsList = document.getElementById('credit-cards-list');
 
     // --- ELEMENTOS PESTAÑA INGRESOS ---
     const incomeForm = document.getElementById('income-form');
@@ -58,10 +62,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const addCategoryButton = document.getElementById('add-category-button');
     const removeCategoryButton = document.getElementById('remove-category-button');
     const expenseFrequencySelect = document.getElementById('expense-frequency');
+    const expenseMovementDateInput = document.getElementById('expense-movement-date');
     const expenseStartDateInput = document.getElementById('expense-start-date');
     const expenseEndDateInput = document.getElementById('expense-end-date');
     const expenseOngoingCheckbox = document.getElementById('expense-ongoing');
     const expenseIsRealCheckbox = document.getElementById('expense-is-real');
+    const expensePaymentMethodSelect = document.getElementById('expense-payment-method');
+    const expenseCreditCardContainer = document.getElementById('expense-credit-card-container');
+    const expenseCreditCardSelect = document.getElementById('expense-credit-card');
     const addExpenseButton = document.getElementById('add-expense-button');
     const cancelEditExpenseButton = document.getElementById('cancel-edit-expense-button');
     const expensesTableView = document.querySelector('#expenses-table-view tbody');
@@ -486,11 +494,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     (currentBackupData.expenses || []).forEach(exp => {
                         if (exp.start_date) exp.start_date = new Date(exp.start_date + 'T00:00:00Z');
                         if (exp.end_date) exp.end_date = new Date(exp.end_date + 'T00:00:00Z');
+                        if (exp.movement_date) exp.movement_date = new Date(exp.movement_date + 'T00:00:00Z');
+                        else exp.movement_date = exp.start_date;
+                        if (!exp.payment_method) exp.payment_method = 'Efectivo';
                     });
 
                     originalLoadedData = JSON.parse(JSON.stringify(currentBackupData));
 
                     populateSettingsForm();
+                    renderCreditCards();
                     populateExpenseCategoriesDropdowns();
                     populateIncomeReimbursementCategoriesDropdown();
                     renderIncomesTable();
@@ -517,6 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         incomes: [],
                         expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
                         expenses: [],
+                        credit_cards: [],
                         payments: {},
                         budgets: {},
                         baby_steps_status: BABY_STEPS_DATA_JS.map(step => ({
@@ -531,6 +544,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     changeLogEntries = [];
 
                     populateSettingsForm();
+                    renderCreditCards();
                     populateExpenseCategoriesDropdowns();
                     populateIncomeReimbursementCategoriesDropdown();
                     renderIncomesTable();
@@ -873,6 +887,7 @@ document.addEventListener('DOMContentLoaded', () => {
         (dataToSave.expenses || []).forEach(exp => {
             if (exp.start_date) exp.start_date = getISODateString(new Date(exp.start_date));
             if (exp.end_date) exp.end_date = getISODateString(new Date(exp.end_date));
+            if (exp.movement_date) exp.movement_date = getISODateString(new Date(exp.movement_date));
             if (exp.category && dataToSave.expense_categories && dataToSave.expense_categories[exp.category]) {
                 exp.type = dataToSave.expense_categories[exp.category];
             } else {
@@ -1020,6 +1035,30 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateAnalysisDurationLabel() {
         analysisDurationLabel.textContent = "Duración (Meses):";
     }
+
+    function renderCreditCards() {
+        if (!creditCardsList) return;
+        creditCardsList.innerHTML = '';
+        if (!currentBackupData.credit_cards) currentBackupData.credit_cards = [];
+        currentBackupData.credit_cards.forEach((card, idx) => {
+            const li = document.createElement('li');
+            li.textContent = `${card.name} (corte ${card.cutoff_day})`;
+            creditCardsList.appendChild(li);
+        });
+        populateExpenseCreditCardDropdown();
+    }
+
+    function populateExpenseCreditCardDropdown() {
+        if (!expenseCreditCardSelect) return;
+        expenseCreditCardSelect.innerHTML = '';
+        const cards = currentBackupData && currentBackupData.credit_cards ? currentBackupData.credit_cards : [];
+        cards.forEach(card => {
+            const option = document.createElement('option');
+            option.value = card.name;
+            option.textContent = card.name;
+            expenseCreditCardSelect.appendChild(option);
+        });
+    }
     // usdClpRateInput.addEventListener('input', updateUsdClpInfoLabel); // No longer used
     // function updateUsdClpInfoLabel() { // No longer used, handled by fetchAndUpdateUSDCLPRate
     //     const rate = parseFloat(usdClpRateInput.value);
@@ -1041,6 +1080,21 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBudgetsTable();
         renderBudgetSummaryTable();
     });
+
+    if (creditCardForm) {
+        creditCardForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = creditCardNameInput.value.trim();
+            const cutoff = parseInt(creditCardCutoffInput.value, 10);
+            if (!name) { alert('Ingresa nombre de tarjeta'); return; }
+            if (isNaN(cutoff) || cutoff < 1 || cutoff > 31) { alert('Día de corte inválido'); return; }
+            if (!currentBackupData.credit_cards) currentBackupData.credit_cards = [];
+            currentBackupData.credit_cards.push({ name: name, cutoff_day: cutoff });
+            creditCardNameInput.value = '';
+            creditCardCutoffInput.value = '';
+            renderCreditCards();
+        });
+    }
 
     // --- LÓGICA PESTAÑA INGRESOS ---
     incomeOngoingCheckbox.addEventListener('change', () => {
@@ -1230,6 +1284,9 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseEndDateInput.disabled = isUnico || expenseOngoingCheckbox.checked;
         if (isUnico) { expenseOngoingCheckbox.checked = false; expenseEndDateInput.value = ''; }
     });
+    expensePaymentMethodSelect.addEventListener('change', () => {
+        expenseCreditCardContainer.style.display = expensePaymentMethodSelect.value === 'Credito' ? 'block' : 'none';
+    });
     function populateExpenseCategoriesDropdowns() {
         const selects = [expenseCategorySelect, budgetCategorySelect];
         selects.forEach(select => {
@@ -1317,7 +1374,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (endDate && startDate && endDate < startDate) { alert("Fecha de fin no puede ser anterior a fecha de inicio."); return; }
 
         const expenseType = currentBackupData.expense_categories[category] || "Variable";
-        const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal };
+        const movementDate = expenseMovementDateInput.value ? new Date(expenseMovementDateInput.value + 'T00:00:00Z') : startDate;
+        const paymentMethod = expensePaymentMethodSelect.value;
+        const creditCard = paymentMethod === 'Credito' ? expenseCreditCardSelect.value : null;
+        const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal, movement_date: movementDate, payment_method: paymentMethod, credit_card: creditCard };
 
         if (editingExpenseIndex !== null) {
             currentBackupData.expenses[editingExpenseIndex] = expenseEntry;
@@ -1339,6 +1399,8 @@ document.addEventListener('DOMContentLoaded', () => {
     expenseEndDateInput.disabled = true; 
     expenseEndDateInput.value = '';
     expenseIsRealCheckbox.checked = false;
+    expensePaymentMethodSelect.value = 'Efectivo';
+    expenseCreditCardContainer.style.display = 'none';
 
     // ... (rest of the function, e.g., setting default category, button text, etc.)
         if (expenseCategorySelect.options.length > 0 && expenseCategorySelect.value === "") {
@@ -1348,7 +1410,9 @@ document.addEventListener('DOMContentLoaded', () => {
     addExpenseButton.textContent = 'Agregar Gasto'; 
     cancelEditExpenseButton.style.display = 'none';
         editingExpenseIndex = null;
-        expenseStartDateInput.value = getISODateString(currentBackupData && currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
+        const defaultDate = getISODateString(currentBackupData && currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
+        expenseMovementDateInput.value = defaultDate;
+        expenseStartDateInput.value = defaultDate;
         updateRemoveCategoryButtonState();
     }
     cancelEditExpenseButton.addEventListener('click', resetExpenseForm);
@@ -1369,6 +1433,7 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$');
             row.insertCell().textContent = expense.category;
             row.insertCell().textContent = expense.frequency;
+            row.insertCell().textContent = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A');
             row.insertCell().textContent = expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A';
             row.insertCell().textContent = expense.end_date ? getISODateString(new Date(expense.end_date)) : (expense.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
             row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
@@ -1384,8 +1449,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const expense = currentBackupData.expenses[index];
         expenseNameInput.value = expense.name; expenseAmountInput.value = expense.amount;
         expenseCategorySelect.value = expense.category; expenseFrequencySelect.value = expense.frequency;
+        expenseMovementDateInput.value = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : '');
         expenseStartDateInput.value = expense.start_date ? getISODateString(new Date(expense.start_date)) : '';
         expenseIsRealCheckbox.checked = expense.is_real || false;
+        expensePaymentMethodSelect.value = expense.payment_method || 'Efectivo';
+        expenseCreditCardContainer.style.display = expensePaymentMethodSelect.value === 'Credito' ? 'block' : 'none';
+        if (expense.credit_card) expenseCreditCardSelect.value = expense.credit_card;
         const isUnico = expense.frequency === 'Único';
         expenseOngoingCheckbox.disabled = isUnico;
         if (isUnico) {
