@@ -1043,9 +1043,16 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBudgetSummaryTable();
     });
 
+    function cleanNumericSeparators(text) {
+        return text.replace(/\.(?=\d{3}(?:[^\d]|$))/g, '');
+    }
+
     function tableToCSV(table) {
         const rows = Array.from(table.querySelectorAll('tr'));
-        return rows.map(row => Array.from(row.children).map(cell => cell.innerText.replace(/\n/g, ' ').trim()).join(';')).join('\n');
+        return rows.map(row => Array.from(row.children).map(cell => {
+            const cleaned = cell.innerText.replace(/\n/g, ' ').trim();
+            return cleanNumericSeparators(cleaned);
+        }).join(';')).join('\n');
     }
 
     function generateLogCSV() {
