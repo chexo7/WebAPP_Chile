@@ -25,7 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- ELEMENTOS PESTAÑA AJUSTES ---
     const settingsForm = document.getElementById('settings-form');
-    const analysisPeriodicitySelect = document.getElementById('analysis-periodicity-select');
     const analysisDurationInput = document.getElementById('analysis-duration-input');
     const analysisDurationLabel = document.getElementById('analysis-duration-label');
     const analysisStartDateInput = document.getElementById('analysis-start-date-input');
@@ -88,9 +87,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentPaymentViewDate = new Date();
 
     // --- ELEMENTOS PESTAÑA FLUJO DE CAJA ---
-    const cashflowTableBody = document.querySelector('#cashflow-table tbody');
-    const cashflowTableHead = document.querySelector('#cashflow-table thead');
-    const cashflowTitle = document.getElementById('cashflow-title');
+    const cashflowMensualTableBody = document.querySelector('#cashflow-mensual-table tbody');
+    const cashflowMensualTableHead = document.querySelector('#cashflow-mensual-table thead');
+    const cashflowMensualTitle = document.getElementById('cashflow-mensual-title');
+
+    const cashflowSemanalTableBody = document.querySelector('#cashflow-semanal-table tbody');
+    const cashflowSemanalTableHead = document.querySelector('#cashflow-semanal-table thead');
+    const cashflowSemanalTitle = document.getElementById('cashflow-semanal-title');
 
     // --- ELEMENTOS PESTAÑA GRÁFICO ---
     const cashflowChartCanvas = document.getElementById('cashflow-chart');
@@ -102,6 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let chartZoomMode = false;
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
     let fullChartData = null;
+    let activeCashflowPeriodicity = 'Mensual';
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -274,9 +278,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function clearAllDataViews() {
-        if (cashflowTableHead) cashflowTableHead.innerHTML = '';
-        if (cashflowTableBody) cashflowTableBody.innerHTML = '';
-        if (cashflowTitle) cashflowTitle.textContent = 'Flujo de Caja';
+        if (cashflowMensualTableHead) cashflowMensualTableHead.innerHTML = '';
+        if (cashflowMensualTableBody) cashflowMensualTableBody.innerHTML = '';
+        if (cashflowSemanalTableHead) cashflowSemanalTableHead.innerHTML = '';
+        if (cashflowSemanalTableBody) cashflowSemanalTableBody.innerHTML = '';
+        if (cashflowMensualTitle) cashflowMensualTitle.textContent = 'Flujo de Caja - Mensual';
+        if (cashflowSemanalTitle) cashflowSemanalTitle.textContent = 'Flujo de Caja - Semanal';
         if (incomesTableView) incomesTableView.innerHTML = '';
         if (expensesTableView) expensesTableView.innerHTML = '';
         if (budgetsTableView) budgetsTableView.innerHTML = '';
@@ -962,7 +969,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeContent) activeContent.classList.add('active');
         if (activeButton) activeButton.classList.add('active');
 
-        if (tabId === 'flujo-caja' || tabId === 'grafico') renderCashflowTable();
+        if (tabId === 'flujo-caja-mensual') { activeCashflowPeriodicity = 'Mensual'; renderCashflowTable(); }
+        if (tabId === 'flujo-caja-semanal') { activeCashflowPeriodicity = 'Semanal'; renderCashflowTable(); }
+        if (tabId === 'grafico') renderCashflowTable();
         if (tabId === 'presupuestos') { renderBudgetsTable(); renderBudgetSummaryTable(); }
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); renderPaymentsTableForCurrentPeriod(); }
         if (tabId === 'ajustes') {
@@ -1000,7 +1009,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function populateSettingsForm() {
         if (!currentBackupData) return;
-        analysisPeriodicitySelect.value = currentBackupData.analysis_periodicity || "Mensual";
         analysisDurationInput.value = currentBackupData.analysis_duration || 12;
         analysisStartDateInput.value = getISODateString(currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
         analysisInitialBalanceInput.value = currentBackupData.analysis_initial_balance || 0;
@@ -1009,9 +1017,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // updateUsdClpInfoLabel(); // This will be handled by fetchAndUpdateUSDCLPRate
         updateAnalysisDurationLabel();
     }
-    analysisPeriodicitySelect.addEventListener('change', updateAnalysisDurationLabel);
     function updateAnalysisDurationLabel() {
-        analysisDurationLabel.textContent = analysisPeriodicitySelect.value === "Semanal" ? "Duración (Semanas):" : "Duración (Meses):";
+        analysisDurationLabel.textContent = "Duración (Meses):";
     }
     // usdClpRateInput.addEventListener('input', updateUsdClpInfoLabel); // No longer used
     // function updateUsdClpInfoLabel() { // No longer used, handled by fetchAndUpdateUSDCLPRate
@@ -1020,23 +1027,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // }
     applySettingsButton.addEventListener('click', () => {
         if (!currentBackupData) { alert("No hay datos cargados para aplicar ajustes."); return; }
-        const prevPeriodicity = currentBackupData.analysis_periodicity;
-        const newPeriodicity = analysisPeriodicitySelect.value;
-
-        currentBackupData.analysis_periodicity = newPeriodicity;
         currentBackupData.analysis_duration = parseInt(analysisDurationInput.value, 10);
         currentBackupData.analysis_start_date = new Date(analysisStartDateInput.value + 'T00:00:00Z');
         currentBackupData.analysis_initial_balance = parseFloat(analysisInitialBalanceInput.value);
         currentBackupData.display_currency_symbol = displayCurrencySymbolInput.value.trim() || "$";
         // currentBackupData.usd_clp_rate = parseFloat(usdClpRateInput.value) || null; // No longer stored
 
-        if (prevPeriodicity !== newPeriodicity) {
-            const prevDefaultDuration = (prevPeriodicity === "Mensual") ? 12 : 52;
-            if (currentBackupData.analysis_duration === prevDefaultDuration) {
-                currentBackupData.analysis_duration = (newPeriodicity === "Mensual") ? 12 : 52;
-                analysisDurationInput.value = currentBackupData.analysis_duration;
-            }
-        }
         updateAnalysisDurationLabel();
         alert("Ajustes aplicados. El flujo de caja y el gráfico se recalcularán.");
         renderCashflowTable();
@@ -1615,40 +1611,143 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- LÓGICA PESTAÑA FLUJO DE CAJA ---
     function renderCashflowTable() {
-        if (!currentBackupData || !cashflowTableBody || !cashflowTableHead) return;
-        cashflowTableHead.innerHTML = ''; cashflowTableBody.innerHTML = '';
-        let analysisStartDateObj = currentBackupData.analysis_start_date;
-        if (typeof analysisStartDateObj === 'string') analysisStartDateObj = new Date(analysisStartDateObj + 'T00:00:00Z');
-        if (!(analysisStartDateObj instanceof Date) || isNaN(analysisStartDateObj)) { cashflowTableBody.innerHTML = '<tr><td colspan="2">Error: Fecha de inicio inválida.</td></tr>'; return; }
-        const tempCalcData = { ...currentBackupData, analysis_start_date: analysisStartDateObj, incomes: (currentBackupData.incomes || []).map(inc => ({ ...inc, start_date: inc.start_date ? new Date(inc.start_date) : null, end_date: inc.end_date ? new Date(inc.end_date) : null })), expenses: (currentBackupData.expenses || []).map(exp => ({ ...exp, start_date: exp.start_date ? new Date(exp.start_date) : null, end_date: exp.end_date ? new Date(exp.end_date) : null })), };
+        renderCashflowTableFor('Mensual', cashflowMensualTableHead, cashflowMensualTableBody, cashflowMensualTitle);
+        renderCashflowTableFor('Semanal', cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle);
+    }
+
+    function renderCashflowTableFor(periodicity, tableHeadEl, tableBodyEl, titleEl) {
+        if (!currentBackupData || !tableBodyEl || !tableHeadEl) return;
+        tableHeadEl.innerHTML = '';
+        tableBodyEl.innerHTML = '';
+
+        let baseStartDate = currentBackupData.analysis_start_date;
+        if (typeof baseStartDate === 'string') baseStartDate = new Date(baseStartDate + 'T00:00:00Z');
+        if (!(baseStartDate instanceof Date) || isNaN(baseStartDate)) {
+            tableBodyEl.innerHTML = '<tr><td colspan="2">Error: Fecha de inicio inválida.</td></tr>';
+            return;
+        }
+
+        const monthStart = new Date(Date.UTC(baseStartDate.getUTCFullYear(), baseStartDate.getUTCMonth(), 1));
+        let analysisStart = monthStart;
+        let duration = currentBackupData.analysis_duration;
+
+        if (periodicity === 'Semanal') {
+            analysisStart = getPeriodStartDate(monthStart, 'Semanal');
+            const endOfLastMonth = getPeriodEndDate(addMonths(monthStart, duration - 1), 'Mensual');
+            duration = 0; let d = new Date(analysisStart);
+            while (d <= endOfLastMonth) { duration++; d = addWeeks(d, 1); }
+        }
+
+        const tempCalcData = {
+            ...currentBackupData,
+            analysis_start_date: analysisStart,
+            analysis_duration: duration,
+            analysis_periodicity: periodicity,
+            incomes: (currentBackupData.incomes || []).map(inc => ({
+                ...inc,
+                start_date: inc.start_date ? new Date(inc.start_date) : null,
+                end_date: inc.end_date ? new Date(inc.end_date) : null
+            })),
+            expenses: (currentBackupData.expenses || []).map(exp => ({
+                ...exp,
+                start_date: exp.start_date ? new Date(exp.start_date) : null,
+                end_date: exp.end_date ? new Date(exp.end_date) : null
+            }))
+        };
+
         const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData);
-        if (!periodDates || periodDates.length === 0) { cashflowTableBody.innerHTML = '<tr><td colspan="2">No hay datos para el período.</td></tr>'; if (cashflowChartInstance) cashflowChartInstance.destroy(); cashflowChartInstance = null; if (chartMessage) chartMessage.textContent = "No hay datos para graficar."; return; }
-        const symbol = currentBackupData.display_currency_symbol || "$"; const periodicity = currentBackupData.analysis_periodicity; const initialBalance = parseFloat(currentBackupData.analysis_initial_balance);
-        const startQDate = analysisStartDateObj; const startStr = `${('0' + startQDate.getUTCDate()).slice(-2)}/${('0' + (startQDate.getUTCMonth() + 1)).slice(-2)}/${startQDate.getUTCFullYear()}`;
-        const durationUnit = periodicity === "Semanal" ? "Semanas" : "Meses"; cashflowTitle.textContent = `Proyección Flujo de Caja (${currentBackupData.analysis_duration} ${durationUnit} desde ${startStr})`;
-        const headerRow = cashflowTableHead.insertRow(); const thConcept = document.createElement('th'); thConcept.textContent = 'Categoría / Concepto'; headerRow.appendChild(thConcept);
-        periodDates.forEach(d => { const th = document.createElement('th'); if (periodicity === "Semanal") { const [year, week] = getWeekNumber(d); const mondayOfWeek = getMondayOfWeek(year, week); th.innerHTML = `Sem ${week} (${DATE_WEEK_START_FORMAT(mondayOfWeek)})<br>${year}`; } else { th.innerHTML = `${MONTH_NAMES_ES[d.getUTCMonth()]}<br>${d.getUTCFullYear()}`; } headerRow.appendChild(th); });
-        const cf_row_definitions = [{ key: 'START_BALANCE', label: "Saldo Inicial", isBold: true, isHeaderBg: true }, { key: 'NET_INCOME', label: "Ingreso Total Neto", isBold: true },];
-        const fixedCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === "Fijo").sort() : [];
-        const variableCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === "Variable").sort() : [];
-        fixedCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat })); cf_row_definitions.push({ key: 'FIXED_EXP_TOTAL', label: "Total Gastos Fijos", isBold: true, isHeaderBg: true });
-        variableCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat })); cf_row_definitions.push({ key: 'VAR_EXP_TOTAL', label: "Total Gastos Variables", isBold: true, isHeaderBg: true });
-        cf_row_definitions.push({ key: 'NET_FLOW', label: "Flujo Neto del Período", isBold: true }); cf_row_definitions.push({ key: 'END_BALANCE', label: "Saldo Final Estimado", isBold: true, isHeaderBg: true });
+
+        if (!periodDates || periodDates.length === 0) {
+            tableBodyEl.innerHTML = '<tr><td colspan="2">No hay datos para el período.</td></tr>';
+            if (cashflowChartInstance && periodicity === activeCashflowPeriodicity) {
+                cashflowChartInstance.destroy();
+                cashflowChartInstance = null;
+            }
+            if (chartMessage && periodicity === activeCashflowPeriodicity) chartMessage.textContent = "No hay datos para graficar.";
+            return;
+        }
+
+        const symbol = currentBackupData.display_currency_symbol || "$";
+        const initialBalance = parseFloat(currentBackupData.analysis_initial_balance);
+        const startQDate = analysisStart;
+        const startStr = `${('0' + startQDate.getUTCDate()).slice(-2)}/${('0' + (startQDate.getUTCMonth() + 1)).slice(-2)}/${startQDate.getUTCFullYear()}`;
+        titleEl.textContent = `Proyección Flujo de Caja ${periodicity} (${currentBackupData.analysis_duration} Meses desde ${startStr})`;
+
+        const headerRow = tableHeadEl.insertRow();
+        const thConcept = document.createElement('th');
+        thConcept.textContent = 'Categoría / Concepto';
+        headerRow.appendChild(thConcept);
+
+        periodDates.forEach(d => {
+            const th = document.createElement('th');
+            if (periodicity === 'Semanal') {
+                const [year, week] = getWeekNumber(d);
+                const mondayOfWeek = getMondayOfWeek(year, week);
+                th.innerHTML = `Sem ${week} (${DATE_WEEK_START_FORMAT(mondayOfWeek)})<br>${year}`;
+            } else {
+                th.innerHTML = `${MONTH_NAMES_ES[d.getUTCMonth()]}<br>${d.getUTCFullYear()}`;
+            }
+            headerRow.appendChild(th);
+        });
+
+        const cf_row_definitions = [
+            { key: 'START_BALANCE', label: 'Saldo Inicial', isBold: true, isHeaderBg: true },
+            { key: 'NET_INCOME', label: 'Ingreso Total Neto', isBold: true }
+        ];
+        const fixedCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === 'Fijo').sort() : [];
+        const variableCategories = currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories).filter(cat => currentBackupData.expense_categories[cat] === 'Variable').sort() : [];
+        fixedCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat }));
+        cf_row_definitions.push({ key: 'FIXED_EXP_TOTAL', label: 'Total Gastos Fijos', isBold: true, isHeaderBg: true });
+        variableCategories.forEach(cat => cf_row_definitions.push({ key: `CAT_${cat}`, label: cat, isIndent: true, category: cat }));
+        cf_row_definitions.push({ key: 'VAR_EXP_TOTAL', label: 'Total Gastos Variables', isBold: true, isHeaderBg: true });
+        cf_row_definitions.push({ key: 'NET_FLOW', label: 'Flujo Neto del Período', isBold: true });
+        cf_row_definitions.push({ key: 'END_BALANCE', label: 'Saldo Final Estimado', isBold: true, isHeaderBg: true });
+
         cf_row_definitions.forEach((def, rowIndex) => {
-            const tr = cashflowTableBody.insertRow(); const tdLabel = tr.insertCell(); tdLabel.textContent = def.isIndent ? `  ${def.label}` : def.label;
-            if (def.isBold) tdLabel.classList.add('bold'); if (def.isHeaderBg) tr.classList.add('bg-header'); else if (rowIndex % 2 !== 0 && !def.isHeaderBg) tr.classList.add('bg-alt-row');
+            const tr = tableBodyEl.insertRow();
+            const tdLabel = tr.insertCell();
+            tdLabel.textContent = def.isIndent ? `  ${def.label}` : def.label;
+            if (def.isBold) tdLabel.classList.add('bold');
+            if (def.isHeaderBg) tr.classList.add('bg-header');
+            else if (rowIndex % 2 !== 0 && !def.isHeaderBg) tr.classList.add('bg-alt-row');
+
             for (let i = 0; i < periodDates.length; i++) {
-                const tdValue = tr.insertCell(); let value; let colorClass = '';
+                const tdValue = tr.insertCell();
+                let value; let colorClass = '';
                 switch (def.key) {
-                    case 'START_BALANCE': value = (i === 0) ? initialBalance : end_bal_p[i - 1]; break; case 'NET_INCOME': value = income_p[i]; break;
-                    case 'FIXED_EXP_TOTAL': value = -fixed_exp_p[i]; break; case 'VAR_EXP_TOTAL': value = -var_exp_p[i]; break;
-                    case 'NET_FLOW': value = net_flow_p[i]; break; case 'END_BALANCE': value = end_bal_p[i]; colorClass = value >= 0 ? 'text-blue' : 'text-red'; break;
-                    default: value = (def.category && expenses_by_cat_p[i]) ? -(expenses_by_cat_p[i][def.category] || 0) : 0;
+                    case 'START_BALANCE':
+                        value = (i === 0) ? initialBalance : end_bal_p[i - 1];
+                        break;
+                    case 'NET_INCOME':
+                        value = income_p[i];
+                        break;
+                    case 'FIXED_EXP_TOTAL':
+                        value = -fixed_exp_p[i];
+                        break;
+                    case 'VAR_EXP_TOTAL':
+                        value = -var_exp_p[i];
+                        break;
+                    case 'NET_FLOW':
+                        value = net_flow_p[i];
+                        break;
+                    case 'END_BALANCE':
+                        value = end_bal_p[i];
+                        colorClass = value >= 0 ? 'text-blue' : 'text-red';
+                        break;
+                    default:
+                        value = (def.category && expenses_by_cat_p[i]) ? -(expenses_by_cat_p[i][def.category] || 0) : 0;
                 }
-                tdValue.textContent = formatCurrencyJS(value, symbol); if (colorClass) tdValue.classList.add(colorClass); if (def.isBold) tdValue.classList.add('bold');
+                tdValue.textContent = formatCurrencyJS(value, symbol);
+                if (colorClass) tdValue.classList.add(colorClass);
+                if (def.isBold) tdValue.classList.add('bold');
             }
         });
-        renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p); renderBudgetSummaryTable();
+
+        if (periodicity === activeCashflowPeriodicity) {
+            renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p);
+        }
+
+        renderBudgetSummaryTable();
     }
 
     function calculateCashFlowData(data) {
@@ -1998,7 +2097,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
         if (!periodDates || periodDates.length === 0) { if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
         if (chartMessage) chartMessage.textContent = "";
-        const labels = periodDates.map(date => currentBackupData.analysis_periodicity === "Semanal" ? `Sem ${getWeekNumber(date)[1]} ${getWeekNumber(date)[0]}` : `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`);
+        const labels = periodDates.map(date => activeCashflowPeriodicity === 'Semanal' ? `Sem ${getWeekNumber(date)[1]} ${getWeekNumber(date)[0]}` : `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`);
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
             type: 'line',
             data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
