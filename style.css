@@ -367,8 +367,12 @@ td.reimbursement-income {
 
 
 /* Contenedor de flujo de caja */
-#cashflow-container { margin-top: 20px; padding: 0; }
-#cashflow-title { text-align: center; margin-bottom: 15px; color: var(--text-color); font-size: 1.6rem; }
+#cashflow-container,
+#cashflow-mensual-container,
+#cashflow-semanal-container { margin-top: 20px; padding: 0; }
+#cashflow-title,
+#cashflow-mensual-title,
+#cashflow-semanal-title { text-align: center; margin-bottom: 15px; color: var(--text-color); font-size: 1.6rem; }
 
 /* Tabla responsive (Flujo de Caja) */
 .table-responsive {
@@ -379,21 +383,27 @@ td.reimbursement-income {
   box-shadow: var(--shadow);
 }
 
-#cashflow-table {
+#cashflow-table,
+#cashflow-mensual-table,
+#cashflow-semanal-table {
   width: 100%;
   min-width: 600px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.76rem;
 }
-#cashflow-table th, #cashflow-table td {
+#cashflow-table th, #cashflow-table td,
+#cashflow-mensual-table th, #cashflow-mensual-table td,
+#cashflow-semanal-table th, #cashflow-semanal-table td {
   padding: 10px 12px;
   text-align: left;
   border-bottom: 1px solid var(--border-color);
   white-space: nowrap;
   background-color: var(--card-bg);
 }
-#cashflow-table thead th {
+#cashflow-table thead th,
+#cashflow-mensual-table thead th,
+#cashflow-semanal-table thead th {
   background-color: var(--header-bg);
   color: var(--primary-color);
   font-weight: 600;
@@ -403,16 +413,24 @@ td.reimbursement-income {
   z-index: 10;
 }
 #cashflow-table th:first-child,
-#cashflow-table td:first-child {
+#cashflow-table td:first-child,
+#cashflow-mensual-table th:first-child,
+#cashflow-mensual-table td:first-child,
+#cashflow-semanal-table th:first-child,
+#cashflow-semanal-table td:first-child {
   position: sticky;
   left: 0;
 }
-#cashflow-table thead th:first-child {
+#cashflow-table thead th:first-child,
+#cashflow-mensual-table thead th:first-child,
+#cashflow-semanal-table thead th:first-child {
   text-align: left;
   z-index: 11;
   background-color: var(--header-bg);
 }
-#cashflow-table tbody td:first-child {
+#cashflow-table tbody td:first-child,
+#cashflow-mensual-table tbody td:first-child,
+#cashflow-semanal-table tbody td:first-child {
   font-weight: 500;
   z-index: 9;
   background-color: var(--card-bg);
@@ -420,19 +438,33 @@ td.reimbursement-income {
 
 /* Estilos para filas especiales en Flujo de Caja */
 #cashflow-table tbody tr.bg-alt-row td,
-#cashflow-table tbody tr.bg-alt-row td:first-child {
+#cashflow-table tbody tr.bg-alt-row td:first-child,
+#cashflow-mensual-table tbody tr.bg-alt-row td,
+#cashflow-mensual-table tbody tr.bg-alt-row td:first-child,
+#cashflow-semanal-table tbody tr.bg-alt-row td,
+#cashflow-semanal-table tbody tr.bg-alt-row td:first-child {
   background-color: var(--alt-row-bg) !important;
 }
 #cashflow-table tbody tr.bg-header td,
-#cashflow-table tbody tr.bg-header td:first-child {
+#cashflow-table tbody tr.bg-header td:first-child,
+#cashflow-mensual-table tbody tr.bg-header td,
+#cashflow-mensual-table tbody tr.bg-header td:first-child,
+#cashflow-semanal-table tbody tr.bg-header td,
+#cashflow-semanal-table tbody tr.bg-header td:first-child {
   background-color: var(--body-header-row-bg) !important;
 }
 #cashflow-table tbody tr:not(.bg-header):hover td,
-#cashflow-table tbody tr:not(.bg-header):hover td:first-child {
+#cashflow-table tbody tr:not(.bg-header):hover td:first-child,
+#cashflow-mensual-table tbody tr:not(.bg-header):hover td,
+#cashflow-mensual-table tbody tr:not(.bg-header):hover td:first-child,
+#cashflow-semanal-table tbody tr:not(.bg-header):hover td,
+#cashflow-semanal-table tbody tr:not(.bg-header):hover td:first-child {
   background-color: var(--row-hover-bg) !important;
 }
 
-#cashflow-table td:not(:first-child) {
+#cashflow-table td:not(:first-child),
+#cashflow-mensual-table td:not(:first-child),
+#cashflow-semanal-table td:not(:first-child) {
   text-align: right;
   font-family: 'Consolas', monospace;
 }
