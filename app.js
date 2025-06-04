@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const displayCurrencySymbolInput = document.getElementById('display-currency-symbol-input');
     const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
+    const downloadCsvButton = document.getElementById('download-csv-button');
 
     // --- ELEMENTOS PESTAÑA INGRESOS ---
     const incomeForm = document.getElementById('income-form');
@@ -1041,6 +1042,78 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBudgetsTable();
         renderBudgetSummaryTable();
     });
+
+    function tableToCSV(table) {
+        const rows = Array.from(table.querySelectorAll('tr'));
+        return rows.map(row => Array.from(row.children).map(cell => cell.innerText.replace(/\n/g, ' ').trim()).join(';')).join('\n');
+    }
+
+    function generateLogCSV() {
+        if (!Array.isArray(changeLogEntries) || changeLogEntries.length === 0) return '';
+        let csv = 'Fecha;Usuario;Mensaje;Detalles\n';
+        changeLogEntries.forEach(entry => {
+            const date = new Date(entry.timestamp);
+            const details = (entry.details || []).join(' | ');
+            csv += `[${date.toLocaleDateString('es-CL')} ${date.toLocaleTimeString('es-CL')}]` + ';' + (entry.user || '') + ';' + (entry.message || '') + ';' + details + '\n';
+        });
+        return csv.trim();
+    }
+
+    function downloadAllDataAsCSV() {
+        if (!currentBackupData) { alert('No hay datos para exportar.'); return; }
+        renderIncomesTable();
+        renderExpensesTable();
+        renderCashflowTable();
+        renderPaymentsTableForCurrentPeriod();
+        renderLogTab();
+
+        let csvSections = [];
+        const incomesTable = document.querySelector('#incomes-table-view');
+        if (incomesTable) {
+            csvSections.push('Ingresos');
+            csvSections.push(tableToCSV(incomesTable.closest('table')));
+        }
+        const expensesTable = document.querySelector('#expenses-table-view');
+        if (expensesTable) {
+            csvSections.push('');
+            csvSections.push('Gastos');
+            csvSections.push(tableToCSV(expensesTable.closest('table')));
+        }
+        const cfMensualTable = document.querySelector('#cashflow-mensual-table');
+        if (cfMensualTable) {
+            csvSections.push('');
+            csvSections.push('Flujo de Caja - Mensual');
+            csvSections.push(tableToCSV(cfMensualTable));
+        }
+        const cfSemanalTable = document.querySelector('#cashflow-semanal-table');
+        if (cfSemanalTable) {
+            csvSections.push('');
+            csvSections.push('Flujo de Caja - Semanal');
+            csvSections.push(tableToCSV(cfSemanalTable));
+        }
+        const paymentsTable = document.querySelector('#payments-table-view');
+        if (paymentsTable) {
+            csvSections.push('');
+            csvSections.push('Registro de Pagos');
+            csvSections.push(tableToCSV(paymentsTable.closest('table')));
+        }
+        const logCSV = generateLogCSV();
+        if (logCSV) {
+            csvSections.push('');
+            csvSections.push('Log de Cambios');
+            csvSections.push(logCSV);
+        }
+
+        const csvContent = '\ufeff' + csvSections.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'datos_financieros.csv';
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }
+
+    if (downloadCsvButton) downloadCsvButton.addEventListener('click', downloadAllDataAsCSV);
 
     // --- LÓGICA PESTAÑA INGRESOS ---
     incomeOngoingCheckbox.addEventListener('change', () => {
