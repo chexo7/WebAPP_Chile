@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const creditCardForm = document.getElementById('credit-card-form');
     const creditCardNameInput = document.getElementById('credit-card-name');
     const creditCardCutoffInput = document.getElementById('credit-card-cutoff');
+    const creditCardPaymentDayInput = document.getElementById('credit-card-payment-day');
     const creditCardsList = document.getElementById('credit-cards-list');
 
     // --- ELEMENTOS PESTAÑA INGRESOS ---
@@ -498,6 +499,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         else exp.movement_date = exp.start_date;
                         if (!exp.payment_method) exp.payment_method = 'Efectivo';
                     });
+                    if (Array.isArray(currentBackupData.credit_cards)) {
+                        currentBackupData.credit_cards.forEach(card => {
+                            card.cutoff_day = parseInt(card.cutoff_day, 10) || 1;
+                            card.payment_day = parseInt(card.payment_day, 10) || 1;
+                        });
+                    } else {
+                        currentBackupData.credit_cards = [];
+                    }
 
                     originalLoadedData = JSON.parse(JSON.stringify(currentBackupData));
 
@@ -1042,7 +1051,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentBackupData.credit_cards) currentBackupData.credit_cards = [];
         currentBackupData.credit_cards.forEach((card, idx) => {
             const li = document.createElement('li');
-            li.textContent = `${card.name} (corte ${card.cutoff_day})`;
+            li.textContent = `${card.name} (corte ${card.cutoff_day}, paga día ${card.payment_day || 1})`;
             creditCardsList.appendChild(li);
         });
         populateExpenseCreditCardDropdown();
@@ -1058,6 +1067,37 @@ document.addEventListener('DOMContentLoaded', () => {
             option.textContent = card.name;
             expenseCreditCardSelect.appendChild(option);
         });
+    }
+
+    function calculateCreditCardPaymentDate(movDate, cutoffDay, paymentDay) {
+        const cutoff = parseInt(cutoffDay, 10) || 1;
+        const payDay = parseInt(paymentDay, 10) || 1;
+        let cycleEnd = new Date(Date.UTC(movDate.getUTCFullYear(), movDate.getUTCMonth(), cutoff));
+        if (movDate.getUTCDate() > cutoff) {
+            cycleEnd.setUTCMonth(cycleEnd.getUTCMonth() + 1);
+        }
+        const paymentMonth = new Date(Date.UTC(cycleEnd.getUTCFullYear(), cycleEnd.getUTCMonth() + 1, 1));
+        const daysInPayMonth = getDaysInMonth(paymentMonth.getUTCFullYear(), paymentMonth.getUTCMonth());
+        paymentMonth.setUTCDate(Math.min(payDay, daysInPayMonth));
+        return paymentMonth;
+    }
+
+    function updateExpensePaymentDate() {
+        const movValue = expenseMovementDateInput.value;
+        if (!movValue) { expenseStartDateInput.value = ''; return; }
+        const movDate = new Date(movValue + 'T00:00:00Z');
+        if (expensePaymentMethodSelect.value === 'Efectivo') {
+            expenseStartDateInput.value = movValue;
+        } else {
+            const cardName = expenseCreditCardSelect.value;
+            const card = currentBackupData && currentBackupData.credit_cards ? currentBackupData.credit_cards.find(c => c.name === cardName) : null;
+            if (card) {
+                const payDate = calculateCreditCardPaymentDate(movDate, card.cutoff_day, card.payment_day);
+                expenseStartDateInput.value = getISODateString(payDate);
+            } else {
+                expenseStartDateInput.value = movValue;
+            }
+        }
     }
     // usdClpRateInput.addEventListener('input', updateUsdClpInfoLabel); // No longer used
     // function updateUsdClpInfoLabel() { // No longer used, handled by fetchAndUpdateUSDCLPRate
@@ -1086,12 +1126,15 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const name = creditCardNameInput.value.trim();
             const cutoff = parseInt(creditCardCutoffInput.value, 10);
+            const payDay = parseInt(creditCardPaymentDayInput.value, 10);
             if (!name) { alert('Ingresa nombre de tarjeta'); return; }
             if (isNaN(cutoff) || cutoff < 1 || cutoff > 31) { alert('Día de corte inválido'); return; }
+            if (isNaN(payDay) || payDay < 1 || payDay > 31) { alert('Día de pago inválido'); return; }
             if (!currentBackupData.credit_cards) currentBackupData.credit_cards = [];
-            currentBackupData.credit_cards.push({ name: name, cutoff_day: cutoff });
+            currentBackupData.credit_cards.push({ name: name, cutoff_day: cutoff, payment_day: payDay });
             creditCardNameInput.value = '';
             creditCardCutoffInput.value = '';
+            creditCardPaymentDayInput.value = '';
             renderCreditCards();
         });
     }
@@ -1286,7 +1329,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     expensePaymentMethodSelect.addEventListener('change', () => {
         expenseCreditCardContainer.style.display = expensePaymentMethodSelect.value === 'Credito' ? 'block' : 'none';
+        updateExpensePaymentDate();
     });
+    expenseMovementDateInput.addEventListener('change', updateExpensePaymentDate);
+    expenseCreditCardSelect.addEventListener('change', updateExpensePaymentDate);
     function populateExpenseCategoriesDropdowns() {
         const selects = [expenseCategorySelect, budgetCategorySelect];
         selects.forEach(select => {
@@ -1412,7 +1458,7 @@ document.addEventListener('DOMContentLoaded', () => {
         editingExpenseIndex = null;
         const defaultDate = getISODateString(currentBackupData && currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
         expenseMovementDateInput.value = defaultDate;
-        expenseStartDateInput.value = defaultDate;
+        updateExpensePaymentDate();
         updateRemoveCategoryButtonState();
     }
     cancelEditExpenseButton.addEventListener('click', resetExpenseForm);
@@ -1466,6 +1512,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         addExpenseButton.textContent = 'Guardar Cambios'; cancelEditExpenseButton.style.display = 'inline-block';
         editingExpenseIndex = index; document.getElementById('gastos').scrollIntoView({ behavior: 'smooth' });
+        updateExpensePaymentDate();
         updateRemoveCategoryButtonState();
     }
     function deleteExpense(index) {
@@ -2483,7 +2530,8 @@ function getMondayOfWeek(year, week) {
     const today = new Date();
     const todayISO = getISODateString(today);
     incomeStartDateInput.value = todayISO;
-    expenseStartDateInput.value = todayISO;
+    expenseMovementDateInput.value = todayISO;
+    updateExpensePaymentDate();
     analysisStartDateInput.value = todayISO;
     incomeEndDateInput.disabled = true;
     expenseEndDateInput.disabled = true;
