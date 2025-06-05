@@ -626,6 +626,19 @@ td.reimbursement-income {
     margin-bottom: 0;
 }
 
+/* Selector de período para gráficos adicionales */
+.chart-period-selector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+.chart-period-selector input,
+.chart-period-selector button {
+    padding: 6px 8px;
+}
+
 /* Estilos para Pestaña Gráfico */
 .chart-container {
     width: 100%;
