@@ -362,8 +362,7 @@ button.button-large {
 
 /* Ajuste de ancho y scroll para columna Nombre en Gastos */
 #expenses-table-view td.expense-name-cell {
-    width: 8ch;
-    max-width: 8ch;
+    /* allow width to adapt to the widest value */
 }
 #expenses-table-view td.expense-name-cell .name-scroll {
     display: block;
