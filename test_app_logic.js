@@ -172,7 +172,7 @@ function calculateCashFlowData(data) {
             const inc_end = inc.end_date; 
             const net_amount = parseFloat(inc.net_monthly || 0); 
             const inc_freq = inc.frequency || "Mensual";
-            const isActiveRange = (inc_start <= p_end && (inc_end === null || inc_end >= p_start)); 
+            const isActiveRange = (inc_start <= p_end && (inc_end == null || inc_end >= p_start));
             if (!isActiveRange) return;
             
             let income_to_add = 0.0;
@@ -190,7 +190,7 @@ function calculateCashFlowData(data) {
                 const actualPaymentDayInPStartMonth = Math.min(itemPaymentDay, daysInPStartMonth);
                 const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
                 if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
-                    if (inc_start <= paymentDateInPStartMonth && (inc_end === null || inc_end >= paymentDateInPStartMonth)) {
+                    if (inc_start <= paymentDateInPStartMonth && (inc_end == null || inc_end >= paymentDateInPStartMonth)) {
                         income_to_add = net_amount;
                         paymentOccurred = true;
                     }
@@ -203,7 +203,7 @@ function calculateCashFlowData(data) {
                         const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
                         const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
                         if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
-                            if (inc_start <= paymentDateInPEndMonth && (inc_end === null || inc_end >= paymentDateInPEndMonth)) {
+                            if (inc_start <= paymentDateInPEndMonth && (inc_end == null || inc_end >= paymentDateInPEndMonth)) {
                                 income_to_add = net_amount;
                             }
                         }
@@ -218,7 +218,7 @@ function calculateCashFlowData(data) {
                     const incomePaymentUTCDay = inc_start.getUTCDay(); 
                     while (dayIterator <= p_end) {
                         if (dayIterator.getUTCDay() === incomePaymentUTCDay) {
-                            if (inc_start <= dayIterator && (inc_end === null || inc_end >= dayIterator)) {
+                            if (inc_start <= dayIterator && (inc_end == null || inc_end >= dayIterator)) {
                                 occurrences++;
                             }
                         }
@@ -256,11 +256,17 @@ function calculateCashFlowData(data) {
                 const diff = new Date(exp.start_date).getTime() - new Date(exp.movement_date).getTime();
                 e_end = new Date(new Date(exp.end_date).getTime() - diff);
             }
-            const amt_raw = parseFloat(exp.amount || 0); 
-            const freq = exp.frequency || "Mensual"; 
+            let amt_raw = parseFloat(exp.amount || 0);
+            const inst = parseInt(exp.installments || 1);
+            let freq = exp.frequency || "Mensual";
+            if (inst > 1 && !useInstant) {
+                freq = "Mensual";
+                amt_raw = amt_raw / inst;
+                e_end = addMonths(new Date(e_start), inst - 1);
+            }
             const cat = exp.category;
             if (amt_raw < 0 || !cat || !orderedCategories.includes(cat)) return;
-            const isActiveRange = (e_start <= p_end && (e_end === null || e_end >= p_start)); 
+            const isActiveRange = (e_start <= p_end && (e_end == null || e_end >= p_start));
             if (!isActiveRange) return;
             
             let exp_add_this_period = 0.0;
@@ -278,7 +284,7 @@ function calculateCashFlowData(data) {
                 const actualPaymentDayInPStartMonth = Math.min(itemPaymentDay, daysInPStartMonth);
                 const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
                 if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
-                    if (e_start <= paymentDateInPStartMonth && (e_end === null || e_end >= paymentDateInPStartMonth)) {
+                    if (e_start <= paymentDateInPStartMonth && (e_end == null || e_end >= paymentDateInPStartMonth)) {
                         exp_add_this_period = amt_raw;
                         paymentOccurred = true;
                     }
@@ -291,7 +297,7 @@ function calculateCashFlowData(data) {
                         const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
                         const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
                         if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
-                            if (e_start <= paymentDateInPEndMonth && (e_end === null || e_end >= paymentDateInPEndMonth)) {
+                            if (e_start <= paymentDateInPEndMonth && (e_end == null || e_end >= paymentDateInPEndMonth)) {
                                 exp_add_this_period = amt_raw;
                             }
                         }
@@ -306,7 +312,7 @@ function calculateCashFlowData(data) {
                     const expensePaymentUTCDay = e_start.getUTCDay();
                     while (dayIterator <= p_end) {
                         if (dayIterator.getUTCDay() === expensePaymentUTCDay) {
-                            if (e_start <= dayIterator && (e_end === null || e_end >= dayIterator)) {
+                            if (e_start <= dayIterator && (e_end == null || e_end >= dayIterator)) {
                                 occurrences++;
                             }
                         }
@@ -343,7 +349,7 @@ function calculateCashFlowData(data) {
             const reimb_freq = reimbInc.frequency || "Mensual";
             const reimb_cat = reimbInc.reimbursement_category;
 
-            const isActiveRange = (reimb_start <= p_end && (reimb_end === null || reimb_end >= p_start));
+            const isActiveRange = (reimb_start <= p_end && (reimb_end == null || reimb_end >= p_start));
             if (!isActiveRange) return;
 
             let amount_of_reimbursement_in_this_period = 0.0;
@@ -361,7 +367,7 @@ function calculateCashFlowData(data) {
                 const actualPaymentDayInPStartMonth = Math.min(itemPaymentDay, daysInPStartMonth);
                 const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
                 if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
-                    if (reimb_start <= paymentDateInPStartMonth && (reimb_end === null || reimb_end >= paymentDateInPStartMonth)) {
+                    if (reimb_start <= paymentDateInPStartMonth && (reimb_end == null || reimb_end >= paymentDateInPStartMonth)) {
                         amount_of_reimbursement_in_this_period = reimb_amount_raw;
                         paymentOccurred = true;
                     }
@@ -374,7 +380,7 @@ function calculateCashFlowData(data) {
                         const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
                         const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
                         if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
-                            if (reimb_start <= paymentDateInPEndMonth && (reimb_end === null || reimb_end >= paymentDateInPEndMonth)) {
+                            if (reimb_start <= paymentDateInPEndMonth && (reimb_end == null || reimb_end >= paymentDateInPEndMonth)) {
                                 amount_of_reimbursement_in_this_period = reimb_amount_raw;
                             }
                         }
@@ -389,7 +395,7 @@ function calculateCashFlowData(data) {
                     const reimbursementPaymentUTCDay = reimb_start.getUTCDay();
                     while (dayIterator <= p_end) {
                         if (dayIterator.getUTCDay() === reimbursementPaymentUTCDay) {
-                            if (reimb_start <= dayIterator && (reimb_end === null || reimb_end >= dayIterator)) {
+                            if (reimb_start <= dayIterator && (reimb_end == null || reimb_end >= dayIterator)) {
                                 occurrences++;
                             }
                         }
@@ -638,6 +644,27 @@ runTest("calculateCashFlowData - Instant Expense Uses Movement Date", () => {
     assertEquals(100, res.var_exp_p[1], "Instant Off - May should be 100");
     res = calculateCashFlowData({ ...dataBase, use_instant_expenses: true });
     assertEquals(100, res.var_exp_p[0], "Instant On - April should be 100");
+});
+
+runTest("calculateCashFlowData - Credit Card Installments", () => {
+    const baseData = {
+        analysis_start_date: new Date(Date.UTC(2024,0,1)),
+        analysis_duration: 4,
+        analysis_periodicity: "Mensual",
+        analysis_initial_balance: 0,
+        expense_categories: { "TestCat": "Variable" },
+        incomes: [],
+        expenses: [
+            { name: "InstPurchase", amount: 90, category: "TestCat", frequency: "Único", start_date: new Date(Date.UTC(2024,1,5)), movement_date: new Date(Date.UTC(2024,0,15)), end_date: null, installments: 3 }
+        ]
+    };
+    let r = calculateCashFlowData({ ...baseData, use_instant_expenses: false });
+    assertEquals(0, r.var_exp_p[0], "Installments - Jan should be 0");
+    assertEquals(30, r.var_exp_p[1], "Installments - Feb should be 30");
+    assertEquals(30, r.var_exp_p[2], "Installments - Mar should be 30");
+    assertEquals(30, r.var_exp_p[3], "Installments - Apr should be 30");
+    r = calculateCashFlowData({ ...baseData, use_instant_expenses: true });
+    assertEquals(90, r.var_exp_p[0], "Instant mode - Jan charged full amount");
 });
 
 runTest("calculateCashFlowData - Scenario 4: Weekly Analysis, Monthly Item", () => {
