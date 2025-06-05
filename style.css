@@ -949,6 +949,10 @@ td.reimbursement-income {
   to { opacity: 1; transform: translateY(0); }
 }
 #login-form, #logout-area { width: 100%; }
+.error-message {
+  color: var(--danger-color);
+  margin-top: 0.5rem;
+}
 
 /* Added Styles for Baby Steps Interactivity */
 .baby-step h3.baby-step-title {
