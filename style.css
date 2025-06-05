@@ -586,6 +586,10 @@ td.reimbursement-income {
     padding: 6px 0;
     border-bottom: 1px solid var(--border-color);
 }
+#credit-cards-list .credit-card-actions {
+    display: flex;
+    gap: 5px;
+}
 #credit-cards-list li:last-child {
     border-bottom: none;
 }
