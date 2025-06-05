@@ -1138,3 +1138,35 @@ td.reimbursement-income {
 }
 
 /* End of Added Styles for Baby Steps Interactivity */
+
+/* Modal for chart transactions */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: var(--radius);
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow);
+}
+
+.modal-close {
+    float: right;
+    font-size: 1.5em;
+    cursor: pointer;
+}
