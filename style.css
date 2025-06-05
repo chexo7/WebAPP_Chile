@@ -650,6 +650,13 @@ td.reimbursement-income {
     padding: 10px;
 }
 
+.chart-container canvas {
+    display: block;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
 #cashflow-chart {
     width: 100%;
 }

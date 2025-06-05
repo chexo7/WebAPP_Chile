@@ -124,6 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const pieWeekApply = document.getElementById('pie-week-apply');
     const pieMonthCanvas = document.getElementById('pie-chart-month');
     const pieWeekCanvas = document.getElementById('pie-chart-week');
+    const pieMonthContainer = document.getElementById('pie-month-container');
+    const pieWeekContainer = document.getElementById('pie-week-container');
     let cashflowChartInstance = null;
     let pieMonthChartInstance = null;
     let pieWeekChartInstance = null;
@@ -302,8 +304,8 @@ document.addEventListener('DOMContentLoaded', () => {
         mainContentContainer.style.display = 'block';
         activateTab('gastos'); // Activate a default tab
         fetchAndUpdateUSDCLPRate(); // Fetch USD/CLP rate when main content is shown
-        if (pieMonthApply) pieMonthApply.click();
-        if (pieWeekApply) pieWeekApply.click();
+        if (typeof updatePieMonthChart === 'function') updatePieMonthChart();
+        if (typeof updatePieWeekChart === 'function') updatePieWeekChart();
     }
 
     function clearAllDataViews() {
@@ -1056,6 +1058,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const activeBtn = chartSubtabs.querySelector(`.subtab-button[data-period="${periodicity}"]`);
             if (activeBtn) activeBtn.classList.add('active');
             if (graficoTitle) graficoTitle.textContent = `Gráfico de Flujo de Caja - ${periodicity}`;
+            if (pieMonthContainer && pieWeekContainer) {
+                pieMonthContainer.style.display = periodicity === 'Mensual' ? 'block' : 'none';
+                pieWeekContainer.style.display = periodicity === 'Semanal' ? 'block' : 'none';
+            }
+            if (periodicity === 'Mensual' && typeof updatePieMonthChart === 'function') updatePieMonthChart();
+            if (periodicity === 'Semanal' && typeof updatePieWeekChart === 'function') updatePieWeekChart();
             renderCashflowTable();
         }
     }
@@ -2761,20 +2769,27 @@ function getMondayOfWeek(year, week) {
         const [ywYear, ywWeek] = getWeekNumber(today);
         pieWeekInput.value = `${ywYear}-W${('0'+ywWeek).slice(-2)}`;
     }
-    if (pieMonthApply) pieMonthApply.addEventListener('click', () => {
+
+    function updatePieMonthChart() {
         const val = pieMonthInput.value;
         if (!val) return;
         const [y,m] = val.split('-').map(Number);
         const start = new Date(Date.UTC(y, m-1, 1));
         pieMonthChartInstance = renderExpenseDistributionChart(start, 'Mensual', pieMonthCanvas, pieMonthChartInstance);
-    });
-    if (pieWeekApply) pieWeekApply.addEventListener('click', () => {
+    }
+
+    function updatePieWeekChart() {
         const val = pieWeekInput.value;
         if (!val) return;
         const [y,w] = val.split('-W');
         const start = getMondayOfWeek(parseInt(y), parseInt(w));
         pieWeekChartInstance = renderExpenseDistributionChart(start, 'Semanal', pieWeekCanvas, pieWeekChartInstance);
-    });
+    }
+
+    if (pieMonthApply) pieMonthApply.addEventListener('click', updatePieMonthChart);
+    if (pieWeekApply) pieWeekApply.addEventListener('click', updatePieWeekChart);
+    if (pieMonthInput) pieMonthInput.addEventListener('change', updatePieMonthChart);
+    if (pieWeekInput) pieWeekInput.addEventListener('change', updatePieWeekChart);
 
     // --- CONFIGURAR ZOOM EN EL GRÁFICO ---
     function enableChartZoom() {
