@@ -120,8 +120,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const graficoTitle = document.getElementById('grafico-title');
     const pieMonthInput = document.getElementById('pie-month-input');
     const pieWeekInput = document.getElementById('pie-week-input');
-    const pieMonthApply = document.getElementById('pie-month-apply');
-    const pieWeekApply = document.getElementById('pie-week-apply');
     const pieMonthCanvas = document.getElementById('pie-chart-month');
     const pieWeekCanvas = document.getElementById('pie-chart-week');
     const pieMonthContainer = document.getElementById('pie-month-container');
@@ -2786,8 +2784,6 @@ function getMondayOfWeek(year, week) {
         pieWeekChartInstance = renderExpenseDistributionChart(start, 'Semanal', pieWeekCanvas, pieWeekChartInstance);
     }
 
-    if (pieMonthApply) pieMonthApply.addEventListener('click', updatePieMonthChart);
-    if (pieWeekApply) pieWeekApply.addEventListener('click', updatePieWeekChart);
     if (pieMonthInput) pieMonthInput.addEventListener('change', updatePieMonthChart);
     if (pieWeekInput) pieWeekInput.addEventListener('change', updatePieWeekChart);
 

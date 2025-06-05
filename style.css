@@ -659,6 +659,7 @@ td.reimbursement-income {
 
 #cashflow-chart {
     width: 100%;
+    max-width: none;
 }
 
 .mobile-chart-range {
