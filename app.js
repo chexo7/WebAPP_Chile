@@ -118,7 +118,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const applyMobileChartRangeButton = document.getElementById('apply-mobile-chart-range');
     const chartSubtabs = document.getElementById('chart-subtabs');
     const graficoTitle = document.getElementById('grafico-title');
+    const pieMonthInput = document.getElementById('pie-month-input');
+    const pieWeekInput = document.getElementById('pie-week-input');
+    const pieMonthCanvas = document.getElementById('pie-chart-month');
+    const pieWeekCanvas = document.getElementById('pie-chart-week');
+    const pieMonthContainer = document.getElementById('pie-month-container');
+    const pieWeekContainer = document.getElementById('pie-week-container');
     let cashflowChartInstance = null;
+    let pieMonthChartInstance = null;
+    let pieWeekChartInstance = null;
     let chartZoomMode = false;
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
     let fullChartData = null;
@@ -294,6 +302,8 @@ document.addEventListener('DOMContentLoaded', () => {
         mainContentContainer.style.display = 'block';
         activateTab('gastos'); // Activate a default tab
         fetchAndUpdateUSDCLPRate(); // Fetch USD/CLP rate when main content is shown
+        if (typeof updatePieMonthChart === 'function') updatePieMonthChart();
+        if (typeof updatePieWeekChart === 'function') updatePieWeekChart();
     }
 
     function clearAllDataViews() {
@@ -326,8 +336,12 @@ document.addEventListener('DOMContentLoaded', () => {
             cashflowChartInstance.destroy();
             cashflowChartInstance = null;
         }
+        if (pieMonthChartInstance) { pieMonthChartInstance.destroy(); pieMonthChartInstance = null; }
+        if (pieWeekChartInstance) { pieWeekChartInstance.destroy(); pieWeekChartInstance = null; }
         if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja.";
         if (usdClpInfoLabel) usdClpInfoLabel.textContent = "1 USD = $CLP (Obteniendo...)";
+        if (pieMonthInput) pieMonthInput.value = '';
+        if (pieWeekInput) pieWeekInput.value = '';
     }
 
     // --- AUTENTICACIÓN ---
@@ -1042,6 +1056,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const activeBtn = chartSubtabs.querySelector(`.subtab-button[data-period="${periodicity}"]`);
             if (activeBtn) activeBtn.classList.add('active');
             if (graficoTitle) graficoTitle.textContent = `Gráfico de Flujo de Caja - ${periodicity}`;
+            if (pieMonthContainer && pieWeekContainer) {
+                pieMonthContainer.style.display = periodicity === 'Mensual' ? 'block' : 'none';
+                pieWeekContainer.style.display = periodicity === 'Semanal' ? 'block' : 'none';
+            }
+            if (periodicity === 'Mensual' && typeof updatePieMonthChart === 'function') updatePieMonthChart();
+            if (periodicity === 'Semanal' && typeof updatePieWeekChart === 'function') updatePieWeekChart();
             renderCashflowTable();
         }
     }
@@ -2359,6 +2379,114 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function getExpenseOccurrencesInPeriod(expense, pStart, pEnd, periodicity) {
+        if (!expense.start_date) return 0;
+        const start = new Date(expense.start_date);
+        const end = expense.end_date ? new Date(expense.end_date) : null;
+        const freq = expense.frequency || 'Mensual';
+
+        if (freq === 'Único') {
+            return (start >= pStart && start <= pEnd) ? 1 : 0;
+        } else if (freq === 'Mensual') {
+            if (start > pEnd || (end && end < pStart)) return 0;
+            const payDay = start.getUTCDate();
+            if (periodicity === 'Semanal') {
+                const payDate = new Date(Date.UTC(pStart.getUTCFullYear(), pStart.getUTCMonth(), payDay));
+                return (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) ? 1 : 0;
+            } else {
+                const year = pStart.getUTCFullYear();
+                const month = pStart.getUTCMonth();
+                const daysInMonth = getDaysInMonth(year, month);
+                const payDate = new Date(Date.UTC(year, month, Math.min(payDay, daysInMonth)));
+                return (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) ? 1 : 0;
+            }
+        } else if (freq === 'Semanal') {
+            if (start > pEnd || (end && end < pStart)) return 0;
+            if (periodicity === 'Semanal') {
+                return 1;
+            } else {
+                let count = 0;
+                const payDow = start.getUTCDay();
+                let d = new Date(pStart.getTime());
+                while (d <= pEnd) {
+                    if (d.getUTCDay() === payDow && d >= start && (!end || d <= end)) count++;
+                    d.setUTCDate(d.getUTCDate() + 1);
+                }
+                return count;
+            }
+        } else if (freq === 'Bi-semanal') {
+            if (start > pEnd || (end && end < pStart)) return 0;
+            let count = 0;
+            let payDate = new Date(start.getTime());
+            while (payDate < pStart) {
+                payDate = addWeeks(payDate, 2);
+                if (end && payDate > end) return count;
+            }
+            while (payDate <= pEnd) {
+                if (!end || payDate <= end) count++;
+                payDate = addWeeks(payDate, 2);
+            }
+            return count;
+        }
+        return 0;
+    }
+
+    function calculateExpenseDistribution(periodStart, periodicity) {
+        const periodEnd = getPeriodEndDate(periodStart, periodicity);
+        const totals = {};
+        const methodTotals = {};
+        (currentBackupData.expenses || []).forEach(exp => {
+            const occ = getExpenseOccurrencesInPeriod(exp, periodStart, periodEnd, periodicity);
+            if (occ <= 0) return;
+            const amt = parseFloat(exp.amount || 0) * occ;
+            if (!totals[exp.category]) {
+                totals[exp.category] = 0;
+                methodTotals[exp.category] = { Efectivo: 0, Credito: 0 };
+            }
+            totals[exp.category] += amt;
+            if (exp.payment_method === 'Credito') methodTotals[exp.category].Credito += amt;
+            else methodTotals[exp.category].Efectivo += amt;
+        });
+        return { totals, methodTotals };
+    }
+
+    function renderExpenseDistributionChart(periodStart, periodicity, canvas, existingInstance) {
+        if (!canvas) return null;
+        const { totals, methodTotals } = calculateExpenseDistribution(periodStart, periodicity);
+        const categories = Object.keys(totals).filter(cat => totals[cat] > 0);
+        if (existingInstance) { existingInstance.destroy(); }
+        if (categories.length === 0) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            return null;
+        }
+        const data = categories.map(cat => totals[cat]);
+        const colors = categories.map((_,i) => `hsl(${(i*60)%360},70%,60%)`);
+        const newChart = new Chart(canvas, {
+            type: 'doughnut',
+            data: { labels: categories, datasets: [{ data, backgroundColor: colors }] },
+            options: {
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const cat = ctx.label;
+                                const total = totals[cat] || 0;
+                                const cash = methodTotals[cat].Efectivo || 0;
+                                const credit = methodTotals[cat].Credito || 0;
+                                const pcash = total ? ((cash/total)*100).toFixed(1) : '0';
+                                const pcred = total ? ((credit/total)*100).toFixed(1) : '0';
+                                return `${cat}: ${formatCurrencyJS(total, currentBackupData.display_currency_symbol || '$')} (Efec: ${pcash}%, Cred: ${pcred}%)`;
+                            }
+                        }
+                    },
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+        return newChart;
+    }
+
     // --- LÓGICA PESTAÑA BABY STEPS ---
     function renderBabySteps() {
         if (!babyStepsContainer || !currentBackupData || !currentBackupData.baby_steps_status) return;
@@ -2633,6 +2761,31 @@ function getMondayOfWeek(year, week) {
             applyMobileChartRangeButton.addEventListener('click', applyMobileChartRange);
         }
     }
+
+    if (pieMonthInput) pieMonthInput.value = today.toISOString().slice(0,7);
+    if (pieWeekInput) {
+        const [ywYear, ywWeek] = getWeekNumber(today);
+        pieWeekInput.value = `${ywYear}-W${('0'+ywWeek).slice(-2)}`;
+    }
+
+    function updatePieMonthChart() {
+        const val = pieMonthInput.value;
+        if (!val) return;
+        const [y,m] = val.split('-').map(Number);
+        const start = new Date(Date.UTC(y, m-1, 1));
+        pieMonthChartInstance = renderExpenseDistributionChart(start, 'Mensual', pieMonthCanvas, pieMonthChartInstance);
+    }
+
+    function updatePieWeekChart() {
+        const val = pieWeekInput.value;
+        if (!val) return;
+        const [y,w] = val.split('-W');
+        const start = getMondayOfWeek(parseInt(y), parseInt(w));
+        pieWeekChartInstance = renderExpenseDistributionChart(start, 'Semanal', pieWeekCanvas, pieWeekChartInstance);
+    }
+
+    if (pieMonthInput) pieMonthInput.addEventListener('change', updatePieMonthChart);
+    if (pieWeekInput) pieWeekInput.addEventListener('change', updatePieWeekChart);
 
     // --- CONFIGURAR ZOOM EN EL GRÁFICO ---
     function enableChartZoom() {
