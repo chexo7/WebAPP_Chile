@@ -319,6 +319,11 @@ button.button-large {
     font-size: 0.85rem;
 }
 
+#expenses-table-view th:nth-child(10),
+#expenses-table-view td:nth-child(10) {
+    min-width: 110px;
+}
+
 #incomes-table-view th, #incomes-table-view td,
 #expenses-table-view th, #expenses-table-view td,
 #budgets-table-view th, #budgets-table-view td,
