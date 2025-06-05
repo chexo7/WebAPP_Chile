@@ -256,8 +256,14 @@ function calculateCashFlowData(data) {
                 const diff = new Date(exp.start_date).getTime() - new Date(exp.movement_date).getTime();
                 e_end = new Date(new Date(exp.end_date).getTime() - diff);
             }
-            const amt_raw = parseFloat(exp.amount || 0); 
-            const freq = exp.frequency || "Mensual"; 
+            let amt_raw = parseFloat(exp.amount || 0);
+            const inst = parseInt(exp.installments || 1);
+            let freq = exp.frequency || "Mensual";
+            if (inst > 1 && !useInstant) {
+                freq = "Mensual";
+                amt_raw = amt_raw / inst;
+                e_end = addMonths(new Date(e_start), inst - 1);
+            }
             const cat = exp.category;
             if (amt_raw < 0 || !cat || !orderedCategories.includes(cat)) return;
             const isActiveRange = (e_start <= p_end && (e_end === null || e_end >= p_start)); 
@@ -638,6 +644,27 @@ runTest("calculateCashFlowData - Instant Expense Uses Movement Date", () => {
     assertEquals(100, res.var_exp_p[1], "Instant Off - May should be 100");
     res = calculateCashFlowData({ ...dataBase, use_instant_expenses: true });
     assertEquals(100, res.var_exp_p[0], "Instant On - April should be 100");
+});
+
+runTest("calculateCashFlowData - Credit Card Installments", () => {
+    const baseData = {
+        analysis_start_date: new Date(Date.UTC(2024,0,1)),
+        analysis_duration: 4,
+        analysis_periodicity: "Mensual",
+        analysis_initial_balance: 0,
+        expense_categories: { "TestCat": "Variable" },
+        incomes: [],
+        expenses: [
+            { name: "InstPurchase", amount: 90, category: "TestCat", frequency: "Único", start_date: new Date(Date.UTC(2024,1,5)), movement_date: new Date(Date.UTC(2024,0,15)), end_date: null, installments: 3 }
+        ]
+    };
+    let r = calculateCashFlowData({ ...baseData, use_instant_expenses: false });
+    assertEquals(0, r.var_exp_p[0], "Installments - Jan should be 0");
+    assertEquals(30, r.var_exp_p[1], "Installments - Feb should be 30");
+    assertEquals(30, r.var_exp_p[2], "Installments - Mar should be 30");
+    assertEquals(30, r.var_exp_p[3], "Installments - Apr should be 30");
+    r = calculateCashFlowData({ ...baseData, use_instant_expenses: true });
+    assertEquals(90, r.var_exp_p[0], "Instant mode - Jan charged full amount");
 });
 
 runTest("calculateCashFlowData - Scenario 4: Weekly Analysis, Monthly Item", () => {
