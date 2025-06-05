@@ -319,6 +319,12 @@ button.button-large {
     table-layout: fixed; /* Prevent tables from expanding beyond container */
 }
 
+/* La tabla de gastos necesita que cada columna se ajuste al contenido */
+#expenses-table-view {
+    width: max-content;
+    table-layout: auto;
+}
+
 #incomes-table-view th, #incomes-table-view td,
 #expenses-table-view th, #expenses-table-view td,
 #budgets-table-view th, #budgets-table-view td,
@@ -354,18 +360,14 @@ button.button-large {
     text-overflow: clip;
 }
 
-/* Ajuste de la columna "Real" en la tabla de gastos */
-#expenses-table-view th:nth-child(9),
-#expenses-table-view td:nth-child(9) {
-    width: 60px;
-    max-width: 60px;
-    text-align: center;
-}
-
-/* Permite que la columna de acciones tenga espacio para ambos botones */
-#expenses-table-view th:last-child,
-#expenses-table-view td:last-child {
-    min-width: 110px;
+/* Columnas de la tabla de gastos que deben ajustarse al contenido */
+#expenses-table-view th:nth-child(n+3):nth-child(-n+10),
+#expenses-table-view td:nth-child(n+3):nth-child(-n+10) {
+    width: auto;
+    max-width: none;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: initial;
 }
 
 /* Cabeceras de tabla */
