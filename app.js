@@ -1203,9 +1203,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const editBtn = document.createElement('button');
             editBtn.textContent = 'Editar';
             editBtn.classList.add('small-button');
-            editBtn.disabled = isInUse;
-            editBtn.title = isInUse ? 'Tarjeta en uso por gastos' : 'Editar tarjeta';
-            editBtn.addEventListener('click', () => { if (!isInUse) loadCreditCardForEdit(idx); });
+            editBtn.title = 'Editar tarjeta';
+            editBtn.addEventListener('click', () => { loadCreditCardForEdit(idx); });
             li.appendChild(editBtn);
 
             const delBtn = document.createElement('button');
