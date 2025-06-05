@@ -73,6 +73,19 @@
                         <button type="button" id="apply-settings-button" class="accent">Aplicar Ajustes y Recalcular</button>
                     </form>
                 </div>
+                <div class="form-container">
+                    <h3>Tarjetas de Crédito</h3>
+                    <form id="credit-card-form">
+                        <label for="credit-card-name">Nombre:</label>
+                        <input type="text" id="credit-card-name" placeholder="Visa ****" required>
+                        <label for="credit-card-cutoff">Día de Corte:</label>
+                        <input type="number" id="credit-card-cutoff" min="1" max="31" required>
+                        <label for="credit-card-payment-day">Día de Pago:</label>
+                        <input type="number" id="credit-card-payment-day" min="1" max="31" required>
+                        <button type="submit" id="add-credit-card-button">Agregar Tarjeta</button>
+                    </form>
+                    <ul id="credit-cards-list"></ul>
+                </div>
             </div>
 
             <div id="ingresos" class="tab-content">
@@ -171,8 +184,13 @@
                                 <option value="Único" selected>Único</option>
                             </select>
 
-                            <label for="expense-start-date">Fecha Inicio / Única:</label>
-                            <input type="date" id="expense-start-date" required>
+                            <label for="expense-movement-date">Fecha Movimiento:</label>
+                            <input type="date" id="expense-movement-date" required>
+
+                            <div id="expense-payment-date-container" style="display:none;">
+                                <label for="expense-start-date">Fecha de Gasto/Pago:</label>
+                                <input type="date" id="expense-start-date" disabled required>
+                            </div>
 
                             <label for="expense-end-date">Fecha Fin (si aplica):</label>
                             <input type="date" id="expense-end-date">
@@ -184,6 +202,16 @@
                             <div class="checkbox-container">
                                 <input type="checkbox" id="expense-is-real">
                                 <label for="expense-is-real">Es un gasto real (ya ocurrido)</label>
+                            </div>
+
+                            <label for="expense-payment-method">Método de Pago:</label>
+                            <select id="expense-payment-method">
+                                <option value="Efectivo" selected>Efectivo</option>
+                                <option value="Credito">Tarjeta de Crédito</option>
+                            </select>
+                            <div id="expense-credit-card-container" style="display:none;">
+                                <label for="expense-credit-card">Tarjeta:</label>
+                                <select id="expense-credit-card"></select>
                             </div>
 
                             <button type="submit" id="add-expense-button">Agregar Gasto</button>
@@ -202,7 +230,8 @@
                                         <th>Monto</th>
                                         <th>Categoría</th>
                                         <th>Frecuencia</th>
-                                        <th>Inicio</th>
+                                        <th>Movimiento</th>
+                                        <th>Gasto/Pago</th>
                                         <th>Fin</th>
                                         <th>Real</th>
                                         <th>Acciones</th>
