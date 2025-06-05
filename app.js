@@ -1197,7 +1197,8 @@ document.addEventListener('DOMContentLoaded', () => {
             span.textContent = `${card.name} (corte ${card.cutoff_day}, paga día ${card.payment_day || 1})`;
             li.appendChild(span);
 
-            const isInUse = (currentBackupData.expenses || []).some(exp => exp.payment_method === 'Credito' && exp.credit_card === card.name);
+            const expensesUsingCard = (currentBackupData.expenses || []).filter(exp => exp.payment_method === 'Credito' && exp.credit_card === card.name);
+            const isInUse = expensesUsingCard.length > 0;
 
             const editBtn = document.createElement('button');
             editBtn.textContent = 'Editar';
@@ -1210,10 +1211,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const delBtn = document.createElement('button');
             delBtn.textContent = 'Eliminar';
             delBtn.classList.add('small-button', 'danger');
-            delBtn.disabled = isInUse;
             delBtn.title = isInUse ? 'Tarjeta en uso por gastos' : 'Eliminar tarjeta';
             delBtn.addEventListener('click', () => {
-                if (isInUse) return;
+                if (isInUse) {
+                    const sorted = expensesUsingCard.sort((a, b) => {
+                        const da = new Date(a.movement_date || a.start_date || 0);
+                        const db = new Date(b.movement_date || b.start_date || 0);
+                        return db - da;
+                    });
+                    const list = sorted.map(exp => `- ${exp.name}`).join('\n');
+                    alert(`No se puede eliminar la tarjeta "${card.name}" porque tiene gastos asociados:\n${list}\nCorrige estos gastos manualmente antes de eliminar la tarjeta.`);
+                    return;
+                }
                 if (confirm(`¿Eliminar tarjeta "${card.name}"?`)) {
                     currentBackupData.credit_cards.splice(idx, 1);
                     renderCreditCards();
