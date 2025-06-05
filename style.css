@@ -354,6 +354,20 @@ button.button-large {
     text-overflow: clip;
 }
 
+/* Ajuste de la columna "Real" en la tabla de gastos */
+#expenses-table-view th:nth-child(9),
+#expenses-table-view td:nth-child(9) {
+    width: 60px;
+    max-width: 60px;
+    text-align: center;
+}
+
+/* Permite que la columna de acciones tenga espacio para ambos botones */
+#expenses-table-view th:last-child,
+#expenses-table-view td:last-child {
+    min-width: 110px;
+}
+
 /* Cabeceras de tabla */
 #incomes-table-view thead th,
 #expenses-table-view thead th,
