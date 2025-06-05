@@ -76,6 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const expensePaymentMethodSelect = document.getElementById('expense-payment-method');
     const expenseCreditCardContainer = document.getElementById('expense-credit-card-container');
     const expenseCreditCardSelect = document.getElementById('expense-credit-card');
+    const expenseInstallmentsContainer = document.getElementById('expense-installments-container');
+    const expenseInstallmentsInput = document.getElementById('expense-installments');
     const addExpenseButton = document.getElementById('add-expense-button');
     const cancelEditExpenseButton = document.getElementById('cancel-edit-expense-button');
     const expensesTableView = document.querySelector('#expenses-table-view tbody');
@@ -1450,6 +1452,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isCredit = expensePaymentMethodSelect.value === 'Credito';
         expenseCreditCardContainer.style.display = isCredit ? 'block' : 'none';
         expensePaymentDateContainer.style.display = isCredit ? 'block' : 'none';
+        if (expenseInstallmentsContainer) expenseInstallmentsContainer.style.display = isCredit ? 'block' : 'none';
         updateExpensePaymentDate();
     });
     expenseMovementDateInput.addEventListener('change', updateExpensePaymentDate);
@@ -1535,6 +1538,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const startDate = startDateValue ? new Date(startDateValue + 'T00:00:00Z') : null;
         const isOngoing = expenseOngoingCheckbox.checked;
         const endDate = (frequency === 'Único' || isOngoing || !endDateValue) ? null : new Date(endDateValue + 'T00:00:00Z');
+        const installments = parseInt(expenseInstallmentsInput ? expenseInstallmentsInput.value : '1', 10) || 1;
         const isReal = expenseIsRealCheckbox.checked;
 
         if (isNaN(amount) || !category || !startDate) { alert("Completa los campos obligatorios (Nombre, Monto, Categoría, Fecha Inicio)."); return; }
@@ -1544,7 +1548,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const movementDate = expenseMovementDateInput.value ? new Date(expenseMovementDateInput.value + 'T00:00:00Z') : startDate;
         const paymentMethod = expensePaymentMethodSelect.value;
         const creditCard = paymentMethod === 'Credito' ? expenseCreditCardSelect.value : null;
-        const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal, movement_date: movementDate, payment_method: paymentMethod, credit_card: creditCard };
+        const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal, movement_date: movementDate, payment_method: paymentMethod, credit_card: creditCard, installments };
 
         if (editingExpenseIndex !== null) {
             currentBackupData.expenses[editingExpenseIndex] = expenseEntry;
@@ -1569,6 +1573,8 @@ document.addEventListener('DOMContentLoaded', () => {
     expensePaymentMethodSelect.value = 'Efectivo';
     expenseCreditCardContainer.style.display = 'none';
     expensePaymentDateContainer.style.display = 'none';
+    if (expenseInstallmentsContainer) expenseInstallmentsContainer.style.display = 'none';
+    if (expenseInstallmentsInput) expenseInstallmentsInput.value = '1';
 
     // ... (rest of the function, e.g., setting default category, button text, etc.)
         if (expenseCategorySelect.options.length > 0 && expenseCategorySelect.value === "") {
@@ -1604,6 +1610,7 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A');
             row.insertCell().textContent = expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A';
             row.insertCell().textContent = expense.end_date ? getISODateString(new Date(expense.end_date)) : (expense.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
+            row.insertCell().textContent = expense.payment_method === 'Credito' ? 'Tarjeta' : 'Efectivo';
             row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
             const actionsCell = row.insertCell();
             const editButton = document.createElement('button'); editButton.textContent = 'Editar'; editButton.classList.add('small-button');
@@ -1624,6 +1631,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const isCreditEdit = expensePaymentMethodSelect.value === 'Credito';
         expenseCreditCardContainer.style.display = isCreditEdit ? 'block' : 'none';
         expensePaymentDateContainer.style.display = isCreditEdit ? 'block' : 'none';
+        if (expenseInstallmentsContainer) expenseInstallmentsContainer.style.display = isCreditEdit ? 'block' : 'none';
+        if (expenseInstallmentsInput) expenseInstallmentsInput.value = expense.installments || 1;
         if (expense.credit_card) expenseCreditCardSelect.value = expense.credit_card;
         const isUnico = expense.frequency === 'Único';
         expenseOngoingCheckbox.disabled = isUnico;
@@ -1824,18 +1833,13 @@ document.addEventListener('DOMContentLoaded', () => {
             paymentLogPeriodKeyPart = monthIndex + 1;
         }
         currentPaymentViewDate = periodStart;
-        paymentsTableView.innerHTML = ''; let expensesInPeriodFound = false;
+        paymentsTableView.innerHTML = '';
+        let expensesInPeriodFound = false;
         currentBackupData.expenses.forEach(expense => {
-            if (!expense.start_date) return;
-            const expStartDate = new Date(expense.start_date); const expEndDate = expense.end_date ? new Date(expense.end_date) : null;
-            let occursInPeriod = false;
-            if (expense.frequency === "Único") { if (expStartDate >= periodStart && expStartDate <= periodEnd) occursInPeriod = true; }
-            else if (expense.frequency === "Mensual") { if (isWeeklyView) { const payDay = expStartDate.getUTCDate(); const payDateThisMonth = new Date(Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth(), payDay)); if (payDateThisMonth >= periodStart && payDateThisMonth <= periodEnd) occursInPeriod = true; } else { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true; } }
-            else if (expense.frequency === "Semanal") { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) occursInPeriod = true; } 
-            else if (expense.frequency === "Bi-semanal") { if (expStartDate <= periodEnd && (!expEndDate || expEndDate >= periodStart)) { let paymentDate = new Date(expStartDate.getTime()); while (paymentDate <= periodEnd) { if (paymentDate >= periodStart) { occursInPeriod = true; break; } paymentDate = addWeeks(paymentDate, 2); } } }
-            if (occursInPeriod) {
+            const occ = getExpenseOccurrencesInPeriod(expense, periodStart, periodEnd, currentBackupData.analysis_periodicity, currentBackupData.use_instant_expenses);
+            if (occ > 0) {
                 expensesInPeriodFound = true; const row = paymentsTableView.insertRow();
-                row.insertCell().textContent = expense.name; row.insertCell().textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol);
+                row.insertCell().textContent = expense.name; row.insertCell().textContent = formatCurrencyJS((expense.installments && expense.installments > 1 && !currentBackupData.use_instant_expenses) ? expense.amount / expense.installments : expense.amount, currentBackupData.display_currency_symbol);
                 row.insertCell().textContent = expense.category; row.insertCell().textContent = currentBackupData.expense_categories[expense.category] || 'Variable';
                 row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
                 const paidCell = row.insertCell(); const checkbox = document.createElement('input'); checkbox.type = 'checkbox';
@@ -2015,7 +2019,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (inc.is_reimbursement) return; // Exclude reimbursements from direct income calculation here
 
                 const inc_start = inc.start_date; const inc_end = inc.end_date; const net_amount = parseFloat(inc.net_monthly || 0); const inc_freq = inc.frequency || "Mensual";
-                const isActiveRange = (inc_start <= p_end && (inc_end === null || inc_end >= p_start)); if (!isActiveRange) return;
+            const isActiveRange = (inc_start <= p_end && (inc_end == null || inc_end >= p_start)); if (!isActiveRange) return;
                 
                 let income_to_add = 0.0;
 
@@ -2035,7 +2039,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
 
                     if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
-                        if (inc_start <= paymentDateInPStartMonth && (inc_end === null || inc_end >= paymentDateInPStartMonth)) {
+                        if (inc_start <= paymentDateInPStartMonth && (inc_end == null || inc_end >= paymentDateInPStartMonth)) {
                             income_to_add = net_amount;
                             paymentOccurred = true;
                         }
@@ -2050,7 +2054,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
                             const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
                             if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
-                                if (inc_start <= paymentDateInPEndMonth && (inc_end === null || inc_end >= paymentDateInPEndMonth)) {
+                                if (inc_start <= paymentDateInPEndMonth && (inc_end == null || inc_end >= paymentDateInPEndMonth)) {
                                     income_to_add = net_amount;
                                 }
                             }
@@ -2068,7 +2072,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         while (dayIterator <= p_end) {
                             if (dayIterator.getUTCDay() === incomePaymentUTCDay) {
                                 // Check if the income item is active on this specific dayIterator occurrence
-                                if (inc_start <= dayIterator && (inc_end === null || inc_end >= dayIterator)) {
+                                if (inc_start <= dayIterator && (inc_end == null || inc_end >= dayIterator)) {
                                     occurrences++;
                                 }
                             }
@@ -2124,12 +2128,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     const diff = exp.start_date.getTime() - exp.movement_date.getTime();
                     e_end = new Date(exp.end_date.getTime() - diff);
                 }
-                const amt_raw = parseFloat(exp.amount || 0);
-                const freq = exp.frequency || "Mensual";
+                let amt_raw = parseFloat(exp.amount || 0);
+                const inst = parseInt(exp.installments || 1);
+                let freq = exp.frequency || "Mensual";
+                if (inst > 1 && !data.use_instant_expenses) {
+                    freq = "Mensual";
+                    amt_raw = amt_raw / inst;
+                    e_end = addMonths(new Date(e_start), inst - 1);
+                }
                 const typ = exp.type || (data.expense_categories && data.expense_categories[exp.category]) || "Variable";
                 const cat = exp.category;
                 if (amt_raw < 0 || !cat || !orderedCategories.includes(cat)) return;
-                const isActiveRange = (e_start <= p_end && (e_end === null || e_end >= p_start)); if (!isActiveRange) return;
+            const isActiveRange = (e_start <= p_end && (e_end == null || e_end >= p_start)); if (!isActiveRange) return;
                 
                 let exp_add_this_period = 0.0;
 
@@ -2149,7 +2159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
 
                     if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
-                        if (e_start <= paymentDateInPStartMonth && (e_end === null || e_end >= paymentDateInPStartMonth)) {
+                        if (e_start <= paymentDateInPStartMonth && (e_end == null || e_end >= paymentDateInPStartMonth)) {
                             exp_add_this_period = amt_raw;
                             paymentOccurred = true;
                         }
@@ -2164,7 +2174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
                             const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
                             if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
-                                if (e_start <= paymentDateInPEndMonth && (e_end === null || e_end >= paymentDateInPEndMonth)) {
+                                if (e_start <= paymentDateInPEndMonth && (e_end == null || e_end >= paymentDateInPEndMonth)) {
                                     exp_add_this_period = amt_raw;
                                 }
                             }
@@ -2180,7 +2190,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         while (dayIterator <= p_end) {
                             if (dayIterator.getUTCDay() === expensePaymentUTCDay) {
-                                if (e_start <= dayIterator && (e_end === null || e_end >= dayIterator)) {
+                                if (e_start <= dayIterator && (e_end == null || e_end >= dayIterator)) {
                                     occurrences++;
                                 }
                             }
@@ -2226,7 +2236,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const reimb_freq = reimbInc.frequency || "Mensual";
                 const reimb_cat = reimbInc.reimbursement_category;
 
-                const isActiveRange = (reimb_start <= p_end && (reimb_end === null || reimb_end >= p_start));
+            const isActiveRange = (reimb_start <= p_end && (reimb_end == null || reimb_end >= p_start));
                 if (!isActiveRange) return;
 
                 let amount_of_reimbursement_in_this_period = 0.0;
@@ -2247,7 +2257,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
 
                     if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
-                        if (reimb_start <= paymentDateInPStartMonth && (reimb_end === null || reimb_end >= paymentDateInPStartMonth)) {
+                        if (reimb_start <= paymentDateInPStartMonth && (reimb_end == null || reimb_end >= paymentDateInPStartMonth)) {
                             amount_of_reimbursement_in_this_period = reimb_amount_raw;
                             paymentOccurred = true;
                         }
@@ -2262,7 +2272,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
                             const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
                             if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
-                                if (reimb_start <= paymentDateInPEndMonth && (reimb_end === null || reimb_end >= paymentDateInPEndMonth)) {
+                                if (reimb_start <= paymentDateInPEndMonth && (reimb_end == null || reimb_end >= paymentDateInPEndMonth)) {
                                     amount_of_reimbursement_in_this_period = reimb_amount_raw;
                                 }
                             }
@@ -2278,7 +2288,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         while (dayIterator <= p_end) {
                             if (dayIterator.getUTCDay() === reimbursementPaymentUTCDay) {
-                                if (reimb_start <= dayIterator && (reimb_end === null || reimb_end >= dayIterator)) {
+                                if (reimb_start <= dayIterator && (reimb_end == null || reimb_end >= dayIterator)) {
                                     occurrences++;
                                 }
                             }
@@ -2417,7 +2427,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const diff = new Date(expense.start_date).getTime() - new Date(expense.movement_date).getTime();
             end = new Date(new Date(expense.end_date).getTime() - diff);
         }
-        const freq = expense.frequency || 'Mensual';
+        const installments = parseInt(expense.installments || 1);
+        let freq = expense.frequency || 'Mensual';
+        if (installments > 1 && !useInstant) {
+            freq = 'Mensual';
+            end = addMonths(new Date(start), installments - 1);
+        }
 
         if (freq === 'Único') {
             return (start >= pStart && start <= pEnd) ? 1 : 0;
@@ -2472,7 +2487,10 @@ document.addEventListener('DOMContentLoaded', () => {
         (currentBackupData.expenses || []).forEach(exp => {
             const occ = getExpenseOccurrencesInPeriod(exp, periodStart, periodEnd, periodicity, currentBackupData.use_instant_expenses);
             if (occ <= 0) return;
-            const amt = parseFloat(exp.amount || 0) * occ;
+            let baseAmt = parseFloat(exp.amount || 0);
+            const inst = parseInt(exp.installments || 1);
+            if (inst > 1 && !currentBackupData.use_instant_expenses) baseAmt = baseAmt / inst;
+            const amt = baseAmt * occ;
             if (!totals[exp.category]) {
                 totals[exp.category] = 0;
                 methodTotals[exp.category] = { Efectivo: 0, Credito: 0 };

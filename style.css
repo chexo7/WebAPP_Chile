@@ -21,6 +21,7 @@
   --text-green: #20bf6b;
   --text-red: #eb3b5a;
   --text-orange: #fa8231;
+  --disabled-bg: #f0f0f0;
 }
 
 /* Reseteo y estilos base */
@@ -121,6 +122,11 @@ select {
   font-size: 0.95rem;
   transition: var(--transition);
   background-color: #fdfdff;
+}
+
+input:disabled,
+select:disabled {
+  background-color: var(--disabled-bg);
 }
 
 input[type="email"]:focus,
