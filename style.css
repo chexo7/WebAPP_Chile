@@ -319,6 +319,25 @@ button.button-large {
     font-size: 0.85rem;
 }
 
+/* Ajustes específicos para la tabla de gastos */
+#expenses-table-view {
+    table-layout: fixed;
+    min-width: unset;
+}
+
+#expenses-table-view th,
+#expenses-table-view td {
+    width: calc(100% / 12);
+}
+
+/* Nombre y Acciones ocupan el doble de espacio */
+#expenses-table-view th:nth-child(1),
+#expenses-table-view th:nth-child(10),
+#expenses-table-view td:nth-child(1),
+#expenses-table-view td:nth-child(10) {
+    width: calc(100% / 12 * 2);
+}
+
 #incomes-table-view th, #incomes-table-view td,
 #expenses-table-view th, #expenses-table-view td,
 #budgets-table-view th, #budgets-table-view td,
@@ -358,6 +377,15 @@ button.button-large {
     padding: 4px 8px;
     font-size: 0.8rem;
     margin-right: 5px;
+}
+
+/* Ajuste de ancho y scroll para columna Nombre en Gastos */
+#expenses-table-view td.expense-name-cell {
+    /* allow width to adapt to the widest value */
+}
+#expenses-table-view td.expense-name-cell .name-scroll {
+    display: block;
+    overflow-x: auto;
 }
 /* Estilo para el icono de reembolso y la celda */
 .reimbursement-icon {

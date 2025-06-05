@@ -1699,7 +1699,12 @@ document.addEventListener('DOMContentLoaded', () => {
         filteredExpenses.forEach((expense) => {
             const originalIndex = currentBackupData.expenses.findIndex(exp => exp === expense);
             const row = expensesTableView.insertRow();
-            row.insertCell().textContent = expense.name;
+            const nameCell = row.insertCell();
+            const nameDiv = document.createElement('div');
+            nameDiv.textContent = expense.name;
+            nameDiv.classList.add('name-scroll');
+            nameCell.classList.add('expense-name-cell');
+            nameCell.appendChild(nameDiv);
             row.insertCell().textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$');
             row.insertCell().textContent = expense.category;
             row.insertCell().textContent = expense.frequency;
