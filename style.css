@@ -32,10 +32,10 @@
 }
 
 body {
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: 'Inter', 'Noto Sans', sans-serif;
   margin: 0;
   padding: 10px;
-  background-color: var(--background);
+  background: linear-gradient(135deg, #f5f7fa 0%, #e0e7ff 100%);
   color: var(--text-color);
   line-height: 1.6;
 }
@@ -1089,3 +1089,96 @@ td.reimbursement-income {
 }
 
 /* End of Added Styles for Baby Steps Interactivity */
+
+/* ---- Login Page Enhancements ---- */
+.login-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  padding: 20px;
+}
+
+.login-header-icon {
+  font-size: 4rem;
+  color: #475569;
+  display: block;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.login-title {
+  font-size: 2rem;
+  color: var(--primary-color);
+  margin-bottom: 0.25rem;
+  text-align: center;
+}
+
+.login-subtitle {
+  text-align: center;
+  color: var(--light-text);
+  margin-bottom: 1.5rem;
+}
+
+.login-box {
+  background-color: var(--card-bg);
+  padding: 2rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-box-title {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: var(--text-color);
+  font-size: 1.5rem;
+}
+
+.form-input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  background-color: #f8fafc;
+  border-radius: var(--radius);
+  padding: 0 12px;
+  margin-bottom: 1rem;
+}
+
+.form-input-group span.material-icons-outlined {
+  color: var(--light-text);
+  margin-right: 8px;
+}
+
+.form-input-group input {
+  border: none;
+  background: transparent;
+  flex: 1;
+  padding: 10px 0;
+  font-size: 1rem;
+}
+
+.form-input-group input:focus {
+  outline: none;
+}
+
+#login-button {
+  width: 100%;
+  padding: 12px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  background-color: #0A2342;
+  color: #fff;
+  border-radius: var(--radius);
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease-in-out;
+}
+
+#login-button:hover {
+  opacity: 0.9;
+}
+
