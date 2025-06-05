@@ -319,10 +319,10 @@ button.button-large {
     table-layout: fixed; /* Prevent tables from expanding beyond container */
 }
 
-/* La tabla de gastos necesita que cada columna se ajuste al contenido */
+/* Configuración específica para la tabla de gastos */
 #expenses-table-view {
-    width: max-content;
-    table-layout: auto;
+    width: 100%;
+    table-layout: fixed; /* las columnas con ancho definido mantienen el total dentro del contenedor */
 }
 
 #incomes-table-view th, #incomes-table-view td,
@@ -347,11 +347,10 @@ button.button-large {
     text-overflow: ellipsis; /* prevent content from expanding table width */
 }
 
-/* Ajuste de la columna "Nombre" en la tabla de gastos */
+/* La columna "Nombre" ocupa el espacio restante en la tabla de gastos */
 #expenses-table-view th:first-child,
 #expenses-table-view td:first-child {
-    width: 130px;
-    max-width: 130px;
+    width: auto; /* se reparte el espacio libre */
 }
 
 #expenses-table-view td:first-child {
@@ -360,15 +359,28 @@ button.button-large {
     text-overflow: clip;
 }
 
-/* Columnas de la tabla de gastos que deben ajustarse al contenido */
-#expenses-table-view th:nth-child(n+3):nth-child(-n+10),
-#expenses-table-view td:nth-child(n+3):nth-child(-n+10) {
-    width: auto;
-    max-width: none;
-    white-space: nowrap;
-    overflow: visible;
-    text-overflow: initial;
+/* Anchos fijos para las columnas clave de la tabla de gastos */
+#expenses-table-view th:nth-child(2),
+#expenses-table-view td:nth-child(2) { /* Monto */
+    width: 90px;
 }
+
+#expenses-table-view th:nth-child(3),
+#expenses-table-view td:nth-child(3) { /* Categoría */
+    width: 110px;
+}
+
+#expenses-table-view th:nth-child(9),
+#expenses-table-view td:nth-child(9) { /* Real */
+    width: 60px;
+    text-align: center;
+}
+
+#expenses-table-view th:nth-child(10),
+#expenses-table-view td:nth-child(10) { /* Acciones */
+    min-width: 110px;
+}
+
 
 /* Cabeceras de tabla */
 #incomes-table-view thead th,
