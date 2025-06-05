@@ -60,3 +60,22 @@ function getUserDataRef() {
     const user = auth.currentUser;
     return user ? getUserDataRefByUID(user.uid) : null;
 }
+
+/**
+ * Devuelve una referencia al bloqueo de edición para el UID dado.
+ * @param {string} uid
+ * @returns {firebase.database.Reference|null}
+ */
+function getEditLockRefByUID(uid) {
+    const path = getUserDataPath(uid);
+    return path ? database.ref(`${path}/edit_lock`) : null;
+}
+
+/**
+ * Devuelve una referencia al bloqueo de edición para el usuario actual.
+ * @returns {firebase.database.Reference|null}
+ */
+function getEditLockRef() {
+    const user = auth.currentUser;
+    return user ? getEditLockRefByUID(user.uid) : null;
+}
