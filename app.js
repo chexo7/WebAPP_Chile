@@ -2842,19 +2842,19 @@ document.addEventListener('DOMContentLoaded', () => {
         changeLogList.innerHTML = '';
 
         if (!changeLogEntries || changeLogEntries.length === 0) {
-            const li = document.createElement('li');
-            li.textContent = "No hay cambios registrados aún.";
-            li.classList.add('log-entry-empty');
-            changeLogList.appendChild(li);
+            const empty = document.createElement('div');
+            empty.textContent = "No hay cambios registrados aún.";
+            empty.classList.add('log-entry-empty');
+            changeLogList.appendChild(empty);
             return;
         }
 
         changeLogEntries.forEach(entry => {
-            const li = document.createElement('li');
-            li.classList.add('log-entry');
+            const detailsEl = document.createElement('details');
+            detailsEl.classList.add('log-entry');
 
-            const headerDiv = document.createElement('div');
-            headerDiv.classList.add('log-entry-header');
+            const summaryEl = document.createElement('summary');
+            summaryEl.classList.add('log-entry-header');
 
             const timestampSpan = document.createElement('span');
             timestampSpan.classList.add('log-timestamp');
@@ -2869,10 +2869,10 @@ document.addEventListener('DOMContentLoaded', () => {
             messageSpan.classList.add('log-message');
             messageSpan.textContent = entry.message;
 
-            headerDiv.appendChild(timestampSpan);
-            headerDiv.appendChild(userSpan);
-            headerDiv.appendChild(messageSpan);
-            li.appendChild(headerDiv);
+            summaryEl.appendChild(timestampSpan);
+            summaryEl.appendChild(userSpan);
+            summaryEl.appendChild(messageSpan);
+            detailsEl.appendChild(summaryEl);
 
             if (entry.details && entry.details.length > 0) {
                 const detailsUl = document.createElement('ul');
@@ -2880,11 +2880,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 entry.details.forEach(detailMsg => {
                     const detailLi = document.createElement('li');
                     detailLi.textContent = detailMsg;
+                    if (/(agregado|añadido|añadida|nueva)/i.test(detailMsg)) {
+                        detailLi.classList.add('log-detail-added');
+                    } else if (/(modific|edit|actualiz)/i.test(detailMsg)) {
+                        detailLi.classList.add('log-detail-modified');
+                    } else if (/(eliminado|borrado|quitado)/i.test(detailMsg)) {
+                        detailLi.classList.add('log-detail-deleted');
+                    }
                     detailsUl.appendChild(detailLi);
                 });
-                li.appendChild(detailsUl);
+                detailsEl.appendChild(detailsUl);
             }
-            changeLogList.appendChild(li);
+            changeLogList.appendChild(detailsEl);
         });
     }
 
