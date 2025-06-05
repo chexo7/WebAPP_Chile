@@ -87,6 +87,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchExpenseInput = document.getElementById('search-expense-input');
     let editingExpenseIndex = null;
 
+    // --- BLOQUEO DE EDICIÓN ---
+    let editLockAcquired = false;
+    let editLockRef = null;
+
     // --- ELEMENTOS PESTAÑA PRESUPUESTOS ---
     const budgetForm = document.getElementById('budget-form');
     const budgetCategorySelect = document.getElementById('budget-category-select');
@@ -295,13 +299,48 @@ document.addEventListener('DOMContentLoaded', () => {
         loadLatestVersionButton.disabled = true;
     }
 
-    function showDataSelectionScreen(user) {
+    async function acquireEditLock(user) {
+        const ref = getEditLockRefByUID(user.uid);
+        if (!ref) return false;
+        try {
+            const result = await ref.transaction(current => {
+                if (current === null || current.uid === user.uid) {
+                    return { uid: user.uid, timestamp: firebase.database.ServerValue.TIMESTAMP };
+                }
+                return;
+            });
+            if (result.committed && result.snapshot.val() && result.snapshot.val().uid === user.uid) {
+                editLockRef = ref;
+                editLockAcquired = true;
+                ref.onDisconnect().remove();
+                return true;
+            }
+        } catch (e) { }
+        return false;
+    }
+
+    function releaseEditLock() {
+        if (editLockAcquired && editLockRef) {
+            editLockRef.remove();
+            editLockAcquired = false;
+            editLockRef = null;
+        }
+    }
+
+    async function showDataSelectionScreen(user) {
         authContainer.style.display = 'block';
         loginForm.style.display = 'none';
         logoutArea.style.display = 'block';
-        authStatus.textContent = `Conectado como: ${user.email}`; 
-        dataSelectionContainer.style.display = 'block';
+        authStatus.textContent = `Conectado como: ${user.email}`;
+        dataSelectionContainer.style.display = 'none';
         mainContentContainer.style.display = 'none';
+
+        const locked = await acquireEditLock(user);
+        if (!locked) {
+            authStatus.textContent = 'Otro usuario está editando los datos en este momento.';
+            return;
+        }
+        dataSelectionContainer.style.display = 'block';
         fetchBackups();
     }
 
@@ -365,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 authStatus.textContent = '';
             });
     });
-    logoutButton.addEventListener('click', () => { auth.signOut(); });
+    logoutButton.addEventListener('click', () => { releaseEditLock(); auth.signOut(); });
     auth.onAuthStateChanged(user => user ? showDataSelectionScreen(user) : showLoginScreen());
 
     // --- CARGA DE VERSIONES (BACKUPS) ---
@@ -2993,5 +3032,6 @@ function getMondayOfWeek(year, week) {
             e.preventDefault();
             e.returnValue = '';
         }
+        releaseEditLock();
     });
 }); // This is the closing of DOMContentLoaded
