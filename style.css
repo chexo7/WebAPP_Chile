@@ -851,17 +851,18 @@ td.reimbursement-income {
 }
 
 #change-log-list {
-    list-style: none;
-    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .log-entry {
-    padding: 10px 0; 
-    border-bottom: 1px dotted var(--border-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background-color: var(--card-bg);
+    padding: 10px;
     font-size: 0.9rem;
-}
-.log-entry:last-child {
-    border-bottom: none;
+    box-shadow: var(--shadow);
 }
 
 .log-entry-empty {
@@ -869,11 +870,16 @@ td.reimbursement-income {
     font-style: italic;
 }
 
-.log-entry-header { 
+.log-entry-header {
     display: flex;
-    align-items: baseline; 
-    flex-wrap: nowrap; 
-    gap: 8px; 
+    align-items: baseline;
+    flex-wrap: nowrap;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.log-entry summary::-webkit-details-marker {
+    display: none;
 }
 
 .log-timestamp {
@@ -907,6 +913,18 @@ td.reimbursement-income {
 }
 .log-details-list li {
     margin-bottom: 3px;
+}
+
+.log-detail-added {
+    color: var(--text-green);
+}
+
+.log-detail-modified {
+    color: var(--text-orange);
+}
+
+.log-detail-deleted {
+    color: var(--text-red);
 }
 
 
