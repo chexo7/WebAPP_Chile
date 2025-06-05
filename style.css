@@ -359,6 +359,16 @@ button.button-large {
     font-size: 0.8rem;
     margin-right: 5px;
 }
+
+/* Ajuste de ancho y scroll para columna Monto en Gastos */
+#expenses-table-view td.expense-amount-cell {
+    width: 8ch;
+    max-width: 8ch;
+}
+#expenses-table-view td.expense-amount-cell .amount-scroll {
+    display: block;
+    overflow-x: auto;
+}
 /* Estilo para el icono de reembolso y la celda */
 .reimbursement-icon {
     font-weight: bold;
