@@ -313,10 +313,10 @@ button.button-large {
 /* Tablas dinámicas (Ingresos/Gastos/Presupuestos) */
 #incomes-table-view, #expenses-table-view, #budgets-table-view, #payments-table-view, #budget-summary-table {
     width: 100%;
-    min-width: max-content;
     border-collapse: separate;
     border-spacing: 0;
     font-size: 0.85rem;
+    table-layout: fixed; /* Prevent tables from expanding beyond container */
 }
 
 #incomes-table-view th, #incomes-table-view td,
