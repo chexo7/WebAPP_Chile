@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContentContainer = document.getElementById('main-content-container');
     const tabsContainer = document.querySelector('.tabs-container');
     const saveChangesButton = document.getElementById('save-changes-button');
+    const cashflowTabButton = tabsContainer ? tabsContainer.querySelector('.tab-button[data-tab="flujo-caja"]') : null;
 
     // --- ELEMENTOS PESTAÑA AJUSTES ---
     const settingsForm = document.getElementById('settings-form');
@@ -31,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const analysisStartDateInput = document.getElementById('analysis-start-date-input');
     const analysisInitialBalanceInput = document.getElementById('analysis-initial-balance-input');
     const displayCurrencySymbolInput = document.getElementById('display-currency-symbol-input');
+    const instantExpenseToggle = document.getElementById('instant-expense-toggle');
     const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
     const creditCardForm = document.getElementById('credit-card-form');
@@ -515,6 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentBackupData.analysis_periodicity = currentBackupData.analysis_periodicity || "Mensual";
                     currentBackupData.analysis_initial_balance = parseFloat(currentBackupData.analysis_initial_balance) || 0;
                     currentBackupData.display_currency_symbol = currentBackupData.display_currency_symbol || "$";
+                    currentBackupData.use_instant_expenses = !!currentBackupData.use_instant_expenses;
 
                     (currentBackupData.incomes || []).forEach(inc => {
                         if (inc.start_date) inc.start_date = new Date(inc.start_date + 'T00:00:00Z');
@@ -563,6 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         analysis_periodicity: "Mensual",
                         analysis_initial_balance: 0,
                         display_currency_symbol: "$",
+                        use_instant_expenses: false,
                         incomes: [],
                         expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
                         expenses: [],
@@ -886,6 +890,7 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis_periodicity: "Mensual",
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
+            use_instant_expenses: false,
             // usd_clp_rate: null, // No longer stored
             incomes: [],
             expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
@@ -1039,6 +1044,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.target.classList.contains('tab-button')) activateTab(event.target.dataset.tab);
     });
 
+    function updateAnalysisModeLabels() {
+        const instant = currentBackupData && currentBackupData.use_instant_expenses;
+        if (cashflowTabButton) cashflowTabButton.textContent = instant ? 'Tabla de Gastos/Ingresos' : 'Flujo de Caja';
+        if (cashflowMensualTitle) cashflowMensualTitle.textContent = (instant ? 'Tabla de Gastos/Ingresos' : 'Flujo de Caja') + ' - Mensual';
+        if (cashflowSemanalTitle) cashflowSemanalTitle.textContent = (instant ? 'Tabla de Gastos/Ingresos' : 'Flujo de Caja') + ' - Semanal';
+        if (graficoTitle) graficoTitle.textContent = (instant ? 'Gráfico de Gastos/Ingresos' : 'Gráfico de Flujo de Caja') + ` - ${activeCashflowPeriodicity}`;
+    }
+
     function setPeriodicity(periodicity, parent) {
         activeCashflowPeriodicity = periodicity;
         if (parent === 'cashflow' && cashflowSubtabs) {
@@ -1106,9 +1119,11 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisStartDateInput.value = getISODateString(currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
         analysisInitialBalanceInput.value = currentBackupData.analysis_initial_balance || 0;
         displayCurrencySymbolInput.value = currentBackupData.display_currency_symbol || "$";
+        if (instantExpenseToggle) instantExpenseToggle.checked = !!currentBackupData.use_instant_expenses;
         // usdClpRateInput.value = currentBackupData.usd_clp_rate || ''; // No longer used
         // updateUsdClpInfoLabel(); // This will be handled by fetchAndUpdateUSDCLPRate
         updateAnalysisDurationLabel();
+        updateAnalysisModeLabels();
     }
     function updateAnalysisDurationLabel() {
         analysisDurationLabel.textContent = "Duración (Meses):";
@@ -1208,11 +1223,13 @@ document.addEventListener('DOMContentLoaded', () => {
         currentBackupData.analysis_start_date = new Date(analysisStartDateInput.value + 'T00:00:00Z');
         currentBackupData.analysis_initial_balance = parseFloat(analysisInitialBalanceInput.value);
         currentBackupData.display_currency_symbol = displayCurrencySymbolInput.value.trim() || "$";
+        currentBackupData.use_instant_expenses = instantExpenseToggle ? instantExpenseToggle.checked : false;
         // currentBackupData.usd_clp_rate = parseFloat(usdClpRateInput.value) || null; // No longer stored
 
         updateAnalysisDurationLabel();
         alert("Ajustes aplicados. El flujo de caja y el gráfico se recalcularán.");
         renderCashflowTable();
+        updateAnalysisModeLabels();
         setupPaymentPeriodSelectors();
         renderPaymentsTableForCurrentPeriod();
         renderBudgetsTable();
@@ -1834,6 +1851,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- LÓGICA PESTAÑA FLUJO DE CAJA ---
     function renderCashflowTable() {
+        updateAnalysisModeLabels();
         renderCashflowTableFor('Mensual', cashflowMensualTableHead, cashflowMensualTableBody, cashflowMensualTitle);
         renderCashflowTableFor('Semanal', cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle);
     }
@@ -2098,7 +2116,18 @@ document.addEventListener('DOMContentLoaded', () => {
             let p_var_exp_total_for_period = 0.0;
 
             (data.expenses || []).forEach(exp => {
-                if (!exp.start_date) return; const e_start = exp.start_date; const e_end = exp.end_date; const amt_raw = parseFloat(exp.amount || 0); const freq = exp.frequency || "Mensual"; const typ = exp.type || (data.expense_categories && data.expense_categories[exp.category]) || "Variable"; const cat = exp.category;
+                if (!exp.start_date) return;
+                const baseStart = data.use_instant_expenses && exp.movement_date ? exp.movement_date : exp.start_date;
+                const e_start = baseStart;
+                let e_end = exp.end_date;
+                if (data.use_instant_expenses && exp.end_date && exp.movement_date) {
+                    const diff = exp.start_date.getTime() - exp.movement_date.getTime();
+                    e_end = new Date(exp.end_date.getTime() - diff);
+                }
+                const amt_raw = parseFloat(exp.amount || 0);
+                const freq = exp.frequency || "Mensual";
+                const typ = exp.type || (data.expense_categories && data.expense_categories[exp.category]) || "Variable";
+                const cat = exp.category;
                 if (amt_raw < 0 || !cat || !orderedCategories.includes(cat)) return;
                 const isActiveRange = (e_start <= p_end && (e_end === null || e_end >= p_start)); if (!isActiveRange) return;
                 
@@ -2379,10 +2408,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function getExpenseOccurrencesInPeriod(expense, pStart, pEnd, periodicity) {
+    function getExpenseOccurrencesInPeriod(expense, pStart, pEnd, periodicity, useInstant) {
         if (!expense.start_date) return 0;
-        const start = new Date(expense.start_date);
-        const end = expense.end_date ? new Date(expense.end_date) : null;
+        const baseStart = useInstant && expense.movement_date ? new Date(expense.movement_date) : new Date(expense.start_date);
+        let start = baseStart;
+        let end = expense.end_date ? new Date(expense.end_date) : null;
+        if (useInstant && expense.end_date && expense.movement_date) {
+            const diff = new Date(expense.start_date).getTime() - new Date(expense.movement_date).getTime();
+            end = new Date(new Date(expense.end_date).getTime() - diff);
+        }
         const freq = expense.frequency || 'Mensual';
 
         if (freq === 'Único') {
@@ -2436,7 +2470,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const totals = {};
         const methodTotals = {};
         (currentBackupData.expenses || []).forEach(exp => {
-            const occ = getExpenseOccurrencesInPeriod(exp, periodStart, periodEnd, periodicity);
+            const occ = getExpenseOccurrencesInPeriod(exp, periodStart, periodEnd, periodicity, currentBackupData.use_instant_expenses);
             if (occ <= 0) return;
             const amt = parseFloat(exp.amount || 0) * occ;
             if (!totals[exp.category]) {

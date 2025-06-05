@@ -138,8 +138,9 @@ function getPeriodEndDate(date, periodicity) {
 function calculateCashFlowData(data) {
     const startDate = data.analysis_start_date; 
     const duration = parseInt(data.analysis_duration, 10); 
-    const periodicity = data.analysis_periodicity; 
+    const periodicity = data.analysis_periodicity;
     const initialBalance = parseFloat(data.analysis_initial_balance);
+    const useInstant = !!data.use_instant_expenses;
     
     let periodDates = []; 
     let income_p = Array(duration).fill(0.0); 
@@ -247,9 +248,14 @@ function calculateCashFlowData(data) {
         let p_var_exp_total_for_period = 0.0;
 
         (data.expenses || []).forEach(exp => {
-            if (!exp.start_date) return; 
-            const e_start = exp.start_date; 
-            const e_end = exp.end_date; 
+            if (!exp.start_date) return;
+            const baseStart = useInstant && exp.movement_date ? exp.movement_date : exp.start_date;
+            const e_start = baseStart;
+            let e_end = exp.end_date;
+            if (useInstant && exp.end_date && exp.movement_date) {
+                const diff = new Date(exp.start_date).getTime() - new Date(exp.movement_date).getTime();
+                e_end = new Date(new Date(exp.end_date).getTime() - diff);
+            }
             const amt_raw = parseFloat(exp.amount || 0); 
             const freq = exp.frequency || "Mensual"; 
             const cat = exp.category;
@@ -613,6 +619,25 @@ runTest("calculateCashFlowData - Scenario 3: Monthly Analysis, Bi-weekly Item", 
     const result = calculateCashFlowData(data);
     assertEquals(20 * 3, result.income_p[0], "Scenario 3 - Income (Jan 1, 15, 29)");
     assertEquals(7 * 2, result.var_exp_p[0], "Scenario 3 - Variable Expense (Jan 8, 22 for Food)");
+});
+
+runTest("calculateCashFlowData - Instant Expense Uses Movement Date", () => {
+    const dataBase = {
+        analysis_start_date: new Date(Date.UTC(2024, 3, 1)), // April 1, 2024
+        analysis_duration: 2,
+        analysis_periodicity: "Mensual",
+        analysis_initial_balance: 0,
+        expense_categories: { "TestCat": "Variable" },
+        incomes: [],
+        expenses: [
+            { name: "CardExp", amount: 100, category: "TestCat", frequency: "Mensual", start_date: new Date(Date.UTC(2024,4,10)), movement_date: new Date(Date.UTC(2024,3,15)), end_date: null }
+        ]
+    };
+    let res = calculateCashFlowData({ ...dataBase, use_instant_expenses: false });
+    assertEquals(0, res.var_exp_p[0], "Instant Off - April should be 0");
+    assertEquals(100, res.var_exp_p[1], "Instant Off - May should be 100");
+    res = calculateCashFlowData({ ...dataBase, use_instant_expenses: true });
+    assertEquals(100, res.var_exp_p[0], "Instant On - April should be 100");
 });
 
 runTest("calculateCashFlowData - Scenario 4: Weekly Analysis, Monthly Item", () => {
