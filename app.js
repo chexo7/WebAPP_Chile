@@ -1102,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
             !isNaN(payDay) && payDay >= 1 && payDay <= 31) {
             const start = cutoff === 31 ? 1 : cutoff + 1;
             creditCardExample.textContent =
-                `Ejemplo: seleccionaste día de corte el ${cutoff}, por lo que todo entre el ${start} y ${cutoff} (ambos incluidos) se pagará el día ${payDay}.`;
+                `Ejemplo: seleccionaste día de corte el ${cutoff}, por lo que por ejemplo todo entre el ${start} de enero y ${cutoff} de febrero (ambos incluidos) se pagará el día ${payDay} de marzo.`;
         } else {
             creditCardExample.textContent = '';
         }
