@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const authContainer = document.getElementById('auth-container');
     const loginForm = document.getElementById('login-form');
     const logoutArea = document.getElementById('logout-area');
+    const loginError = document.getElementById('login-error');
 
     const dataSelectionContainer = document.getElementById('data-selection-container');
     const backupSelector = document.getElementById('backup-selector');
@@ -263,6 +264,8 @@ document.addEventListener('DOMContentLoaded', () => {
         logoutArea.style.display = 'none';
         dataSelectionContainer.style.display = 'none';
         mainContentContainer.style.display = 'none';
+        loginError.style.display = 'none';
+        loginError.textContent = '';
         clearAllDataViews();
         currentBackupData = null;
         originalLoadedData = null;
@@ -326,9 +329,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const email = emailInput.value;
         const password = passwordInput.value;
         authStatus.textContent = "Ingresando...";
+        loginError.style.display = 'none';
+        loginError.textContent = '';
         auth.signInWithEmailAndPassword(email, password)
             .catch(error => {
-                authStatus.textContent = `Error: ${error.message}`;
+                loginError.textContent = 'Usuario o contraseña incorrectos.';
+                loginError.style.display = 'block';
+                authStatus.textContent = '';
             });
     });
     logoutButton.addEventListener('click', () => { auth.signOut(); });
