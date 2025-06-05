@@ -327,8 +327,18 @@ button.button-large {
     padding: 8px 10px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
-    white-space: nowrap;
     background-color: var(--card-bg);
+    min-width: 0; /* allow cells to shrink within fixed layout */
+}
+
+#incomes-table-view td,
+#expenses-table-view td,
+#budgets-table-view td,
+#payments-table-view td,
+#budget-summary-table td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* prevent content from expanding table width */
 }
 
 /* Cabeceras de tabla */
