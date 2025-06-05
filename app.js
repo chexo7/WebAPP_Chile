@@ -85,6 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let editingExpenseIndex = null;
 
     // --- BLOQUEO DE EDICIÓN ---
+    // Estado del bloqueo de edición. Permite que solo un usuario acceda a la
+    // carga de la base de datos a la vez.
     let editLockAcquired = false;
     let editLockRef = null;
     let pendingLoginError = null;
