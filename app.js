@@ -135,6 +135,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const pieWeekCanvas = document.getElementById('pie-chart-week');
     const pieMonthContainer = document.getElementById('pie-month-container');
     const pieWeekContainer = document.getElementById('pie-week-container');
+    const chartModal = document.getElementById('chart-modal');
+    const chartModalClose = document.getElementById('chart-modal-close');
+    const chartModalTitle = document.getElementById('chart-modal-title');
+    const chartModalTableBody = document.querySelector('#chart-modal-table tbody');
     let cashflowChartInstance = null;
     let pieMonthChartInstance = null;
     let pieWeekChartInstance = null;
@@ -2510,6 +2514,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+        cashflowChartCanvas.onclick = (evt) => {
+            if (!cashflowChartInstance) return;
+            const points = cashflowChartInstance.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+            if (points.length) {
+                const idx = points[0].index;
+                const rows = gatherPeriodTransactions(periodDates[idx], activeCashflowPeriodicity);
+                openChartModal(`Transacciones - ${labels[idx]}`, rows);
+            }
+        };
         if (isTouchDevice) {
             enableChartZoom();
             if (chartMessage) chartMessage.textContent = 'Usa dos dedos para hacer zoom y mover el gráfico. Doble tap fuera del gráfico para salir.';
@@ -2534,6 +2547,58 @@ document.addEventListener('DOMContentLoaded', () => {
             freq = 'Mensual';
             end = addMonths(new Date(start), installments - 1);
         }
+
+        if (freq === 'Único') {
+            return (start >= pStart && start <= pEnd) ? 1 : 0;
+        } else if (freq === 'Mensual') {
+            if (start > pEnd || (end && end < pStart)) return 0;
+            const payDay = start.getUTCDate();
+            if (periodicity === 'Semanal') {
+                const payDate = new Date(Date.UTC(pStart.getUTCFullYear(), pStart.getUTCMonth(), payDay));
+                return (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) ? 1 : 0;
+            } else {
+                const year = pStart.getUTCFullYear();
+                const month = pStart.getUTCMonth();
+                const daysInMonth = getDaysInMonth(year, month);
+                const payDate = new Date(Date.UTC(year, month, Math.min(payDay, daysInMonth)));
+                return (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) ? 1 : 0;
+            }
+        } else if (freq === 'Semanal') {
+            if (start > pEnd || (end && end < pStart)) return 0;
+            if (periodicity === 'Semanal') {
+                return 1;
+            } else {
+                let count = 0;
+                const payDow = start.getUTCDay();
+                let d = new Date(pStart.getTime());
+                while (d <= pEnd) {
+                    if (d.getUTCDay() === payDow && d >= start && (!end || d <= end)) count++;
+                    d.setUTCDate(d.getUTCDate() + 1);
+                }
+                return count;
+            }
+        } else if (freq === 'Bi-semanal') {
+            if (start > pEnd || (end && end < pStart)) return 0;
+            let count = 0;
+            let payDate = new Date(start.getTime());
+            while (payDate < pStart) {
+                payDate = addWeeks(payDate, 2);
+                if (end && payDate > end) return count;
+            }
+            while (payDate <= pEnd) {
+                if (!end || payDate <= end) count++;
+                payDate = addWeeks(payDate, 2);
+            }
+            return count;
+        }
+        return 0;
+    }
+
+    function getIncomeOccurrencesInPeriod(income, pStart, pEnd, periodicity) {
+        if (!income.start_date) return 0;
+        const start = new Date(income.start_date);
+        const end = income.end_date ? new Date(income.end_date) : null;
+        const freq = income.frequency || 'Mensual';
 
         if (freq === 'Único') {
             return (start >= pStart && start <= pEnd) ? 1 : 0;
@@ -2637,6 +2702,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+        canvas.onclick = (evt) => {
+            const points = newChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+            if (points.length) {
+                const idx = points[0].index;
+                const cat = newChart.data.labels[idx];
+                const rows = gatherPeriodTransactions(periodStart, periodicity, cat);
+                openChartModal(`Transacciones - ${cat}`, rows);
+            }
+        };
         return newChart;
     }
 
@@ -3003,6 +3077,52 @@ function getMondayOfWeek(year, week) {
             }
         }
         renderCashflowChart(fDates, fInc, fExp, fNet, fEnd, false);
+    }
+
+    function openChartModal(title, rows) {
+        if (!chartModal || !chartModalTableBody || !chartModalTitle) return;
+        chartModalTitle.textContent = title;
+        chartModalTableBody.innerHTML = '';
+        const symbol = currentBackupData && currentBackupData.display_currency_symbol ? currentBackupData.display_currency_symbol : '$';
+        rows.forEach(r => {
+            const tr = document.createElement('tr');
+            tr.insertCell().textContent = r.type;
+            tr.insertCell().textContent = r.name;
+            tr.insertCell().textContent = formatCurrencyJS(r.amount, symbol);
+            tr.insertCell().textContent = r.category || '';
+            tr.insertCell().textContent = r.date || '';
+            chartModalTableBody.appendChild(tr);
+        });
+        chartModal.style.display = 'flex';
+    }
+
+    if (chartModalClose) chartModalClose.addEventListener('click', () => { chartModal.style.display = 'none'; });
+    if (chartModal) chartModal.addEventListener('click', (e) => { if (e.target === chartModal) chartModal.style.display = 'none'; });
+
+    function gatherPeriodTransactions(pStart, periodicity, categoryFilter = null) {
+        const pEnd = getPeriodEndDate(pStart, periodicity);
+        const rows = [];
+        (currentBackupData.incomes || []).forEach(inc => {
+            const occ = getIncomeOccurrencesInPeriod(inc, pStart, pEnd, periodicity);
+            if (occ > 0) {
+                const amount = parseFloat(inc.net_monthly || 0) * occ;
+                const category = inc.is_reimbursement ? inc.reimbursement_category : '';
+                if (categoryFilter && categoryFilter !== category) return;
+                rows.push({ type: inc.is_reimbursement ? 'Reembolso' : 'Ingreso', name: inc.name, amount, category, date: getISODateString(new Date(inc.start_date)) });
+            }
+        });
+        (currentBackupData.expenses || []).forEach(exp => {
+            if (categoryFilter && categoryFilter !== exp.category) return;
+            const occ = getExpenseOccurrencesInPeriod(exp, pStart, pEnd, periodicity, currentBackupData.use_instant_expenses);
+            if (occ > 0) {
+                let amount = parseFloat(exp.amount || 0);
+                const inst = parseInt(exp.installments || 1);
+                if (inst > 1 && !currentBackupData.use_instant_expenses) amount = amount / inst;
+                amount = amount * occ;
+                rows.push({ type: 'Gasto', name: exp.name, amount, category: exp.category, date: getISODateString(new Date(exp.start_date)) });
+            }
+        });
+        return rows;
     }
 
     if (cashflowChartCanvas) {
