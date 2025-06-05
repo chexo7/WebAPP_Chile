@@ -519,6 +519,30 @@ td.reimbursement-income {
 .tab-content { display: none; padding-top: 10px; }
 .tab-content.active { display: block; animation: fadeIn 0.5s ease-out; }
 
+/* Subtabs Styling */
+.subtabs-container {
+  display: flex;
+  gap: 10px;
+  border-bottom: 2px solid var(--border-color);
+  margin-bottom: 10px;
+}
+.subtab-button {
+  padding: 6px 12px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font-size: 0.9rem;
+  color: var(--light-text);
+  border-bottom: 3px solid transparent;
+  transition: color 0.3s ease, border-bottom-color 0.3s ease;
+}
+.subtab-button.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  font-weight: 600;
+}
+.subtab-button:hover:not(.active) { color: var(--primary-color); }
+
 .save-changes-container {
     text-align: center;
     margin-top: 25px;
@@ -896,6 +920,10 @@ td.reimbursement-income {
     white-space: nowrap;
     font-size: 0.9rem;
     padding: 8px 12px;
+  }
+  .subtab-button {
+    font-size: 0.85rem;
+    padding: 6px 10px;
   }
 
   .form-and-table-layout {

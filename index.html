@@ -44,8 +44,7 @@
             <div class="tabs-container">
                 <button class="tab-button" data-tab="gastos">Gastos</button>
                 <button class="tab-button" data-tab="ingresos">Ingresos</button>
-                <button class="tab-button" data-tab="flujo-caja-mensual">Flujo de Caja - Mensual</button>
-                <button class="tab-button" data-tab="flujo-caja-semanal">Flujo de Caja - Semanal</button>
+                <button class="tab-button" data-tab="flujo-caja">Flujo de Caja</button>
                 <button class="tab-button" data-tab="grafico">Gráfico</button>
                 <button class="tab-button" data-tab="registro-pagos">Registro Pagos</button>
                 <button class="tab-button" data-tab="recordatorios">Recordatorios</button>
@@ -323,7 +322,11 @@
                 </div>
             </div>
             
-            <div id="flujo-caja-mensual" class="tab-content">
+            <div id="flujo-caja" class="tab-content">
+                <div class="subtabs-container" id="cashflow-subtabs">
+                    <button class="subtab-button active" data-parent="cashflow" data-period="Mensual">Mensual</button>
+                    <button class="subtab-button" data-parent="cashflow" data-period="Semanal">Semanal</button>
+                </div>
                 <div id="cashflow-mensual-container">
                     <h2 id="cashflow-mensual-title">Flujo de Caja - Mensual</h2>
                     <div class="table-responsive">
@@ -333,10 +336,7 @@
                         </table>
                     </div>
                 </div>
-            </div>
-
-            <div id="flujo-caja-semanal" class="tab-content">
-                <div id="cashflow-semanal-container">
+                <div id="cashflow-semanal-container" style="display:none;">
                     <h2 id="cashflow-semanal-title">Flujo de Caja - Semanal</h2>
                     <div class="table-responsive">
                         <table id="cashflow-semanal-table">
@@ -348,7 +348,11 @@
             </div>
 
             <div id="grafico" class="tab-content">
-                <h2>Gráfico de Flujo de Caja</h2>
+                <div class="subtabs-container" id="chart-subtabs">
+                    <button class="subtab-button active" data-parent="chart" data-period="Mensual">Mensual</button>
+                    <button class="subtab-button" data-parent="chart" data-period="Semanal">Semanal</button>
+                </div>
+                <h2 id="grafico-title">Gráfico de Flujo de Caja</h2>
                 <div class="chart-container">
                     <canvas id="cashflow-chart"></canvas>
                 </div>

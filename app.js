@@ -105,6 +105,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const cashflowSemanalTableBody = document.querySelector('#cashflow-semanal-table tbody');
     const cashflowSemanalTableHead = document.querySelector('#cashflow-semanal-table thead');
     const cashflowSemanalTitle = document.getElementById('cashflow-semanal-title');
+    const cashflowSubtabs = document.getElementById('cashflow-subtabs');
+    const cashflowMensualContainer = document.getElementById('cashflow-mensual-container');
+    const cashflowSemanalContainer = document.getElementById('cashflow-semanal-container');
 
     // --- ELEMENTOS PESTAÑA GRÁFICO ---
     const cashflowChartCanvas = document.getElementById('cashflow-chart');
@@ -112,6 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const mobileChartStartInput = document.getElementById('mobile-chart-start');
     const mobileChartEndInput = document.getElementById('mobile-chart-end');
     const applyMobileChartRangeButton = document.getElementById('apply-mobile-chart-range');
+    const chartSubtabs = document.getElementById('chart-subtabs');
+    const graficoTitle = document.getElementById('grafico-title');
     let cashflowChartInstance = null;
     let chartZoomMode = false;
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
@@ -1001,9 +1006,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeContent) activeContent.classList.add('active');
         if (activeButton) activeButton.classList.add('active');
 
-        if (tabId === 'flujo-caja-mensual') { activeCashflowPeriodicity = 'Mensual'; renderCashflowTable(); }
-        if (tabId === 'flujo-caja-semanal') { activeCashflowPeriodicity = 'Semanal'; renderCashflowTable(); }
-        if (tabId === 'grafico') renderCashflowTable();
+        if (tabId === 'flujo-caja') {
+            setPeriodicity(activeCashflowPeriodicity, 'cashflow');
+        }
+        if (tabId === 'grafico') {
+            setPeriodicity(activeCashflowPeriodicity, 'chart');
+        }
         if (tabId === 'presupuestos') { renderBudgetsTable(); renderBudgetSummaryTable(); }
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); renderPaymentsTableForCurrentPeriod(); }
         if (tabId === 'ajustes') {
@@ -1015,6 +1023,38 @@ document.addEventListener('DOMContentLoaded', () => {
     tabsContainer.addEventListener('click', (event) => {
         if (event.target.classList.contains('tab-button')) activateTab(event.target.dataset.tab);
     });
+
+    function setPeriodicity(periodicity, parent) {
+        activeCashflowPeriodicity = periodicity;
+        if (parent === 'cashflow' && cashflowSubtabs) {
+            cashflowSubtabs.querySelectorAll('.subtab-button').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = cashflowSubtabs.querySelector(`.subtab-button[data-period="${periodicity}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+            if (cashflowMensualContainer && cashflowSemanalContainer) {
+                cashflowMensualContainer.style.display = periodicity === 'Mensual' ? 'block' : 'none';
+                cashflowSemanalContainer.style.display = periodicity === 'Semanal' ? 'block' : 'none';
+            }
+            renderCashflowTable();
+        }
+        if (parent === 'chart' && chartSubtabs) {
+            chartSubtabs.querySelectorAll('.subtab-button').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = chartSubtabs.querySelector(`.subtab-button[data-period="${periodicity}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+            if (graficoTitle) graficoTitle.textContent = `Gráfico de Flujo de Caja - ${periodicity}`;
+            renderCashflowTable();
+        }
+    }
+
+    if (cashflowSubtabs) {
+        cashflowSubtabs.addEventListener('click', (e) => {
+            if (e.target.classList.contains('subtab-button')) setPeriodicity(e.target.dataset.period, 'cashflow');
+        });
+    }
+    if (chartSubtabs) {
+        chartSubtabs.addEventListener('click', (e) => {
+            if (e.target.classList.contains('subtab-button')) setPeriodicity(e.target.dataset.period, 'chart');
+        });
+    }
 
     // --- LÓGICA PESTAÑA AJUSTES ---
     async function fetchAndUpdateUSDCLPRate() {
