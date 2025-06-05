@@ -1610,6 +1610,7 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A');
             row.insertCell().textContent = expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A';
             row.insertCell().textContent = expense.end_date ? getISODateString(new Date(expense.end_date)) : (expense.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
+            row.insertCell().textContent = expense.payment_method === 'Credito' ? 'Tarjeta' : 'Efectivo';
             row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
             const actionsCell = row.insertCell();
             const editButton = document.createElement('button'); editButton.textContent = 'Editar'; editButton.classList.add('small-button');
