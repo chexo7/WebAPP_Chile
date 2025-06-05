@@ -187,8 +187,10 @@
                             <label for="expense-movement-date">Fecha Movimiento:</label>
                             <input type="date" id="expense-movement-date" required>
 
-                            <label for="expense-start-date">Fecha de Gasto/Pago:</label>
-                            <input type="date" id="expense-start-date" disabled required>
+                            <div id="expense-payment-date-container" style="display:none;">
+                                <label for="expense-start-date">Fecha de Gasto/Pago:</label>
+                                <input type="date" id="expense-start-date" disabled required>
+                            </div>
 
                             <label for="expense-end-date">Fecha Fin (si aplica):</label>
                             <input type="date" id="expense-end-date">

@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const removeCategoryButton = document.getElementById('remove-category-button');
     const expenseFrequencySelect = document.getElementById('expense-frequency');
     const expenseMovementDateInput = document.getElementById('expense-movement-date');
+    const expensePaymentDateContainer = document.getElementById('expense-payment-date-container');
     const expenseStartDateInput = document.getElementById('expense-start-date');
     const expenseEndDateInput = document.getElementById('expense-end-date');
     const expenseOngoingCheckbox = document.getElementById('expense-ongoing');
@@ -1051,10 +1052,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentBackupData.credit_cards) currentBackupData.credit_cards = [];
         currentBackupData.credit_cards.forEach((card, idx) => {
             const li = document.createElement('li');
-            li.textContent = `${card.name} (corte ${card.cutoff_day}, paga día ${card.payment_day || 1})`;
+            const span = document.createElement('span');
+            span.textContent = `${card.name} (corte ${card.cutoff_day}, paga día ${card.payment_day || 1})`;
+            li.appendChild(span);
+            const delBtn = document.createElement('button');
+            delBtn.textContent = 'Eliminar';
+            delBtn.classList.add('small-button', 'danger');
+            delBtn.addEventListener('click', () => {
+                if (confirm(`¿Eliminar tarjeta "${card.name}"?`)) {
+                    currentBackupData.credit_cards.splice(idx, 1);
+                    renderCreditCards();
+                }
+            });
+            li.appendChild(delBtn);
             creditCardsList.appendChild(li);
         });
         populateExpenseCreditCardDropdown();
+        updateExpensePaymentDate();
     }
 
     function populateExpenseCreditCardDropdown() {
@@ -1084,9 +1098,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateExpensePaymentDate() {
         const movValue = expenseMovementDateInput.value;
+        const isCredit = expensePaymentMethodSelect.value === 'Credito';
+        if (expensePaymentDateContainer) expensePaymentDateContainer.style.display = isCredit ? 'block' : 'none';
         if (!movValue) { expenseStartDateInput.value = ''; return; }
         const movDate = new Date(movValue + 'T00:00:00Z');
-        if (expensePaymentMethodSelect.value === 'Efectivo') {
+        if (!isCredit) {
             expenseStartDateInput.value = movValue;
         } else {
             const cardName = expenseCreditCardSelect.value;
@@ -1328,7 +1344,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isUnico) { expenseOngoingCheckbox.checked = false; expenseEndDateInput.value = ''; }
     });
     expensePaymentMethodSelect.addEventListener('change', () => {
-        expenseCreditCardContainer.style.display = expensePaymentMethodSelect.value === 'Credito' ? 'block' : 'none';
+        const isCredit = expensePaymentMethodSelect.value === 'Credito';
+        expenseCreditCardContainer.style.display = isCredit ? 'block' : 'none';
+        expensePaymentDateContainer.style.display = isCredit ? 'block' : 'none';
         updateExpensePaymentDate();
     });
     expenseMovementDateInput.addEventListener('change', updateExpensePaymentDate);
@@ -1447,6 +1465,7 @@ document.addEventListener('DOMContentLoaded', () => {
     expenseIsRealCheckbox.checked = false;
     expensePaymentMethodSelect.value = 'Efectivo';
     expenseCreditCardContainer.style.display = 'none';
+    expensePaymentDateContainer.style.display = 'none';
 
     // ... (rest of the function, e.g., setting default category, button text, etc.)
         if (expenseCategorySelect.options.length > 0 && expenseCategorySelect.value === "") {
@@ -1499,7 +1518,9 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseStartDateInput.value = expense.start_date ? getISODateString(new Date(expense.start_date)) : '';
         expenseIsRealCheckbox.checked = expense.is_real || false;
         expensePaymentMethodSelect.value = expense.payment_method || 'Efectivo';
-        expenseCreditCardContainer.style.display = expensePaymentMethodSelect.value === 'Credito' ? 'block' : 'none';
+        const isCreditEdit = expensePaymentMethodSelect.value === 'Credito';
+        expenseCreditCardContainer.style.display = isCreditEdit ? 'block' : 'none';
+        expensePaymentDateContainer.style.display = isCreditEdit ? 'block' : 'none';
         if (expense.credit_card) expenseCreditCardSelect.value = expense.credit_card;
         const isUnico = expense.frequency === 'Único';
         expenseOngoingCheckbox.disabled = isUnico;
