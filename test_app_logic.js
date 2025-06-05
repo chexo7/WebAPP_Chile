@@ -931,6 +931,53 @@ runTest("testWeeklyView_MonthlyRecurringExpense_Oct1_AnalysisFromSep24", () => {
         assertEquals(100, (expenses_by_cat_p[idxDec]["TestMonthlyBugCat"] || 0), "TestMonthlyBug: Expense should be 100 in week of Dec 1");
     }
 });
+runTest("calculateCashFlowData - Credit Card Installments Weekly View", () => {
+    const data = {
+        analysis_start_date: new Date(Date.UTC(2024,0,1)),
+        analysis_duration: 10,
+        analysis_periodicity: "Semanal",
+        analysis_initial_balance: 0,
+        expense_categories: { "TestCat": "Variable" },
+        incomes: [],
+        expenses: [
+            { name: "InstPurchase", amount: 100, category: "TestCat", frequency: "Único", start_date: new Date(Date.UTC(2024,1,5)), movement_date: new Date(Date.UTC(2024,0,15)), end_date: null, installments: 2 }
+        ]
+    };
+    let r = calculateCashFlowData({ ...data, use_instant_expenses: false });
+    assertEquals(50, r.var_exp_p[5], "Weekly View - first installment Feb 5");
+    assertEquals(50, r.var_exp_p[9], "Weekly View - second installment Mar 5");
+    r = calculateCashFlowData({ ...data, use_instant_expenses: true });
+    assertEquals(100, r.var_exp_p[2], "Weekly View instant mode uses movement date");
+});
+
+runTest("calculateCashFlowData - Mixed Incomes and Installments", () => {
+    const data = {
+        analysis_start_date: new Date(Date.UTC(2024,0,1)),
+        analysis_duration: 3,
+        analysis_periodicity: "Mensual",
+        analysis_initial_balance: 0,
+        expense_categories: { "Rent": "Fijo", "Shopping": "Variable" },
+        incomes: [
+            { name: "Salary", net_monthly: 1000, frequency: "Mensual", start_date: new Date(Date.UTC(2024,0,1)), end_date: null, is_reimbursement: false }
+        ],
+        expenses: [
+            { name: "Rent", amount: 500, category: "Rent", frequency: "Mensual", start_date: new Date(Date.UTC(2024,0,5)), end_date: null },
+            { name: "TV", amount: 300, category: "Shopping", frequency: "Único", start_date: new Date(Date.UTC(2024,1,5)), movement_date: new Date(Date.UTC(2024,0,15)), end_date: null, installments: 3 }
+        ]
+    };
+    let r = calculateCashFlowData({ ...data, use_instant_expenses: false });
+    assertEquals(1000, r.income_p[0], "Mixed - Jan income");
+    assertEquals(500, r.fixed_exp_p[0], "Mixed - Jan rent");
+    assertEquals(0, r.var_exp_p[0], "Mixed - Jan var expense");
+    assertEquals(1000, r.income_p[1], "Mixed - Feb income");
+    assertEquals(500, r.fixed_exp_p[1], "Mixed - Feb rent");
+    assertEquals(100, r.var_exp_p[1], "Mixed - Feb installment");
+    assertEquals(1000, r.income_p[2], "Mixed - Mar income");
+    assertEquals(500, r.fixed_exp_p[2], "Mixed - Mar rent");
+    assertEquals(100, r.var_exp_p[2], "Mixed - Mar installment");
+    r = calculateCashFlowData({ ...data, use_instant_expenses: true });
+    assertEquals(300, r.var_exp_p[0], "Mixed - Instant mode charges full amount Jan");
+});
 // Ensure summarizeTests() is the last call.
 summarizeTests();
 // End of test_app_logic.js
