@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const creditCardCutoffInput = document.getElementById('credit-card-cutoff');
     const creditCardPaymentDayInput = document.getElementById('credit-card-payment-day');
     const creditCardsList = document.getElementById('credit-cards-list');
+    const creditCardExample = document.getElementById('credit-card-example');
 
     // --- ELEMENTOS PESTAÑA INGRESOS ---
     const incomeForm = document.getElementById('income-form');
@@ -1093,6 +1094,20 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisDurationLabel.textContent = "Duración (Meses):";
     }
 
+    function updateCreditCardExample() {
+        if (!creditCardExample) return;
+        const cutoff = parseInt(creditCardCutoffInput.value, 10);
+        const payDay = parseInt(creditCardPaymentDayInput.value, 10);
+        if (!isNaN(cutoff) && cutoff >= 1 && cutoff <= 31 &&
+            !isNaN(payDay) && payDay >= 1 && payDay <= 31) {
+            const start = cutoff === 31 ? 1 : cutoff + 1;
+            creditCardExample.textContent =
+                `Ejemplo: seleccionaste día de corte el ${cutoff}, por lo que todo entre el ${start} y ${cutoff} (ambos incluidos) se pagará el día ${payDay}.`;
+        } else {
+            creditCardExample.textContent = '';
+        }
+    }
+
     function renderCreditCards() {
         if (!creditCardsList) return;
         creditCardsList.innerHTML = '';
@@ -1185,6 +1200,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (creditCardForm) {
+        creditCardCutoffInput.addEventListener('input', updateCreditCardExample);
+        creditCardPaymentDayInput.addEventListener('input', updateCreditCardExample);
+        updateCreditCardExample();
         creditCardForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const name = creditCardNameInput.value.trim();
@@ -1198,6 +1216,7 @@ document.addEventListener('DOMContentLoaded', () => {
             creditCardNameInput.value = '';
             creditCardCutoffInput.value = '';
             creditCardPaymentDayInput.value = '';
+            updateCreditCardExample();
             renderCreditCards();
         });
     }

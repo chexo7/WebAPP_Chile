@@ -559,6 +559,30 @@ td.reimbursement-income {
     max-width: 600px;
     margin: 0 auto;
 }
+#credit-card-settings-container {
+    max-width: 600px;
+    margin: 20px auto;
+}
+#credit-card-example {
+    margin-top: -5px;
+    margin-bottom: 10px;
+    color: var(--light-text);
+}
+#credit-cards-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 10px;
+}
+#credit-cards-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+#credit-cards-list li:last-child {
+    border-bottom: none;
+}
 #settings-form label {
     margin-top: 10px;
 }
