@@ -657,6 +657,17 @@ td.reimbursement-income {
     margin: 0 auto;
 }
 
+.multiple-pie-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: space-around;
+}
+
+.pie-wrapper {
+    flex: 1 1 30%;
+}
+
 #cashflow-chart {
     width: 100%;
     max-width: none;
