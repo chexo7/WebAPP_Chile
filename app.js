@@ -41,6 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const creditCardPaymentDayInput = document.getElementById('credit-card-payment-day');
     const creditCardsList = document.getElementById('credit-cards-list');
     const creditCardExample = document.getElementById('credit-card-example');
+    const addCreditCardButton = document.getElementById('add-credit-card-button');
+    const cancelEditCreditCardButton = document.getElementById('cancel-edit-credit-card-button');
+    let editingCreditCardIndex = null;
 
     // --- ELEMENTOS PESTAÑA INGRESOS ---
     const incomeForm = document.getElementById('income-form');
@@ -1154,16 +1157,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const span = document.createElement('span');
             span.textContent = `${card.name} (corte ${card.cutoff_day}, paga día ${card.payment_day || 1})`;
             li.appendChild(span);
+
+            const isInUse = (currentBackupData.expenses || []).some(exp => exp.payment_method === 'Credito' && exp.credit_card === card.name);
+
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Editar';
+            editBtn.classList.add('small-button');
+            editBtn.disabled = isInUse;
+            editBtn.title = isInUse ? 'Tarjeta en uso por gastos' : 'Editar tarjeta';
+            editBtn.addEventListener('click', () => { if (!isInUse) loadCreditCardForEdit(idx); });
+            li.appendChild(editBtn);
+
             const delBtn = document.createElement('button');
             delBtn.textContent = 'Eliminar';
             delBtn.classList.add('small-button', 'danger');
+            delBtn.disabled = isInUse;
+            delBtn.title = isInUse ? 'Tarjeta en uso por gastos' : 'Eliminar tarjeta';
             delBtn.addEventListener('click', () => {
+                if (isInUse) return;
                 if (confirm(`¿Eliminar tarjeta "${card.name}"?`)) {
                     currentBackupData.credit_cards.splice(idx, 1);
                     renderCreditCards();
                 }
             });
             li.appendChild(delBtn);
+
             creditCardsList.appendChild(li);
         });
         populateExpenseCreditCardDropdown();
@@ -1242,6 +1260,7 @@ document.addEventListener('DOMContentLoaded', () => {
         creditCardCutoffInput.addEventListener('input', updateCreditCardExample);
         creditCardPaymentDayInput.addEventListener('input', updateCreditCardExample);
         updateCreditCardExample();
+
         creditCardForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const name = creditCardNameInput.value.trim();
@@ -1251,13 +1270,42 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isNaN(cutoff) || cutoff < 1 || cutoff > 31) { alert('Día de corte inválido'); return; }
             if (isNaN(payDay) || payDay < 1 || payDay > 31) { alert('Día de pago inválido'); return; }
             if (!currentBackupData.credit_cards) currentBackupData.credit_cards = [];
-            currentBackupData.credit_cards.push({ name: name, cutoff_day: cutoff, payment_day: payDay });
-            creditCardNameInput.value = '';
-            creditCardCutoffInput.value = '';
-            creditCardPaymentDayInput.value = '';
-            updateCreditCardExample();
+
+            const cardData = { name: name, cutoff_day: cutoff, payment_day: payDay };
+            if (editingCreditCardIndex !== null) {
+                currentBackupData.credit_cards[editingCreditCardIndex] = cardData;
+            } else {
+                currentBackupData.credit_cards.push(cardData);
+            }
+
             renderCreditCards();
+            resetCreditCardForm();
         });
+
+        cancelEditCreditCardButton.addEventListener('click', resetCreditCardForm);
+    }
+
+    function loadCreditCardForEdit(index) {
+        const card = currentBackupData.credit_cards[index];
+        creditCardNameInput.value = card.name;
+        creditCardCutoffInput.value = card.cutoff_day;
+        creditCardPaymentDayInput.value = card.payment_day;
+        addCreditCardButton.textContent = 'Guardar Cambios';
+        cancelEditCreditCardButton.style.display = 'inline-block';
+        editingCreditCardIndex = index;
+        updateCreditCardExample();
+        document.getElementById('ajustes').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function resetCreditCardForm() {
+        creditCardForm.reset();
+        creditCardNameInput.value = '';
+        creditCardCutoffInput.value = '';
+        creditCardPaymentDayInput.value = '';
+        addCreditCardButton.textContent = 'Agregar Tarjeta';
+        cancelEditCreditCardButton.style.display = 'none';
+        editingCreditCardIndex = null;
+        updateCreditCardExample();
     }
 
     // --- LÓGICA PESTAÑA INGRESOS ---
