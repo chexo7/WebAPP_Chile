@@ -360,12 +360,12 @@ button.button-large {
     margin-right: 5px;
 }
 
-/* Ajuste de ancho y scroll para columna Monto en Gastos */
-#expenses-table-view td.expense-amount-cell {
+/* Ajuste de ancho y scroll para columna Nombre en Gastos */
+#expenses-table-view td.expense-name-cell {
     width: 8ch;
     max-width: 8ch;
 }
-#expenses-table-view td.expense-amount-cell .amount-scroll {
+#expenses-table-view td.expense-name-cell .name-scroll {
     display: block;
     overflow-x: auto;
 }

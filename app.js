@@ -1699,13 +1699,13 @@ document.addEventListener('DOMContentLoaded', () => {
         filteredExpenses.forEach((expense) => {
             const originalIndex = currentBackupData.expenses.findIndex(exp => exp === expense);
             const row = expensesTableView.insertRow();
-            row.insertCell().textContent = expense.name;
-            const amountCell = row.insertCell();
-            const amountDiv = document.createElement('div');
-            amountDiv.textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$');
-            amountDiv.classList.add('amount-scroll');
-            amountCell.classList.add('expense-amount-cell');
-            amountCell.appendChild(amountDiv);
+            const nameCell = row.insertCell();
+            const nameDiv = document.createElement('div');
+            nameDiv.textContent = expense.name;
+            nameDiv.classList.add('name-scroll');
+            nameCell.classList.add('expense-name-cell');
+            nameCell.appendChild(nameDiv);
+            row.insertCell().textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$');
             row.insertCell().textContent = expense.category;
             row.insertCell().textContent = expense.frequency;
             row.insertCell().textContent = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A');
