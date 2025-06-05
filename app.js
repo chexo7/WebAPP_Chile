@@ -84,6 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchExpenseInput = document.getElementById('search-expense-input');
     let editingExpenseIndex = null;
 
+    // --- BLOQUEO DE EDICIÓN ---
+    let editLockAcquired = false;
+    let editLockRef = null;
+    let pendingLoginError = null;
+
     // --- ELEMENTOS PESTAÑA PRESUPUESTOS ---
     const budgetForm = document.getElementById('budget-form');
     const budgetCategorySelect = document.getElementById('budget-category-select');
@@ -276,14 +281,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- LÓGICA DE UI ---
-    function showLoginScreen() {
+    function showLoginScreen(errorMessage = null) {
         authContainer.style.display = 'block';
         loginForm.style.display = 'block';
         logoutArea.style.display = 'none';
         dataSelectionContainer.style.display = 'none';
         mainContentContainer.style.display = 'none';
-        loginError.style.display = 'none';
-        loginError.textContent = '';
+        if (errorMessage) {
+            loginError.textContent = errorMessage;
+            loginError.style.display = 'block';
+        } else {
+            loginError.style.display = 'none';
+            loginError.textContent = '';
+        }
         clearAllDataViews();
         currentBackupData = null;
         originalLoadedData = null;
@@ -292,13 +302,49 @@ document.addEventListener('DOMContentLoaded', () => {
         loadLatestVersionButton.disabled = true;
     }
 
-    function showDataSelectionScreen(user) {
+    async function acquireEditLock(user) {
+        const ref = getEditLockRefByUID(user.uid);
+        if (!ref) return false;
+        try {
+            const result = await ref.transaction(current => {
+                if (current === null || current.uid === user.uid) {
+                    return { uid: user.uid, timestamp: firebase.database.ServerValue.TIMESTAMP };
+                }
+                return;
+            });
+            if (result.committed && result.snapshot.val() && result.snapshot.val().uid === user.uid) {
+                editLockRef = ref;
+                editLockAcquired = true;
+                ref.onDisconnect().remove();
+                return true;
+            }
+        } catch (e) { }
+        return false;
+    }
+
+    function releaseEditLock() {
+        if (editLockAcquired && editLockRef) {
+            editLockRef.remove();
+            editLockAcquired = false;
+            editLockRef = null;
+        }
+    }
+
+    async function showDataSelectionScreen(user) {
         authContainer.style.display = 'block';
         loginForm.style.display = 'none';
         logoutArea.style.display = 'block';
-        authStatus.textContent = `Conectado como: ${user.email}`; 
-        dataSelectionContainer.style.display = 'block';
+        authStatus.textContent = `Conectado como: ${user.email}`;
+        dataSelectionContainer.style.display = 'none';
         mainContentContainer.style.display = 'none';
+
+        const locked = await acquireEditLock(user);
+        if (!locked) {
+            pendingLoginError = 'La base de datos está siendo utilizada por otro usuario.';
+            auth.signOut();
+            return;
+        }
+        dataSelectionContainer.style.display = 'block';
         fetchBackups();
     }
 
@@ -362,8 +408,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 authStatus.textContent = '';
             });
     });
-    logoutButton.addEventListener('click', () => { auth.signOut(); });
-    auth.onAuthStateChanged(user => user ? showDataSelectionScreen(user) : showLoginScreen());
+    logoutButton.addEventListener('click', () => { releaseEditLock(); auth.signOut(); });
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            showDataSelectionScreen(user);
+        } else {
+            showLoginScreen(pendingLoginError);
+            pendingLoginError = null;
+        }
+    });
 
     // --- CARGA DE VERSIONES (BACKUPS) ---
 
@@ -2945,5 +2998,6 @@ function getMondayOfWeek(year, week) {
             e.preventDefault();
             e.returnValue = '';
         }
+        releaseEditLock();
     });
 }); // This is the closing of DOMContentLoaded
