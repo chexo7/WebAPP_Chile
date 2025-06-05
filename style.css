@@ -341,6 +341,19 @@ button.button-large {
     text-overflow: ellipsis; /* prevent content from expanding table width */
 }
 
+/* Ajuste de la columna "Nombre" en la tabla de gastos */
+#expenses-table-view th:first-child,
+#expenses-table-view td:first-child {
+    width: 130px;
+    max-width: 130px;
+}
+
+#expenses-table-view td:first-child {
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-overflow: clip;
+}
+
 /* Cabeceras de tabla */
 #incomes-table-view thead th,
 #expenses-table-view thead th,
