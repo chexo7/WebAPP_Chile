@@ -87,6 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- BLOQUEO DE EDICIÓN ---
     let editLockAcquired = false;
     let editLockRef = null;
+    let pendingLoginError = null;
 
     // --- ELEMENTOS PESTAÑA PRESUPUESTOS ---
     const budgetForm = document.getElementById('budget-form');
@@ -280,14 +281,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- LÓGICA DE UI ---
-    function showLoginScreen() {
+    function showLoginScreen(errorMessage = null) {
         authContainer.style.display = 'block';
         loginForm.style.display = 'block';
         logoutArea.style.display = 'none';
         dataSelectionContainer.style.display = 'none';
         mainContentContainer.style.display = 'none';
-        loginError.style.display = 'none';
-        loginError.textContent = '';
+        if (errorMessage) {
+            loginError.textContent = errorMessage;
+            loginError.style.display = 'block';
+        } else {
+            loginError.style.display = 'none';
+            loginError.textContent = '';
+        }
         clearAllDataViews();
         currentBackupData = null;
         originalLoadedData = null;
@@ -334,7 +340,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const locked = await acquireEditLock(user);
         if (!locked) {
-            authStatus.textContent = 'Otro usuario está editando los datos en este momento.';
+            pendingLoginError = 'La base de datos está siendo utilizada por otro usuario.';
+            auth.signOut();
             return;
         }
         dataSelectionContainer.style.display = 'block';
@@ -402,7 +409,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     });
     logoutButton.addEventListener('click', () => { releaseEditLock(); auth.signOut(); });
-    auth.onAuthStateChanged(user => user ? showDataSelectionScreen(user) : showLoginScreen());
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            showDataSelectionScreen(user);
+        } else {
+            showLoginScreen(pendingLoginError);
+            pendingLoginError = null;
+        }
+    });
 
     // --- CARGA DE VERSIONES (BACKUPS) ---
 
