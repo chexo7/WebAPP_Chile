@@ -1224,10 +1224,13 @@ td.reimbursement-income {
     max-height: 80vh;
     overflow-y: auto;
     box-shadow: var(--shadow);
+    position: relative;
 }
 
 .modal-close {
-    float: right;
+    position: absolute;
+    top: 10px;
+    right: 10px;
     font-size: 1.5em;
     cursor: pointer;
 }
