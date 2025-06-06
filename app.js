@@ -1240,9 +1240,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const editBtn = document.createElement('button');
             editBtn.textContent = 'Editar';
             editBtn.classList.add('small-button');
-            editBtn.disabled = isInUse;
+            // La edición debe permitirse aunque la tarjeta esté en uso.
             editBtn.title = isInUse ? 'Tarjeta en uso por gastos' : 'Editar tarjeta';
-            editBtn.addEventListener('click', () => { if (!isInUse) loadCreditCardForEdit(idx); });
+            editBtn.addEventListener('click', () => { loadCreditCardForEdit(idx); });
             li.appendChild(editBtn);
 
             const delBtn = document.createElement('button');
@@ -1358,10 +1358,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const cardData = { name: name, cutoff_day: cutoff, payment_day: payDay };
             if (editingCreditCardIndex !== null) {
+                const oldName = currentBackupData.credit_cards[editingCreditCardIndex].name;
                 currentBackupData.credit_cards[editingCreditCardIndex] = cardData;
+                // Actualizar gastos que usen esta tarjeta si cambió el nombre
+                if (oldName !== name && currentBackupData.expenses) {
+                    currentBackupData.expenses.forEach(exp => {
+                        if (exp.payment_method === 'Credito' && exp.credit_card === oldName) {
+                            exp.credit_card = name;
+                        }
+                    });
+                }
             } else {
                 currentBackupData.credit_cards.push(cardData);
             }
+
+            // Refrescar vista de gastos para reflejar cambios de nombre
+            renderExpensesTable();
 
             renderCreditCards();
             resetCreditCardForm();
