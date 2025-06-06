@@ -3200,9 +3200,15 @@ function getMondayOfWeek(year, week) {
         });
         chartModal.style.display = 'flex';
     }
+    function closeChartModal() {
+        if (chartModal) chartModal.style.display = "none";
+    }
 
-    if (chartModalClose) chartModalClose.addEventListener('click', () => { chartModal.style.display = 'none'; });
-    if (chartModal) chartModal.addEventListener('click', (e) => { if (e.target === chartModal) chartModal.style.display = 'none'; });
+    if (chartModalClose) {
+        chartModalClose.addEventListener("click", closeChartModal);
+        chartModalClose.addEventListener("touchstart", function(e) { e.preventDefault(); closeChartModal(); });
+    }
+    if (chartModal) chartModal.addEventListener("click", function(e) { if (e.target === chartModal) closeChartModal(); });
 
     function gatherPeriodTransactions(pStart, periodicity, categoryFilter = null) {
         const pEnd = getPeriodEndDate(pStart, periodicity);
