@@ -673,6 +673,49 @@ td.reimbursement-income {
     padding: 6px 8px;
 }
 
+.multi-pie-container {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.multi-pie-container .chart-container {
+    flex: 1 1 250px;
+    max-width: 300px;
+    height: 40vh;
+    margin: 10px;
+}
+
+.shared-legend {
+    text-align: center;
+    margin-top: 10px;
+}
+
+.shared-legend ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.shared-legend li {
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    display: inline-block;
+    margin-right: 4px;
+    border-radius: 2px;
+}
+
 /* Estilos para Pestaña Gráfico */
 .chart-container {
     width: 100%;
