@@ -2701,17 +2701,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return { totals, methodTotals };
     }
 
-    function renderExpenseDistributionChart(periodStart, periodicity, canvas, existingInstance) {
+    function renderExpenseDistributionChart(periodStart, periodicity, canvas, existingInstance, categoriesOrder = null) {
         if (!canvas) return null;
         const { totals, methodTotals } = calculateExpenseDistribution(periodStart, periodicity);
-        const categories = Object.keys(totals).filter(cat => totals[cat] > 0);
+        let categories = categoriesOrder ? categoriesOrder.slice() : Object.keys(totals).filter(cat => totals[cat] > 0);
         if (existingInstance) { existingInstance.destroy(); }
-        if (categories.length === 0) {
+
+        const data = categories.map(cat => totals[cat] || 0);
+        const totalSum = data.reduce((a, b) => a + b, 0);
+        if (totalSum === 0) {
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0,0,canvas.width,canvas.height);
             return null;
         }
-        const data = categories.map(cat => totals[cat]);
+
         const colors = categories.map(cat => getCategoryColor(cat));
         const newChart = new Chart(canvas, {
             type: 'doughnut',
@@ -3066,13 +3069,14 @@ function getMondayOfWeek(year, week) {
             const { totals } = calculateExpenseDistribution(start, 'Mensual');
             Object.keys(totals).filter(c => totals[c] > 0).forEach(c => allCats.add(c));
         });
-        renderSharedLegend(pieMonthLegend, Array.from(allCats));
+        const catList = Array.from(allCats).sort();
+        renderSharedLegend(pieMonthLegend, catList);
         pieMonthInputs.forEach((inp, idx) => {
             const val = inp.value;
             if (!val) return;
             const [y,m] = val.split('-');
             const start = new Date(Date.UTC(parseInt(y), parseInt(m)-1, 1));
-            pieMonthChartInstances[idx] = renderExpenseDistributionChart(start, 'Mensual', pieMonthCanvases[idx], pieMonthChartInstances[idx]);
+            pieMonthChartInstances[idx] = renderExpenseDistributionChart(start, 'Mensual', pieMonthCanvases[idx], pieMonthChartInstances[idx], catList);
         });
     }
 
@@ -3091,13 +3095,14 @@ function getMondayOfWeek(year, week) {
             const { totals } = calculateExpenseDistribution(start, 'Semanal');
             Object.keys(totals).filter(c => totals[c] > 0).forEach(c => allCats.add(c));
         });
-        renderSharedLegend(pieWeekLegend, Array.from(allCats));
+        const catList = Array.from(allCats).sort();
+        renderSharedLegend(pieWeekLegend, catList);
         pieWeekInputs.forEach((inp, idx) => {
             const val = inp.value;
             if (!val) return;
             const [y,w] = val.split('-W');
             const start = getMondayOfWeek(parseInt(y), parseInt(w));
-            pieWeekChartInstances[idx] = renderExpenseDistributionChart(start, 'Semanal', pieWeekCanvases[idx], pieWeekChartInstances[idx]);
+            pieWeekChartInstances[idx] = renderExpenseDistributionChart(start, 'Semanal', pieWeekCanvases[idx], pieWeekChartInstances[idx], catList);
         });
     }
 
