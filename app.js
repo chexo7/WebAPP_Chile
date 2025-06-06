@@ -129,10 +129,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const applyMobileChartRangeButton = document.getElementById('apply-mobile-chart-range');
     const chartSubtabs = document.getElementById('chart-subtabs');
     const graficoTitle = document.getElementById('grafico-title');
-    const pieMonthInput = document.getElementById('pie-month-input');
-    const pieWeekInput = document.getElementById('pie-week-input');
-    const pieMonthCanvas = document.getElementById('pie-chart-month');
-    const pieWeekCanvas = document.getElementById('pie-chart-week');
+    const pieMonthInputs = [
+        document.getElementById('pie-month-input-1'),
+        document.getElementById('pie-month-input-2'),
+        document.getElementById('pie-month-input-3')
+    ];
+    const pieWeekInputs = [
+        document.getElementById('pie-week-input-1'),
+        document.getElementById('pie-week-input-2'),
+        document.getElementById('pie-week-input-3')
+    ];
+    const pieMonthCanvases = [
+        document.getElementById('pie-chart-month-1'),
+        document.getElementById('pie-chart-month-2'),
+        document.getElementById('pie-chart-month-3')
+    ];
+    const pieWeekCanvases = [
+        document.getElementById('pie-chart-week-1'),
+        document.getElementById('pie-chart-week-2'),
+        document.getElementById('pie-chart-week-3')
+    ];
     const pieMonthContainer = document.getElementById('pie-month-container');
     const pieWeekContainer = document.getElementById('pie-week-container');
     const chartModal = document.getElementById('chart-modal');
@@ -140,8 +156,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const chartModalTitle = document.getElementById('chart-modal-title');
     const chartModalTableBody = document.querySelector('#chart-modal-table tbody');
     let cashflowChartInstance = null;
-    let pieMonthChartInstance = null;
-    let pieWeekChartInstance = null;
+    let pieMonthChartInstances = [null, null, null];
+    let pieWeekChartInstances = [null, null, null];
     let chartZoomMode = false;
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
     let fullChartData = null;
@@ -352,8 +368,12 @@ document.addEventListener('DOMContentLoaded', () => {
         mainContentContainer.style.display = 'block';
         activateTab('gastos'); // Activate a default tab
         fetchAndUpdateUSDCLPRate(); // Fetch USD/CLP rate when main content is shown
-        if (typeof updatePieMonthChart === 'function') updatePieMonthChart();
-        if (typeof updatePieWeekChart === 'function') updatePieWeekChart();
+        if (typeof updatePieMonthChart === 'function') {
+            [0,1,2].forEach(idx => updatePieMonthChart(idx));
+        }
+        if (typeof updatePieWeekChart === 'function') {
+            [0,1,2].forEach(idx => updatePieWeekChart(idx));
+        }
     }
 
     function clearAllDataViews() {
@@ -386,12 +406,16 @@ document.addEventListener('DOMContentLoaded', () => {
             cashflowChartInstance.destroy();
             cashflowChartInstance = null;
         }
-        if (pieMonthChartInstance) { pieMonthChartInstance.destroy(); pieMonthChartInstance = null; }
-        if (pieWeekChartInstance) { pieWeekChartInstance.destroy(); pieWeekChartInstance = null; }
+        pieMonthChartInstances.forEach((inst, idx) => {
+            if (inst) { inst.destroy(); pieMonthChartInstances[idx] = null; }
+        });
+        pieWeekChartInstances.forEach((inst, idx) => {
+            if (inst) { inst.destroy(); pieWeekChartInstances[idx] = null; }
+        });
         if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja.";
         if (usdClpInfoLabel) usdClpInfoLabel.textContent = "1 USD = $CLP (Obteniendo...)";
-        if (pieMonthInput) pieMonthInput.value = '';
-        if (pieWeekInput) pieWeekInput.value = '';
+        pieMonthInputs.forEach(input => { if (input) input.value = ''; });
+        pieWeekInputs.forEach(input => { if (input) input.value = ''; });
     }
 
     // --- AUTENTICACIÓN ---
@@ -1121,8 +1145,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 pieMonthContainer.style.display = periodicity === 'Mensual' ? 'block' : 'none';
                 pieWeekContainer.style.display = periodicity === 'Semanal' ? 'block' : 'none';
             }
-            if (periodicity === 'Mensual' && typeof updatePieMonthChart === 'function') updatePieMonthChart();
-            if (periodicity === 'Semanal' && typeof updatePieWeekChart === 'function') updatePieWeekChart();
+            if (periodicity === 'Mensual' && typeof updatePieMonthChart === 'function') {
+                [0,1,2].forEach(idx => updatePieMonthChart(idx));
+            }
+            if (periodicity === 'Semanal' && typeof updatePieWeekChart === 'function') {
+                [0,1,2].forEach(idx => updatePieWeekChart(idx));
+            }
             renderCashflowTable();
         }
     }
@@ -2698,7 +2726,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         }
                     },
-                    legend: { position: 'bottom' }
+                    legend: { position: 'right' }
                 }
             }
         });
@@ -2996,30 +3024,42 @@ function getMondayOfWeek(year, week) {
         }
     }
 
-    if (pieMonthInput) pieMonthInput.value = today.toISOString().slice(0,7);
-    if (pieWeekInput) {
-        const [ywYear, ywWeek] = getWeekNumber(today);
-        pieWeekInput.value = `${ywYear}-W${('0'+ywWeek).slice(-2)}`;
+    pieMonthInputs.forEach(input => {
+        if (input) input.value = today.toISOString().slice(0,7);
+    });
+    const [ywYear, ywWeek] = getWeekNumber(today);
+    pieWeekInputs.forEach(input => {
+        if (input) input.value = `${ywYear}-W${('0'+ywWeek).slice(-2)}`;
+    });
+
+    function updatePieMonthChart(index) {
+        const input = pieMonthInputs[index];
+        const canvas = pieMonthCanvases[index];
+        if (!input || !canvas) return;
+        const val = input.value;
+        if (!val) return;
+        const [y, m] = val.split('-').map(Number);
+        const start = new Date(Date.UTC(y, m - 1, 1));
+        pieMonthChartInstances[index] = renderExpenseDistributionChart(start, 'Mensual', canvas, pieMonthChartInstances[index]);
     }
 
-    function updatePieMonthChart() {
-        const val = pieMonthInput.value;
+    function updatePieWeekChart(index) {
+        const input = pieWeekInputs[index];
+        const canvas = pieWeekCanvases[index];
+        if (!input || !canvas) return;
+        const val = input.value;
         if (!val) return;
-        const [y,m] = val.split('-').map(Number);
-        const start = new Date(Date.UTC(y, m-1, 1));
-        pieMonthChartInstance = renderExpenseDistributionChart(start, 'Mensual', pieMonthCanvas, pieMonthChartInstance);
-    }
-
-    function updatePieWeekChart() {
-        const val = pieWeekInput.value;
-        if (!val) return;
-        const [y,w] = val.split('-W');
+        const [y, w] = val.split('-W');
         const start = getMondayOfWeek(parseInt(y), parseInt(w));
-        pieWeekChartInstance = renderExpenseDistributionChart(start, 'Semanal', pieWeekCanvas, pieWeekChartInstance);
+        pieWeekChartInstances[index] = renderExpenseDistributionChart(start, 'Semanal', canvas, pieWeekChartInstances[index]);
     }
 
-    if (pieMonthInput) pieMonthInput.addEventListener('change', updatePieMonthChart);
-    if (pieWeekInput) pieWeekInput.addEventListener('change', updatePieWeekChart);
+    pieMonthInputs.forEach((input, idx) => {
+        if (input) input.addEventListener('change', () => updatePieMonthChart(idx));
+    });
+    pieWeekInputs.forEach((input, idx) => {
+        if (input) input.addEventListener('change', () => updatePieWeekChart(idx));
+    });
 
     // --- CONFIGURAR ZOOM EN EL GRÁFICO ---
     function enableChartZoom() {
