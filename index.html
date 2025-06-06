@@ -380,22 +380,44 @@
 
                 <div id="pie-month-container">
                     <h3>Distribución de Gastos por Categoría - Mensual</h3>
-                    <div class="chart-period-selector">
-                        <input type="month" id="pie-month-input">
+                    <div class="chart-period-selector multi-input">
+                        <input type="month" id="pie-month-input-1">
+                        <input type="month" id="pie-month-input-2">
+                        <input type="month" id="pie-month-input-3">
                     </div>
-                    <div class="chart-container">
-                        <canvas id="pie-chart-month"></canvas>
+                    <div class="multi-pie-container">
+                        <div class="chart-container">
+                            <canvas id="pie-chart-month-1"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="pie-chart-month-2"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="pie-chart-month-3"></canvas>
+                        </div>
                     </div>
+                    <div id="pie-month-legend" class="shared-legend"></div>
                 </div>
 
                 <div id="pie-week-container" style="display:none;">
                     <h3>Distribución de Gastos por Categoría - Semanal</h3>
-                    <div class="chart-period-selector">
-                        <input type="week" id="pie-week-input">
+                    <div class="chart-period-selector multi-input">
+                        <input type="week" id="pie-week-input-1">
+                        <input type="week" id="pie-week-input-2">
+                        <input type="week" id="pie-week-input-3">
                     </div>
-                    <div class="chart-container">
-                        <canvas id="pie-chart-week"></canvas>
+                    <div class="multi-pie-container">
+                        <div class="chart-container">
+                            <canvas id="pie-chart-week-1"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="pie-chart-week-2"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="pie-chart-week-3"></canvas>
+                        </div>
                     </div>
+                    <div id="pie-week-legend" class="shared-legend"></div>
                 </div>
             </div>
 

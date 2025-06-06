@@ -3,6 +3,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
         Chart.register(ChartZoom);
     }
+    const CATEGORY_COLORS = [
+        '#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
+        '#edc949', '#af7aa1', '#ff9da7', '#9c755f', '#bab0ab',
+        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+    ];
+    const globalCategoryColors = {};
+    let nextCategoryColorIndex = 0;
+    function getCategoryColor(cat) {
+        if (!globalCategoryColors[cat]) {
+            globalCategoryColors[cat] = CATEGORY_COLORS[nextCategoryColorIndex % CATEGORY_COLORS.length];
+            nextCategoryColorIndex++;
+        }
+        return globalCategoryColors[cat];
+    }
     // --- ELEMENTOS GLOBALES ---
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
@@ -129,19 +144,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const applyMobileChartRangeButton = document.getElementById('apply-mobile-chart-range');
     const chartSubtabs = document.getElementById('chart-subtabs');
     const graficoTitle = document.getElementById('grafico-title');
-    const pieMonthInput = document.getElementById('pie-month-input');
-    const pieWeekInput = document.getElementById('pie-week-input');
-    const pieMonthCanvas = document.getElementById('pie-chart-month');
-    const pieWeekCanvas = document.getElementById('pie-chart-week');
+    const pieMonthInputs = [
+        document.getElementById('pie-month-input-1'),
+        document.getElementById('pie-month-input-2'),
+        document.getElementById('pie-month-input-3')
+    ];
+    const pieWeekInputs = [
+        document.getElementById('pie-week-input-1'),
+        document.getElementById('pie-week-input-2'),
+        document.getElementById('pie-week-input-3')
+    ];
+    const pieMonthCanvases = [
+        document.getElementById('pie-chart-month-1'),
+        document.getElementById('pie-chart-month-2'),
+        document.getElementById('pie-chart-month-3')
+    ];
+    const pieWeekCanvases = [
+        document.getElementById('pie-chart-week-1'),
+        document.getElementById('pie-chart-week-2'),
+        document.getElementById('pie-chart-week-3')
+    ];
     const pieMonthContainer = document.getElementById('pie-month-container');
     const pieWeekContainer = document.getElementById('pie-week-container');
+    const pieMonthLegend = document.getElementById('pie-month-legend');
+    const pieWeekLegend = document.getElementById('pie-week-legend');
     const chartModal = document.getElementById('chart-modal');
     const chartModalClose = document.getElementById('chart-modal-close');
     const chartModalTitle = document.getElementById('chart-modal-title');
     const chartModalTableBody = document.querySelector('#chart-modal-table tbody');
     let cashflowChartInstance = null;
-    let pieMonthChartInstance = null;
-    let pieWeekChartInstance = null;
+    const pieMonthChartInstances = [null, null, null];
+    const pieWeekChartInstances = [null, null, null];
     let chartZoomMode = false;
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
     let fullChartData = null;
@@ -386,12 +419,12 @@ document.addEventListener('DOMContentLoaded', () => {
             cashflowChartInstance.destroy();
             cashflowChartInstance = null;
         }
-        if (pieMonthChartInstance) { pieMonthChartInstance.destroy(); pieMonthChartInstance = null; }
-        if (pieWeekChartInstance) { pieWeekChartInstance.destroy(); pieWeekChartInstance = null; }
+        pieMonthChartInstances.forEach((ch, idx) => { if (ch) { ch.destroy(); pieMonthChartInstances[idx] = null; } });
+        pieWeekChartInstances.forEach((ch, idx) => { if (ch) { ch.destroy(); pieWeekChartInstances[idx] = null; } });
         if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja.";
         if (usdClpInfoLabel) usdClpInfoLabel.textContent = "1 USD = $CLP (Obteniendo...)";
-        if (pieMonthInput) pieMonthInput.value = '';
-        if (pieWeekInput) pieWeekInput.value = '';
+        pieMonthInputs.forEach(inp => { if (inp) inp.value = ''; });
+        pieWeekInputs.forEach(inp => { if (inp) inp.value = ''; });
     }
 
     // --- AUTENTICACIÓN ---
@@ -2679,7 +2712,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return null;
         }
         const data = categories.map(cat => totals[cat]);
-        const colors = categories.map((_,i) => `hsl(${(i*60)%360},70%,60%)`);
+        const colors = categories.map(cat => getCategoryColor(cat));
         const newChart = new Chart(canvas, {
             type: 'doughnut',
             data: { labels: categories, datasets: [{ data, backgroundColor: colors }] },
@@ -2698,7 +2731,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         }
                     },
-                    legend: { position: 'bottom' }
+                    legend: { display: false }
                 }
             }
         });
@@ -2712,6 +2745,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         return newChart;
+    }
+
+    function renderSharedLegend(container, categories) {
+        if (!container) return;
+        container.innerHTML = '';
+        const ul = document.createElement('ul');
+        categories.forEach(cat => {
+            const li = document.createElement('li');
+            const sw = document.createElement('span');
+            sw.className = 'legend-color';
+            sw.style.backgroundColor = getCategoryColor(cat);
+            li.appendChild(sw);
+            li.appendChild(document.createTextNode(cat));
+            ul.appendChild(li);
+        });
+        container.appendChild(ul);
     }
 
     // --- LÓGICA PESTAÑA BABY STEPS ---
@@ -2996,30 +3045,67 @@ function getMondayOfWeek(year, week) {
         }
     }
 
-    if (pieMonthInput) pieMonthInput.value = today.toISOString().slice(0,7);
-    if (pieWeekInput) {
+    pieMonthInputs.forEach(inp => { if (inp) inp.value = today.toISOString().slice(0,7); });
+    if (pieWeekInputs[0]) {
         const [ywYear, ywWeek] = getWeekNumber(today);
-        pieWeekInput.value = `${ywYear}-W${('0'+ywWeek).slice(-2)}`;
+        pieWeekInputs.forEach(inp => { if (inp) inp.value = `${ywYear}-W${('0'+ywWeek).slice(-2)}`; });
     }
 
-    function updatePieMonthChart() {
-        const val = pieMonthInput.value;
-        if (!val) return;
-        const [y,m] = val.split('-').map(Number);
-        const start = new Date(Date.UTC(y, m-1, 1));
-        pieMonthChartInstance = renderExpenseDistributionChart(start, 'Mensual', pieMonthCanvas, pieMonthChartInstance);
+    function updatePieMonthCharts() {
+        const allCats = new Set();
+        pieMonthInputs.forEach((inp, idx) => {
+            const val = inp.value;
+            if (!val) {
+                if (pieMonthChartInstances[idx]) { pieMonthChartInstances[idx].destroy(); pieMonthChartInstances[idx] = null; }
+                const ctx = pieMonthCanvases[idx].getContext('2d');
+                ctx.clearRect(0,0,pieMonthCanvases[idx].width, pieMonthCanvases[idx].height);
+                return;
+            }
+            const [y,m] = val.split('-');
+            const start = new Date(Date.UTC(parseInt(y), parseInt(m)-1, 1));
+            const { totals } = calculateExpenseDistribution(start, 'Mensual');
+            Object.keys(totals).filter(c => totals[c] > 0).forEach(c => allCats.add(c));
+        });
+        renderSharedLegend(pieMonthLegend, Array.from(allCats));
+        pieMonthInputs.forEach((inp, idx) => {
+            const val = inp.value;
+            if (!val) return;
+            const [y,m] = val.split('-');
+            const start = new Date(Date.UTC(parseInt(y), parseInt(m)-1, 1));
+            pieMonthChartInstances[idx] = renderExpenseDistributionChart(start, 'Mensual', pieMonthCanvases[idx], pieMonthChartInstances[idx]);
+        });
     }
 
-    function updatePieWeekChart() {
-        const val = pieWeekInput.value;
-        if (!val) return;
-        const [y,w] = val.split('-W');
-        const start = getMondayOfWeek(parseInt(y), parseInt(w));
-        pieWeekChartInstance = renderExpenseDistributionChart(start, 'Semanal', pieWeekCanvas, pieWeekChartInstance);
+    function updatePieWeekCharts() {
+        const allCats = new Set();
+        pieWeekInputs.forEach((inp, idx) => {
+            const val = inp.value;
+            if (!val) {
+                if (pieWeekChartInstances[idx]) { pieWeekChartInstances[idx].destroy(); pieWeekChartInstances[idx] = null; }
+                const ctx = pieWeekCanvases[idx].getContext('2d');
+                ctx.clearRect(0,0,pieWeekCanvases[idx].width, pieWeekCanvases[idx].height);
+                return;
+            }
+            const [y,w] = val.split('-W');
+            const start = getMondayOfWeek(parseInt(y), parseInt(w));
+            const { totals } = calculateExpenseDistribution(start, 'Semanal');
+            Object.keys(totals).filter(c => totals[c] > 0).forEach(c => allCats.add(c));
+        });
+        renderSharedLegend(pieWeekLegend, Array.from(allCats));
+        pieWeekInputs.forEach((inp, idx) => {
+            const val = inp.value;
+            if (!val) return;
+            const [y,w] = val.split('-W');
+            const start = getMondayOfWeek(parseInt(y), parseInt(w));
+            pieWeekChartInstances[idx] = renderExpenseDistributionChart(start, 'Semanal', pieWeekCanvases[idx], pieWeekChartInstances[idx]);
+        });
     }
 
-    if (pieMonthInput) pieMonthInput.addEventListener('change', updatePieMonthChart);
-    if (pieWeekInput) pieWeekInput.addEventListener('change', updatePieWeekChart);
+    pieMonthInputs.forEach(inp => inp && inp.addEventListener('change', updatePieMonthCharts));
+    pieWeekInputs.forEach(inp => inp && inp.addEventListener('change', updatePieWeekCharts));
+
+    updatePieMonthCharts();
+    updatePieWeekCharts();
 
     // --- CONFIGURAR ZOOM EN EL GRÁFICO ---
     function enableChartZoom() {
