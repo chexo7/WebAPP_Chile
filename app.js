@@ -1926,8 +1926,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- LÓGICA PESTAÑA REGISTRO PAGOS ---
     function setupPaymentPeriodSelectors() {
-        currentPaymentViewDate = (currentBackupData && currentBackupData.analysis_start_date) ? new Date(currentBackupData.analysis_start_date) : new Date();
-        const analysisStartDate = new Date(currentPaymentViewDate);
+        const today = new Date();
+        const analysisStartDate = (currentBackupData && currentBackupData.analysis_start_date)
+            ? new Date(currentBackupData.analysis_start_date)
+            : new Date(today);
+        currentPaymentViewDate = today;
         const analysisEndDate = addMonths(new Date(analysisStartDate), (currentBackupData ? currentBackupData.analysis_duration : 12));
         paymentYearSelect.innerHTML = '';
         const startYear = Math.min(analysisStartDate.getUTCFullYear(), new Date().getUTCFullYear()) - 2;
