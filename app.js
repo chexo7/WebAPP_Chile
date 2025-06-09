@@ -1510,12 +1510,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!incomesTableView || !currentBackupData || !currentBackupData.incomes) return;
         incomesTableView.innerHTML = '';
         const searchTerm = searchIncomeInput.value.toLowerCase();
-        const filteredIncomes = currentBackupData.incomes.filter(income =>
-            income.name.toLowerCase().includes(searchTerm) ||
-            formatCurrencyJS(income.net_monthly, currentBackupData.display_currency_symbol || '$').toLowerCase().includes(searchTerm) ||
-            income.frequency.toLowerCase().includes(searchTerm) ||
-            (income.is_reimbursement && "reembolso".includes(searchTerm))
-        );
+        const numericTerm = searchTerm.replace(/[^0-9]/g, '');
+        const filteredIncomes = currentBackupData.incomes.filter(income => {
+            const amountStr = formatCurrencyJS(income.net_monthly, currentBackupData.display_currency_symbol || '$');
+            const amountLower = amountStr.toLowerCase();
+            const amountNumeric = amountStr.replace(/[^0-9]/g, '');
+            return (
+                income.name.toLowerCase().includes(searchTerm) ||
+                amountLower.includes(searchTerm) ||
+                (numericTerm && amountNumeric.includes(numericTerm)) ||
+                income.frequency.toLowerCase().includes(searchTerm) ||
+                (income.is_reimbursement && "reembolso".includes(searchTerm))
+            );
+        });
         filteredIncomes.forEach((income) => {
             const originalIndex = currentBackupData.incomes.findIndex(inc => inc === income);
             const row = incomesTableView.insertRow();
@@ -1739,12 +1746,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!expensesTableView || !currentBackupData || !currentBackupData.expenses) return;
         expensesTableView.innerHTML = '';
         const searchTerm = searchExpenseInput.value.toLowerCase();
-        const filteredExpenses = currentBackupData.expenses.filter(expense =>
-            expense.name.toLowerCase().includes(searchTerm) ||
-            formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$').toLowerCase().includes(searchTerm) ||
-            expense.category.toLowerCase().includes(searchTerm) ||
-            expense.frequency.toLowerCase().includes(searchTerm)
-        );
+        const numericTerm = searchTerm.replace(/[^0-9]/g, '');
+        const filteredExpenses = currentBackupData.expenses.filter(expense => {
+            const amountStr = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$');
+            const amountLower = amountStr.toLowerCase();
+            const amountNumeric = amountStr.replace(/[^0-9]/g, '');
+            return (
+                expense.name.toLowerCase().includes(searchTerm) ||
+                amountLower.includes(searchTerm) ||
+                (numericTerm && amountNumeric.includes(numericTerm)) ||
+                expense.category.toLowerCase().includes(searchTerm) ||
+                expense.frequency.toLowerCase().includes(searchTerm)
+            );
+        });
         filteredExpenses.forEach((expense) => {
             const originalIndex = currentBackupData.expenses.findIndex(exp => exp === expense);
             const row = expensesTableView.insertRow();
