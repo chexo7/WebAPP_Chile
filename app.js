@@ -1729,7 +1729,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addExpenseButton.textContent = 'Agregar Gasto'; 
     cancelEditExpenseButton.style.display = 'none';
         editingExpenseIndex = null;
-        const defaultDate = getISODateString(currentBackupData && currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
+        const defaultDate = getISODateString(new Date());
         expenseMovementDateInput.value = defaultDate;
         updateExpensePaymentDate();
         updateRemoveCategoryButtonState();
