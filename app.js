@@ -2155,6 +2155,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        highlightCurrentPeriodColumn(periodicity, tableHeadEl, tableBodyEl, periodDates);
+
         if (periodicity === activeCashflowPeriodicity) {
             renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p);
         }
@@ -3049,6 +3051,22 @@ function getMondayOfWeek(year, week) {
             throw new Error("Invalid periodicity provided to getPeriodEndDate. Must be 'Mensual' or 'Semanal'.");
         }
         return periodEnd;
+    }
+
+    function highlightCurrentPeriodColumn(periodicity, headEl, bodyEl, periodDates) {
+        const today = new Date();
+        let idx = -1;
+        for (let i = 0; i < periodDates.length; i++) {
+            const start = periodDates[i];
+            const end = getPeriodEndDate(start, periodicity);
+            if (today >= start && today <= end) { idx = i; break; }
+        }
+        if (idx === -1) return;
+        const headerCells = headEl.querySelectorAll('th');
+        if (headerCells[idx + 1]) headerCells[idx + 1].classList.add('current-period');
+        Array.from(bodyEl.rows).forEach(row => {
+            if (row.cells[idx + 1]) row.cells[idx + 1].classList.add('current-period');
+        });
     }
 
 

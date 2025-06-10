@@ -509,6 +509,20 @@ td.reimbursement-income {
 .text-orange { color: var(--text-orange) !important; }
 .small-text { font-size: 0.8em; color: var(--light-text); }
 
+/* Column highlight for el período actual */
+#cashflow-mensual-table th.current-period,
+#cashflow-mensual-table td.current-period,
+#cashflow-semanal-table th.current-period,
+#cashflow-semanal-table td.current-period {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(56, 103, 214, 0.10) 0,
+    rgba(56, 103, 214, 0.10) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+}
+
 
 /* Mensaje de carga */
 #loading-message {
