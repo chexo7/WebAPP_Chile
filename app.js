@@ -116,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- ELEMENTOS PESTAÑA REGISTRO PAGOS ---
     const paymentsTabTitle = document.getElementById('payments-tab-title');
+    const paymentsSubtabs = document.getElementById('payments-subtabs');
     const prevPeriodButton = document.getElementById('prev-period-button');
     const nextPeriodButton = document.getElementById('next-period-button');
     const paymentYearSelect = document.getElementById('payment-year-select');
@@ -179,6 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
     let fullChartData = null;
     let activeCashflowPeriodicity = 'Mensual';
+    let activePaymentsPeriodicity = 'Mensual';
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -632,8 +634,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderBabySteps();
                     renderReminders();
                     renderLogTab();
+                    activePaymentsPeriodicity = currentBackupData.analysis_periodicity || 'Mensual';
                     setupPaymentPeriodSelectors();
-                    renderPaymentsTableForCurrentPeriod();
+                    setPaymentPeriodicity(activePaymentsPeriodicity);
                     renderCashflowTable();
 
                     showMainContentScreen();
@@ -675,8 +678,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderBabySteps();
                     renderReminders();
                     renderLogTab();
+                    activePaymentsPeriodicity = currentBackupData.analysis_periodicity || 'Mensual';
                     setupPaymentPeriodSelectors();
-                    renderPaymentsTableForCurrentPeriod();
+                    setPaymentPeriodicity(activePaymentsPeriodicity);
                     renderCashflowTable();
 
                     showMainContentScreen();
@@ -1114,7 +1118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setPeriodicity(activeCashflowPeriodicity, 'chart');
         }
         if (tabId === 'presupuestos') { renderBudgetsTable(); renderBudgetSummaryTable(); }
-        if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); renderPaymentsTableForCurrentPeriod(); }
+        if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); setPaymentPeriodicity(activePaymentsPeriodicity); }
         if (tabId === 'ajustes') {
             populateSettingsForm();
             fetchAndUpdateUSDCLPRate(); // Fetch rate when adjustments tab is activated
@@ -1160,6 +1164,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function setPaymentPeriodicity(periodicity) {
+        activePaymentsPeriodicity = periodicity;
+        if (paymentsSubtabs) {
+            paymentsSubtabs.querySelectorAll('.subtab-button').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = paymentsSubtabs.querySelector(`.subtab-button[data-period="${periodicity}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+        }
+        updatePaymentPeriodSelectorVisibility();
+        renderPaymentsTableForCurrentPeriod();
+    }
+
     if (cashflowSubtabs) {
         cashflowSubtabs.addEventListener('click', (e) => {
             if (e.target.classList.contains('subtab-button')) setPeriodicity(e.target.dataset.period, 'cashflow');
@@ -1168,6 +1183,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (chartSubtabs) {
         chartSubtabs.addEventListener('click', (e) => {
             if (e.target.classList.contains('subtab-button')) setPeriodicity(e.target.dataset.period, 'chart');
+        });
+    }
+    if (paymentsSubtabs) {
+        paymentsSubtabs.addEventListener('click', (e) => {
+            if (e.target.classList.contains('subtab-button')) setPaymentPeriodicity(e.target.dataset.period);
         });
     }
 
@@ -1336,7 +1356,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCashflowTable();
         updateAnalysisModeLabels();
         setupPaymentPeriodSelectors();
-        renderPaymentsTableForCurrentPeriod();
+        setPaymentPeriodicity(activePaymentsPeriodicity);
         renderBudgetsTable();
         renderBudgetSummaryTable();
     });
@@ -1961,7 +1981,7 @@ document.addEventListener('DOMContentLoaded', () => {
         [paymentYearSelect, paymentMonthSelect, paymentWeekSelect].forEach(sel => { sel.removeEventListener('change', renderPaymentsTableForCurrentPeriod); sel.addEventListener('change', renderPaymentsTableForCurrentPeriod); });
     }
     function updatePaymentPeriodSelectorVisibility() {
-        const isWeekly = currentBackupData && currentBackupData.analysis_periodicity === "Semanal";
+        const isWeekly = activePaymentsPeriodicity === "Semanal";
         paymentsTabTitle.textContent = isWeekly ? "Registro de Pagos Semanales" : "Registro de Pagos Mensuales";
         paymentMonthSelect.style.display = isWeekly ? 'none' : 'inline-block';
         paymentWeekSelect.style.display = isWeekly ? 'inline-block' : 'none';
@@ -1969,7 +1989,7 @@ document.addEventListener('DOMContentLoaded', () => {
     prevPeriodButton.addEventListener('click', () => navigatePaymentPeriod(-1));
     nextPeriodButton.addEventListener('click', () => navigatePaymentPeriod(1));
     function navigatePaymentPeriod(direction) {
-        const isWeekly = currentBackupData.analysis_periodicity === "Semanal";
+        const isWeekly = activePaymentsPeriodicity === "Semanal";
         let year = parseInt(paymentYearSelect.value);
         if (isWeekly) {
             let week = parseInt(paymentWeekSelect.value);
@@ -1987,7 +2007,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderPaymentsTableForCurrentPeriod() {
         if (!paymentsTableView || !currentBackupData || !currentBackupData.expenses) { if (paymentsTableView) paymentsTableView.innerHTML = '<tr><td colspan="6">No hay datos de gastos.</td></tr>'; return; }
         updatePaymentPeriodSelectorVisibility();
-        const isWeeklyView = currentBackupData.analysis_periodicity === "Semanal";
+        const isWeeklyView = activePaymentsPeriodicity === "Semanal";
         const year = parseInt(paymentYearSelect.value);
         let periodStart, periodEnd, paymentLogPeriodKeyPart;
         if (isWeeklyView) {
@@ -2003,7 +2023,7 @@ document.addEventListener('DOMContentLoaded', () => {
         paymentsTableView.innerHTML = '';
         let expensesInPeriodFound = false;
         currentBackupData.expenses.forEach(expense => {
-            const occ = getExpenseOccurrencesInPeriod(expense, periodStart, periodEnd, currentBackupData.analysis_periodicity, currentBackupData.use_instant_expenses);
+            const occ = getExpenseOccurrencesInPeriod(expense, periodStart, periodEnd, activePaymentsPeriodicity, currentBackupData.use_instant_expenses);
             if (occ > 0) {
                 expensesInPeriodFound = true; const row = paymentsTableView.insertRow();
                 row.insertCell().textContent = expense.name; row.insertCell().textContent = formatCurrencyJS((expense.installments && expense.installments > 1 && !currentBackupData.use_instant_expenses) ? expense.amount / expense.installments : expense.amount, currentBackupData.display_currency_symbol);

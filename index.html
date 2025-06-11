@@ -309,7 +309,11 @@
             </div>
 
             <div id="registro-pagos" class="tab-content">
-                <h2 id="payments-tab-title">Registro de Pagos</h2>
+                <div class="subtabs-container" id="payments-subtabs">
+                    <button class="subtab-button active" data-parent="payments" data-period="Mensual">Mensual</button>
+                    <button class="subtab-button" data-parent="payments" data-period="Semanal">Semanal</button>
+                </div>
+                <h2 id="payments-tab-title">Registro de Pagos Mensual</h2>
                 <div class="payments-period-selector">
                     <button id="prev-period-button" title="Periodo Anterior">&lt;</button>
                     <select id="payment-year-select"></select>
