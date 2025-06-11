@@ -2638,8 +2638,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (start > pEnd || (end && end < pStart)) return 0;
             const payDay = start.getUTCDate();
             if (periodicity === 'Semanal') {
-                const payDate = new Date(Date.UTC(pStart.getUTCFullYear(), pStart.getUTCMonth(), payDay));
-                return (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) ? 1 : 0;
+                const candidates = [];
+                const monthsToCheck = new Set([
+                    `${pStart.getUTCFullYear()}-${pStart.getUTCMonth()}`,
+                    `${pEnd.getUTCFullYear()}-${pEnd.getUTCMonth()}`
+                ]);
+                monthsToCheck.forEach(key => {
+                    const [y,m] = key.split('-').map(n=>parseInt(n));
+                    const daysInMonth = getDaysInMonth(y,m);
+                    const d = new Date(Date.UTC(y, m, Math.min(payDay, daysInMonth)));
+                    candidates.push(d);
+                });
+                for (const payDate of candidates) {
+                    if (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) return 1;
+                }
+                return 0;
             } else {
                 const year = pStart.getUTCFullYear();
                 const month = pStart.getUTCMonth();
@@ -2690,8 +2703,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (start > pEnd || (end && end < pStart)) return 0;
             const payDay = start.getUTCDate();
             if (periodicity === 'Semanal') {
-                const payDate = new Date(Date.UTC(pStart.getUTCFullYear(), pStart.getUTCMonth(), payDay));
-                return (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) ? 1 : 0;
+                const candidates = [];
+                const monthsToCheck = new Set([
+                    `${pStart.getUTCFullYear()}-${pStart.getUTCMonth()}`,
+                    `${pEnd.getUTCFullYear()}-${pEnd.getUTCMonth()}`
+                ]);
+                monthsToCheck.forEach(key => {
+                    const [y,m] = key.split('-').map(n=>parseInt(n));
+                    const daysInMonth = getDaysInMonth(y,m);
+                    candidates.push(new Date(Date.UTC(y, m, Math.min(payDay, daysInMonth))));
+                });
+                for (const payDate of candidates) {
+                    if (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) return 1;
+                }
+                return 0;
             } else {
                 const year = pStart.getUTCFullYear();
                 const month = pStart.getUTCMonth();
