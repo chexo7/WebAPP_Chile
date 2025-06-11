@@ -2617,7 +2617,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getExpenseOccurrencesInPeriod(expense, pStart, pEnd, periodicity, useInstant) {
-        if (!expense.start_date) return 0;
+        if (!expense || !expense.start_date || !(pStart instanceof Date) || !(pEnd instanceof Date) || pStart > pEnd) return 0;
         const baseStart = useInstant && expense.movement_date ? new Date(expense.movement_date) : new Date(expense.start_date);
         let start = baseStart;
         let end = expense.end_date ? new Date(expense.end_date) : null;
@@ -2692,7 +2692,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getIncomeOccurrencesInPeriod(income, pStart, pEnd, periodicity) {
-        if (!income.start_date) return 0;
+        if (!income || !income.start_date || !(pStart instanceof Date) || !(pEnd instanceof Date) || pStart > pEnd) return 0;
         const start = new Date(income.start_date);
         const end = income.end_date ? new Date(income.end_date) : null;
         const freq = income.frequency || 'Mensual';
