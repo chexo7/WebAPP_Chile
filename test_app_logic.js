@@ -98,6 +98,138 @@ function getMondayOfWeek(year, week) {
 
 function getDaysInMonth(year, month) { return new Date(Date.UTC(year, month + 1, 0)).getUTCDate(); }
 
+function getExpenseOccurrencesInPeriod(expense, pStart, pEnd, periodicity, useInstant) {
+    if (!expense || !expense.start_date || !(pStart instanceof Date) || !(pEnd instanceof Date) || pStart > pEnd) return 0;
+    const baseStart = useInstant && expense.movement_date ? new Date(expense.movement_date) : new Date(expense.start_date);
+    let start = baseStart;
+    let end = expense.end_date ? new Date(expense.end_date) : null;
+    if (useInstant && expense.end_date && expense.movement_date) {
+        const diff = new Date(expense.start_date).getTime() - new Date(expense.movement_date).getTime();
+        end = new Date(new Date(expense.end_date).getTime() - diff);
+    }
+    const installments = parseInt(expense.installments || 1);
+    let freq = expense.frequency || 'Mensual';
+    if (installments > 1 && !useInstant) {
+        freq = 'Mensual';
+        end = addMonths(new Date(start), installments - 1);
+    }
+
+    if (freq === 'Único') {
+        return (start >= pStart && start <= pEnd) ? 1 : 0;
+    } else if (freq === 'Mensual') {
+        if (start > pEnd || (end && end < pStart)) return 0;
+        const payDay = start.getUTCDate();
+        if (periodicity === 'Semanal') {
+            const candidates = [];
+            const monthsToCheck = new Set([
+                `${pStart.getUTCFullYear()}-${pStart.getUTCMonth()}`,
+                `${pEnd.getUTCFullYear()}-${pEnd.getUTCMonth()}`
+            ]);
+            monthsToCheck.forEach(key => {
+                const [y, m] = key.split('-').map(n => parseInt(n));
+                const daysInMonth = getDaysInMonth(y, m);
+                candidates.push(new Date(Date.UTC(y, m, Math.min(payDay, daysInMonth))));
+            });
+            for (const payDate of candidates) {
+                if (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) return 1;
+            }
+            return 0;
+        } else {
+            const year = pStart.getUTCFullYear();
+            const month = pStart.getUTCMonth();
+            const daysInMonth = getDaysInMonth(year, month);
+            const payDate = new Date(Date.UTC(year, month, Math.min(payDay, daysInMonth)));
+            return (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) ? 1 : 0;
+        }
+    } else if (freq === 'Semanal') {
+        if (start > pEnd || (end && end < pStart)) return 0;
+        if (periodicity === 'Semanal') {
+            return 1;
+        } else {
+            let count = 0;
+            const payDow = start.getUTCDay();
+            let d = new Date(pStart.getTime());
+            while (d <= pEnd) {
+                if (d.getUTCDay() === payDow && d >= start && (!end || d <= end)) count++;
+                d.setUTCDate(d.getUTCDate() + 1);
+            }
+            return count;
+        }
+    } else if (freq === 'Bi-semanal') {
+        if (start > pEnd || (end && end < pStart)) return 0;
+        let count = 0;
+        let payDate = new Date(start.getTime());
+        while (payDate < pStart) {
+            payDate = addWeeks(payDate, 2);
+            if (end && payDate > end) return count;
+        }
+        while (payDate <= pEnd) {
+            if (!end || payDate <= end) count++;
+            payDate = addWeeks(payDate, 2);
+        }
+        return count;
+    }
+    return 0;
+}
+
+function getExpenseOccurrenceDatesInPeriod(expense, pStart, pEnd, useInstant) {
+    if (!expense || !expense.start_date || !(pStart instanceof Date) || !(pEnd instanceof Date) || pStart > pEnd) return [];
+    const baseStart = useInstant && expense.movement_date ? new Date(expense.movement_date) : new Date(expense.start_date);
+    let start = baseStart;
+    let end = expense.end_date ? new Date(expense.end_date) : null;
+    if (useInstant && expense.end_date && expense.movement_date) {
+        const diff = new Date(expense.start_date).getTime() - new Date(expense.movement_date).getTime();
+        end = new Date(new Date(expense.end_date).getTime() - diff);
+    }
+    const installments = parseInt(expense.installments || 1);
+    let freq = expense.frequency || 'Mensual';
+    if (installments > 1 && !useInstant) {
+        freq = 'Mensual';
+        end = addMonths(new Date(start), installments - 1);
+    }
+
+    const dates = [];
+
+    if (freq === 'Único') {
+        if (start >= pStart && start <= pEnd) dates.push(new Date(start));
+    } else if (freq === 'Mensual') {
+        if (start > pEnd || (end && end < pStart)) return [];
+        const payDay = start.getUTCDate();
+        const monthsToCheck = new Set();
+        let iter = new Date(Date.UTC(pStart.getUTCFullYear(), pStart.getUTCMonth(), 1));
+        while (iter <= pEnd) {
+            monthsToCheck.add(`${iter.getUTCFullYear()}-${iter.getUTCMonth()}`);
+            iter.setUTCMonth(iter.getUTCMonth() + 1);
+        }
+        monthsToCheck.forEach(key => {
+            const [y,m] = key.split('-').map(n=>parseInt(n));
+            const daysInMonth = getDaysInMonth(y,m);
+            const d = new Date(Date.UTC(y,m,Math.min(payDay,daysInMonth)));
+            if (d >= pStart && d <= pEnd && d >= start && (!end || d <= end)) dates.push(d);
+        });
+    } else if (freq === 'Semanal') {
+        if (start > pEnd || (end && end < pStart)) return [];
+        const payDow = start.getUTCDay();
+        let d = new Date(pStart.getTime());
+        while (d <= pEnd) {
+            if (d.getUTCDay() === payDow && d >= start && (!end || d <= end)) dates.push(new Date(d));
+            d.setUTCDate(d.getUTCDate() + 1);
+        }
+    } else if (freq === 'Bi-semanal') {
+        if (start > pEnd || (end && end < pStart)) return [];
+        let payDate = new Date(start.getTime());
+        while (payDate < pStart) {
+            payDate = addWeeks(payDate, 2);
+            if (end && payDate > end) return dates;
+        }
+        while (payDate <= pEnd) {
+            if (!end || payDate <= end) dates.push(new Date(payDate));
+            payDate = addWeeks(payDate, 2);
+        }
+    }
+    return dates;
+}
+
 
 function getPeriodStartDate(date, periodicity) {
     const year = date.getUTCFullYear();
@@ -977,6 +1109,47 @@ runTest("calculateCashFlowData - Mixed Incomes and Installments", () => {
     assertEquals(100, r.var_exp_p[2], "Mixed - Mar installment");
     r = calculateCashFlowData({ ...data, use_instant_expenses: true });
     assertEquals(300, r.var_exp_p[0], "Mixed - Instant mode charges full amount Jan");
+});
+
+runTest("getExpenseOccurrencesInPeriod - Monthly across week boundary", () => {
+    const exp = { start_date: new Date(Date.UTC(2024,0,31)), frequency: "Mensual" };
+    const pStart = new Date(Date.UTC(2024,1,26));
+    const pEnd = new Date(Date.UTC(2024,2,3));
+    const occ = getExpenseOccurrencesInPeriod(exp, pStart, pEnd, "Semanal", false);
+    assertEquals(1, occ, "Monthly on 31 included in Feb 26-Mar 3 week");
+});
+
+runTest("getExpenseOccurrencesInPeriod - Weekly count in monthly view", () => {
+    const exp = { start_date: new Date(Date.UTC(2024,0,1)), frequency: "Semanal" };
+    const pStart = new Date(Date.UTC(2024,0,1));
+    const pEnd = new Date(Date.UTC(2024,0,31));
+    const occ = getExpenseOccurrencesInPeriod(exp, pStart, pEnd, "Mensual", false);
+    assertEquals(5, occ, "5 Mondays in Jan 2024");
+});
+
+runTest("getExpenseOccurrencesInPeriod - Bi-weekly count in monthly view", () => {
+    const exp = { start_date: new Date(Date.UTC(2024,0,1)), frequency: "Bi-semanal" };
+    const pStart = new Date(Date.UTC(2024,0,1));
+    const pEnd = new Date(Date.UTC(2024,0,31));
+    const occ = getExpenseOccurrencesInPeriod(exp, pStart, pEnd, "Mensual", false);
+    assertEquals(3, occ, "Bi-weekly Jan 2024 occurrences");
+});
+
+runTest("getExpenseOccurrencesInPeriod - Único weekly view", () => {
+    const exp = { start_date: new Date(Date.UTC(2024,1,14)), frequency: "Único" };
+    const pStart = new Date(Date.UTC(2024,1,12));
+    const pEnd = new Date(Date.UTC(2024,1,18));
+    const occ = getExpenseOccurrencesInPeriod(exp, pStart, pEnd, "Semanal", false);
+    assertEquals(1, occ, "Unique expense in same week");
+});
+
+runTest("getExpenseOccurrenceDatesInPeriod - Monthly", () => {
+    const exp = { start_date: new Date(Date.UTC(2024,0,15)), frequency: "Mensual" };
+    const pStart = new Date(Date.UTC(2024,0,1));
+    const pEnd = new Date(Date.UTC(2024,0,31));
+    const dates = getExpenseOccurrenceDatesInPeriod(exp, pStart, pEnd, false);
+    assertEquals(1, dates.length, "One occurrence date in Jan 2024");
+    assertEquals("2024-01-15", getISODateString(dates[0]), "Date is Jan 15" );
 });
 // Ensure summarizeTests() is the last call.
 summarizeTests();

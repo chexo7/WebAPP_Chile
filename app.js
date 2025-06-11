@@ -116,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- ELEMENTOS PESTAÑA REGISTRO PAGOS ---
     const paymentsTabTitle = document.getElementById('payments-tab-title');
+    const paymentsSubtabs = document.getElementById('payments-subtabs');
     const prevPeriodButton = document.getElementById('prev-period-button');
     const nextPeriodButton = document.getElementById('next-period-button');
     const paymentYearSelect = document.getElementById('payment-year-select');
@@ -179,6 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
     let fullChartData = null;
     let activeCashflowPeriodicity = 'Mensual';
+    let activePaymentsPeriodicity = 'Mensual';
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -632,8 +634,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderBabySteps();
                     renderReminders();
                     renderLogTab();
+                    activePaymentsPeriodicity = currentBackupData.analysis_periodicity || 'Mensual';
                     setupPaymentPeriodSelectors();
-                    renderPaymentsTableForCurrentPeriod();
+                    setPaymentPeriodicity(activePaymentsPeriodicity);
                     renderCashflowTable();
 
                     showMainContentScreen();
@@ -675,8 +678,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderBabySteps();
                     renderReminders();
                     renderLogTab();
+                    activePaymentsPeriodicity = currentBackupData.analysis_periodicity || 'Mensual';
                     setupPaymentPeriodSelectors();
-                    renderPaymentsTableForCurrentPeriod();
+                    setPaymentPeriodicity(activePaymentsPeriodicity);
                     renderCashflowTable();
 
                     showMainContentScreen();
@@ -1114,7 +1118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setPeriodicity(activeCashflowPeriodicity, 'chart');
         }
         if (tabId === 'presupuestos') { renderBudgetsTable(); renderBudgetSummaryTable(); }
-        if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); renderPaymentsTableForCurrentPeriod(); }
+        if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); setPaymentPeriodicity(activePaymentsPeriodicity); }
         if (tabId === 'ajustes') {
             populateSettingsForm();
             fetchAndUpdateUSDCLPRate(); // Fetch rate when adjustments tab is activated
@@ -1160,6 +1164,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function setPaymentPeriodicity(periodicity) {
+        activePaymentsPeriodicity = periodicity;
+        if (paymentsSubtabs) {
+            paymentsSubtabs.querySelectorAll('.subtab-button').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = paymentsSubtabs.querySelector(`.subtab-button[data-period="${periodicity}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+        }
+        updatePaymentPeriodSelectorVisibility();
+        renderPaymentsTableForCurrentPeriod();
+    }
+
     if (cashflowSubtabs) {
         cashflowSubtabs.addEventListener('click', (e) => {
             if (e.target.classList.contains('subtab-button')) setPeriodicity(e.target.dataset.period, 'cashflow');
@@ -1168,6 +1183,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (chartSubtabs) {
         chartSubtabs.addEventListener('click', (e) => {
             if (e.target.classList.contains('subtab-button')) setPeriodicity(e.target.dataset.period, 'chart');
+        });
+    }
+    if (paymentsSubtabs) {
+        paymentsSubtabs.addEventListener('click', (e) => {
+            if (e.target.classList.contains('subtab-button')) setPaymentPeriodicity(e.target.dataset.period);
         });
     }
 
@@ -1336,7 +1356,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCashflowTable();
         updateAnalysisModeLabels();
         setupPaymentPeriodSelectors();
-        renderPaymentsTableForCurrentPeriod();
+        setPaymentPeriodicity(activePaymentsPeriodicity);
         renderBudgetsTable();
         renderBudgetSummaryTable();
     });
@@ -1961,7 +1981,7 @@ document.addEventListener('DOMContentLoaded', () => {
         [paymentYearSelect, paymentMonthSelect, paymentWeekSelect].forEach(sel => { sel.removeEventListener('change', renderPaymentsTableForCurrentPeriod); sel.addEventListener('change', renderPaymentsTableForCurrentPeriod); });
     }
     function updatePaymentPeriodSelectorVisibility() {
-        const isWeekly = currentBackupData && currentBackupData.analysis_periodicity === "Semanal";
+        const isWeekly = activePaymentsPeriodicity === "Semanal";
         paymentsTabTitle.textContent = isWeekly ? "Registro de Pagos Semanales" : "Registro de Pagos Mensuales";
         paymentMonthSelect.style.display = isWeekly ? 'none' : 'inline-block';
         paymentWeekSelect.style.display = isWeekly ? 'inline-block' : 'none';
@@ -1969,7 +1989,7 @@ document.addEventListener('DOMContentLoaded', () => {
     prevPeriodButton.addEventListener('click', () => navigatePaymentPeriod(-1));
     nextPeriodButton.addEventListener('click', () => navigatePaymentPeriod(1));
     function navigatePaymentPeriod(direction) {
-        const isWeekly = currentBackupData.analysis_periodicity === "Semanal";
+        const isWeekly = activePaymentsPeriodicity === "Semanal";
         let year = parseInt(paymentYearSelect.value);
         if (isWeekly) {
             let week = parseInt(paymentWeekSelect.value);
@@ -1985,39 +2005,53 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPaymentsTableForCurrentPeriod();
     }
     function renderPaymentsTableForCurrentPeriod() {
-        if (!paymentsTableView || !currentBackupData || !currentBackupData.expenses) { if (paymentsTableView) paymentsTableView.innerHTML = '<tr><td colspan="6">No hay datos de gastos.</td></tr>'; return; }
+        if (!paymentsTableView || !currentBackupData || !currentBackupData.expenses) { if (paymentsTableView) paymentsTableView.innerHTML = '<tr><td colspan="7">No hay datos de gastos.</td></tr>'; return; }
         updatePaymentPeriodSelectorVisibility();
-        const isWeeklyView = currentBackupData.analysis_periodicity === "Semanal";
+        const isWeeklyView = activePaymentsPeriodicity === "Semanal";
         const year = parseInt(paymentYearSelect.value);
-        let periodStart, periodEnd, paymentLogPeriodKeyPart;
+        let periodStart, periodEnd;
         if (isWeeklyView) {
             const week = parseInt(paymentWeekSelect.value);
             periodStart = getMondayOfWeek(year, week); periodEnd = addWeeks(new Date(periodStart), 1); periodEnd.setUTCDate(periodEnd.getUTCDate() - 1);
-            paymentLogPeriodKeyPart = week;
         } else {
             const monthIndex = parseInt(paymentMonthSelect.value);
             periodStart = new Date(Date.UTC(year, monthIndex, 1)); periodEnd = new Date(Date.UTC(year, monthIndex + 1, 0));
-            paymentLogPeriodKeyPart = monthIndex + 1;
         }
         currentPaymentViewDate = periodStart;
         paymentsTableView.innerHTML = '';
         let expensesInPeriodFound = false;
         currentBackupData.expenses.forEach(expense => {
-            const occ = getExpenseOccurrencesInPeriod(expense, periodStart, periodEnd, currentBackupData.analysis_periodicity, currentBackupData.use_instant_expenses);
-            if (occ > 0) {
-                expensesInPeriodFound = true; const row = paymentsTableView.insertRow();
-                row.insertCell().textContent = expense.name; row.insertCell().textContent = formatCurrencyJS((expense.installments && expense.installments > 1 && !currentBackupData.use_instant_expenses) ? expense.amount / expense.installments : expense.amount, currentBackupData.display_currency_symbol);
-                row.insertCell().textContent = expense.category; row.insertCell().textContent = currentBackupData.expense_categories[expense.category] || 'Variable';
+            const dates = getExpenseOccurrenceDatesInPeriod(expense, periodStart, periodEnd, currentBackupData.use_instant_expenses);
+            dates.forEach(occDate => {
+                expensesInPeriodFound = true;
+                const row = paymentsTableView.insertRow();
+                row.insertCell().textContent = expense.name;
+                row.insertCell().textContent = formatCurrencyJS((expense.installments && expense.installments > 1 && !currentBackupData.use_instant_expenses) ? expense.amount / expense.installments : expense.amount, currentBackupData.display_currency_symbol);
+                row.insertCell().textContent = expense.category;
+                row.insertCell().textContent = currentBackupData.expense_categories[expense.category] || 'Variable';
                 row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
-                const paidCell = row.insertCell(); const checkbox = document.createElement('input'); checkbox.type = 'checkbox';
-                const paymentKey = `${expense.name}|${year}|${paymentLogPeriodKeyPart}`;
+                const dateCell = row.insertCell();
+                dateCell.textContent = getISODateString(occDate);
+                const paidCell = row.insertCell();
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                const paymentKey = `${expense.name}|${getISODateString(occDate)}`;
                 checkbox.checked = currentBackupData.payments && currentBackupData.payments[paymentKey] === true;
                 checkbox.dataset.paymentKey = paymentKey;
-                checkbox.addEventListener('change', (e) => { if (!currentBackupData.payments) currentBackupData.payments = {}; currentBackupData.payments[e.target.dataset.paymentKey] = e.target.checked; });
+                checkbox.addEventListener('change', (e) => {
+                    if (!currentBackupData.payments) currentBackupData.payments = {};
+                    currentBackupData.payments[e.target.dataset.paymentKey] = e.target.checked;
+                });
                 paidCell.appendChild(checkbox);
-            }
+            });
         });
-        if (!expensesInPeriodFound) { const row = paymentsTableView.insertRow(); const cell = row.insertCell(); cell.colSpan = 6; cell.textContent = "No hay gastos programados para este período."; cell.style.textAlign = "center"; }
+        if (!expensesInPeriodFound) {
+            const row = paymentsTableView.insertRow();
+            const cell = row.insertCell();
+            cell.colSpan = 7;
+            cell.textContent = "No hay gastos programados para este período.";
+            cell.style.textAlign = "center";
+        }
     }
 
     // --- LÓGICA PESTAÑA FLUJO DE CAJA ---
@@ -2597,7 +2631,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getExpenseOccurrencesInPeriod(expense, pStart, pEnd, periodicity, useInstant) {
-        if (!expense.start_date) return 0;
+        if (!expense || !expense.start_date || !(pStart instanceof Date) || !(pEnd instanceof Date) || pStart > pEnd) return 0;
         const baseStart = useInstant && expense.movement_date ? new Date(expense.movement_date) : new Date(expense.start_date);
         let start = baseStart;
         let end = expense.end_date ? new Date(expense.end_date) : null;
@@ -2618,8 +2652,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (start > pEnd || (end && end < pStart)) return 0;
             const payDay = start.getUTCDate();
             if (periodicity === 'Semanal') {
-                const payDate = new Date(Date.UTC(pStart.getUTCFullYear(), pStart.getUTCMonth(), payDay));
-                return (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) ? 1 : 0;
+                const candidates = [];
+                const monthsToCheck = new Set([
+                    `${pStart.getUTCFullYear()}-${pStart.getUTCMonth()}`,
+                    `${pEnd.getUTCFullYear()}-${pEnd.getUTCMonth()}`
+                ]);
+                monthsToCheck.forEach(key => {
+                    const [y,m] = key.split('-').map(n=>parseInt(n));
+                    const daysInMonth = getDaysInMonth(y,m);
+                    const d = new Date(Date.UTC(y, m, Math.min(payDay, daysInMonth)));
+                    candidates.push(d);
+                });
+                for (const payDate of candidates) {
+                    if (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) return 1;
+                }
+                return 0;
             } else {
                 const year = pStart.getUTCFullYear();
                 const month = pStart.getUTCMonth();
@@ -2658,8 +2705,66 @@ document.addEventListener('DOMContentLoaded', () => {
         return 0;
     }
 
+    function getExpenseOccurrenceDatesInPeriod(expense, pStart, pEnd, useInstant) {
+        if (!expense || !expense.start_date || !(pStart instanceof Date) || !(pEnd instanceof Date) || pStart > pEnd) return [];
+        const baseStart = useInstant && expense.movement_date ? new Date(expense.movement_date) : new Date(expense.start_date);
+        let start = baseStart;
+        let end = expense.end_date ? new Date(expense.end_date) : null;
+        if (useInstant && expense.end_date && expense.movement_date) {
+            const diff = new Date(expense.start_date).getTime() - new Date(expense.movement_date).getTime();
+            end = new Date(new Date(expense.end_date).getTime() - diff);
+        }
+        const installments = parseInt(expense.installments || 1);
+        let freq = expense.frequency || 'Mensual';
+        if (installments > 1 && !useInstant) {
+            freq = 'Mensual';
+            end = addMonths(new Date(start), installments - 1);
+        }
+
+        const dates = [];
+
+        if (freq === 'Único') {
+            if (start >= pStart && start <= pEnd) dates.push(new Date(start));
+        } else if (freq === 'Mensual') {
+            if (start > pEnd || (end && end < pStart)) return [];
+            const payDay = start.getUTCDate();
+            const monthsToCheck = new Set();
+            let iter = new Date(Date.UTC(pStart.getUTCFullYear(), pStart.getUTCMonth(), 1));
+            while (iter <= pEnd) {
+                monthsToCheck.add(`${iter.getUTCFullYear()}-${iter.getUTCMonth()}`);
+                iter.setUTCMonth(iter.getUTCMonth() + 1);
+            }
+            monthsToCheck.forEach(key => {
+                const [y,m] = key.split('-').map(n=>parseInt(n));
+                const daysInMonth = getDaysInMonth(y,m);
+                const d = new Date(Date.UTC(y,m,Math.min(payDay,daysInMonth)));
+                if (d >= pStart && d <= pEnd && d >= start && (!end || d <= end)) dates.push(d);
+            });
+        } else if (freq === 'Semanal') {
+            if (start > pEnd || (end && end < pStart)) return [];
+            const payDow = start.getUTCDay();
+            let d = new Date(pStart.getTime());
+            while (d <= pEnd) {
+                if (d.getUTCDay() === payDow && d >= start && (!end || d <= end)) dates.push(new Date(d));
+                d.setUTCDate(d.getUTCDate() + 1);
+            }
+        } else if (freq === 'Bi-semanal') {
+            if (start > pEnd || (end && end < pStart)) return [];
+            let payDate = new Date(start.getTime());
+            while (payDate < pStart) {
+                payDate = addWeeks(payDate, 2);
+                if (end && payDate > end) return dates;
+            }
+            while (payDate <= pEnd) {
+                if (!end || payDate <= end) dates.push(new Date(payDate));
+                payDate = addWeeks(payDate, 2);
+            }
+        }
+        return dates;
+    }
+
     function getIncomeOccurrencesInPeriod(income, pStart, pEnd, periodicity) {
-        if (!income.start_date) return 0;
+        if (!income || !income.start_date || !(pStart instanceof Date) || !(pEnd instanceof Date) || pStart > pEnd) return 0;
         const start = new Date(income.start_date);
         const end = income.end_date ? new Date(income.end_date) : null;
         const freq = income.frequency || 'Mensual';
@@ -2670,8 +2775,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (start > pEnd || (end && end < pStart)) return 0;
             const payDay = start.getUTCDate();
             if (periodicity === 'Semanal') {
-                const payDate = new Date(Date.UTC(pStart.getUTCFullYear(), pStart.getUTCMonth(), payDay));
-                return (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) ? 1 : 0;
+                const candidates = [];
+                const monthsToCheck = new Set([
+                    `${pStart.getUTCFullYear()}-${pStart.getUTCMonth()}`,
+                    `${pEnd.getUTCFullYear()}-${pEnd.getUTCMonth()}`
+                ]);
+                monthsToCheck.forEach(key => {
+                    const [y,m] = key.split('-').map(n=>parseInt(n));
+                    const daysInMonth = getDaysInMonth(y,m);
+                    candidates.push(new Date(Date.UTC(y, m, Math.min(payDay, daysInMonth))));
+                });
+                for (const payDate of candidates) {
+                    if (payDate >= pStart && payDate <= pEnd && start <= payDate && (!end || end >= payDate)) return 1;
+                }
+                return 0;
             } else {
                 const year = pStart.getUTCFullYear();
                 const month = pStart.getUTCMonth();
