@@ -101,6 +101,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const expensesTableView = document.querySelector('#expenses-table-view tbody');
     const searchExpenseInput = document.getElementById('search-expense-input');
     let editingExpenseIndex = null;
+    const openExpenseImportButton = document.getElementById('open-expense-import-button');
+    const expenseImportModal = document.getElementById('expense-import-modal');
+    const expenseImportModalClose = document.getElementById('expense-import-modal-close');
+    const expenseImportDropArea = document.getElementById('expense-import-drop-area');
+    const expenseFileInput = document.getElementById('expense-file-input');
+    const expenseImportPreview = document.getElementById('expense-import-preview');
+    const expenseImportTableHead = document.querySelector('#expense-import-table thead');
+    const expenseImportTableBody = document.querySelector('#expense-import-table tbody');
+    const mergeExpensesButton = document.getElementById('merge-expenses-button');
 
     // --- BLOQUEO DE EDICIÓN ---
     let editLockAcquired = false;
@@ -3361,6 +3370,92 @@ function getMondayOfWeek(year, week) {
         chartModalClose.addEventListener("touchstart", function(e) { e.preventDefault(); closeChartModal(); });
     }
     if (chartModal) chartModal.addEventListener("click", function(e) { if (e.target === chartModal) closeChartModal(); });
+
+    // --- Importar Gastos desde Excel ---
+    let importedExpensesData = [];
+    function openExpenseImportModal() {
+        if (expenseImportModal) expenseImportModal.style.display = 'flex';
+    }
+    function closeExpenseImportModal() {
+        if (expenseImportModal) expenseImportModal.style.display = 'none';
+        if (expenseImportPreview) expenseImportPreview.style.display = 'none';
+        importedExpensesData = [];
+        if (expenseImportTableHead) expenseImportTableHead.innerHTML = '';
+        if (expenseImportTableBody) expenseImportTableBody.innerHTML = '';
+        if (expenseFileInput) expenseFileInput.value = '';
+    }
+    function handleExpenseFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            if (rows.length === 0) return;
+            const headers = rows[0];
+            const dataRows = rows.slice(1);
+            if (expenseImportTableHead) expenseImportTableHead.innerHTML = '';
+            if (expenseImportTableBody) expenseImportTableBody.innerHTML = '';
+            const headerRow = expenseImportTableHead.insertRow();
+            headers.forEach(h => { const th = document.createElement('th'); th.textContent = h; headerRow.appendChild(th); });
+            const mapRow = expenseImportTableHead.insertRow();
+            const fields = ['Ignorar','Fecha','Descripción','Titular/Adicional','Monto','Cuotas Pendientes','Valor Cuota'];
+            headers.forEach(() => {
+                const th = document.createElement('th');
+                const sel = document.createElement('select');
+                fields.forEach(f => { const opt = document.createElement('option'); opt.value = f; opt.textContent = f; sel.appendChild(opt); });
+                th.appendChild(sel); mapRow.appendChild(th);
+            });
+            const categories = Object.keys(currentBackupData.expense_categories || {}).sort();
+            dataRows.forEach(row => {
+                const tr = expenseImportTableBody.insertRow();
+                row.forEach(cell => { const td = tr.insertCell(); td.textContent = cell; });
+                const catTd = tr.insertCell();
+                const catSel = document.createElement('select');
+                categories.forEach(c => { const opt = document.createElement('option'); opt.value = c; opt.textContent = c; catSel.appendChild(opt); });
+                catTd.appendChild(catSel);
+            });
+            importedExpensesData = dataRows;
+            if (expenseImportPreview) expenseImportPreview.style.display = 'block';
+        };
+        reader.readAsArrayBuffer(file);
+    }
+    if (openExpenseImportButton) openExpenseImportButton.addEventListener('click', openExpenseImportModal);
+    if (expenseImportModalClose) expenseImportModalClose.addEventListener('click', closeExpenseImportModal);
+    if (expenseImportModal) expenseImportModal.addEventListener('click', (e) => { if (e.target === expenseImportModal) closeExpenseImportModal(); });
+    if (expenseImportDropArea) {
+        ['dragover','dragenter'].forEach(ev => expenseImportDropArea.addEventListener(ev, e => { e.preventDefault(); expenseImportDropArea.classList.add('dragover'); }));
+        ['dragleave','drop'].forEach(ev => expenseImportDropArea.addEventListener(ev, e => { expenseImportDropArea.classList.remove('dragover'); }));
+        expenseImportDropArea.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files[0]) handleExpenseFile(e.dataTransfer.files[0]); });
+        expenseImportDropArea.addEventListener('click', () => { if (expenseFileInput) expenseFileInput.click(); });
+    }
+    if (expenseFileInput) expenseFileInput.addEventListener('change', () => { if (expenseFileInput.files[0]) handleExpenseFile(expenseFileInput.files[0]); });
+    if (mergeExpensesButton) mergeExpensesButton.addEventListener('click', () => {
+        if (!expenseImportTableHead || !expenseImportTableBody) return;
+        const mapSelects = expenseImportTableHead.querySelectorAll('select');
+        const mappings = Array.from(mapSelects).map(sel => sel.value);
+        const rows = Array.from(expenseImportTableBody.rows);
+        rows.forEach(row => {
+            const cells = Array.from(row.cells);
+            const category = cells[cells.length -1].querySelector('select').value;
+            let name='', amount=0, dateStr='';
+            cells.slice(0, cells.length-1).forEach((cell, idx) => {
+                const val = cell.textContent;
+                const map = mappings[idx];
+                if (map === 'Descripción') name = val;
+                else if (map === 'Monto') amount = parseFloat(val.replace(/[^0-9.-]/g,'')) || 0;
+                else if (map === 'Fecha') dateStr = val;
+            });
+            if (!name || !dateStr) return;
+            const date = new Date(dateStr + 'T00:00:00Z');
+            const duplicate = (currentBackupData.expenses || []).some(exp => exp.name === name && exp.amount === amount && exp.movement_date && new Date(exp.movement_date).getTime() === date.getTime());
+            if (duplicate) { row.style.backgroundColor = 'var(--alt-row-bg)'; return; }
+            const expenseEntry = { name, amount, category, type: currentBackupData.expense_categories[category] || 'Variable', frequency: 'Único', start_date: date, end_date: null, is_real: true, movement_date: date, payment_method: 'Efectivo', credit_card: null, installments: 1 };
+            if (!currentBackupData.expenses) currentBackupData.expenses = [];
+            currentBackupData.expenses.push(expenseEntry);
+        });
+        renderExpensesTable(); renderCashflowTable(); closeExpenseImportModal();
+    });
 
     function gatherPeriodTransactions(pStart, periodicity, categoryFilter = null) {
         const pEnd = getPeriodEndDate(pStart, periodicity);

@@ -232,6 +232,7 @@
                     </div>
                     <div class="table-container-dynamic">
                         <h3>Gastos Registrados</h3>
+                        <button type="button" id="open-expense-import-button" class="button-large accent">Carga Masiva</button>
                         <label for="search-expense-input">Buscar Gasto:</label>
                         <input type="text" id="search-expense-input" placeholder="Escribe para filtrar...">
                         <div class="table-responsive dynamic-table-scroll">
@@ -466,6 +467,26 @@
             <div class="save-changes-container">
                  <button id="save-changes-button" class="accent">Guardar Nueva Versión</button>
             </div>
+            <div id="expense-import-modal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <span id="expense-import-modal-close" class="modal-close">&times;</span>
+                    <h3>Importar Gastos desde Excel</h3>
+                    <div id="expense-import-drop-area" class="drop-area">
+                        <p>Arrastra el archivo .xlsx aquí o haz clic para seleccionarlo</p>
+                        <input type="file" id="expense-file-input" accept=".xlsx" style="display:none;">
+                    </div>
+                    <div id="expense-import-preview" style="display:none;">
+                        <h4>Previsualización</h4>
+                        <div class="table-responsive dynamic-table-scroll">
+                            <table id="expense-import-table">
+                                <thead></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <button id="merge-expenses-button" class="accent">Unir</button>
+                    </div>
+                </div>
+            </div>
             <div id="chart-modal" class="modal" style="display:none;">
                 <div class="modal-content">
                     <span id="chart-modal-close" class="modal-close">&times;</span>
@@ -492,6 +513,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
     <script src="config.js"></script>
     <script src="app.js"></script>
