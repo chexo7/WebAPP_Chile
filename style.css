@@ -1248,3 +1248,38 @@ td.reimbursement-income {
     font-size: 1.5em;
     cursor: pointer;
 }
+
+#expense-drop-zone {
+    border: 2px dashed var(--border-color);
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 10px;
+    cursor: pointer;
+}
+#expense-drop-zone.dragover {
+    background-color: var(--alt-row-bg);
+}
+#column-mapping {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+#column-mapping label {
+    display: flex;
+    flex-direction: column;
+    font-weight: 600;
+    font-size: 0.9em;
+}
+.import-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+}
+.import-preview-table th,
+.import-preview-table td {
+    border: 1px solid var(--border-color);
+    padding: 4px;
+}
+.duplicate-row {
+    background-color: var(--alt-row-bg);
+}
