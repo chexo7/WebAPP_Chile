@@ -102,6 +102,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchExpenseInput = document.getElementById('search-expense-input');
     let editingExpenseIndex = null;
 
+    // --- ELEMENTOS WIZARD DE IMPORTACIÓN ---
+    const openImportWizardButton = document.getElementById('open-import-wizard');
+    const importExpensesModal = document.getElementById('import-expenses-modal');
+    const closeImportModal = document.getElementById('close-import-modal');
+    const dropZone = document.getElementById('drop-zone');
+    const xlsxFileInput = document.getElementById('xlsx-file-input');
+    const importPreview = document.getElementById('import-preview');
+    const importPreviewTableBody = document.querySelector('#import-preview-table tbody');
+    const mergeImportButton = document.getElementById('merge-import-button');
+
     // --- BLOQUEO DE EDICIÓN ---
     let editLockAcquired = false;
     let editLockRef = null;
@@ -3407,6 +3417,124 @@ function getMondayOfWeek(year, week) {
             disableChartZoom();
         }
     });
+
+    // --- Importación de gastos desde XLSX ---
+    function resetImportModal() {
+        importPreviewTableBody.innerHTML = '';
+        importPreview.style.display = 'none';
+        xlsxFileInput.value = '';
+    }
+    if (openImportWizardButton) {
+        openImportWizardButton.addEventListener('click', () => {
+            resetImportModal();
+            importExpensesModal.style.display = 'block';
+        });
+    }
+    if (closeImportModal) {
+        closeImportModal.addEventListener('click', () => {
+            importExpensesModal.style.display = 'none';
+            resetImportModal();
+        });
+    }
+    function handleXlsxFiles(files) {
+        if (!files || !files[0]) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type:'array'});
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, {header:1});
+            parseImportedRows(rows);
+        };
+        reader.readAsArrayBuffer(files[0]);
+    }
+    if (dropZone) {
+        ['dragover','dragenter'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('dragover'); }));
+        ['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('dragover'); }));
+        dropZone.addEventListener('drop', e => handleXlsxFiles(e.dataTransfer.files));
+        dropZone.addEventListener('click', () => xlsxFileInput.click());
+    }
+    if (xlsxFileInput) {
+        xlsxFileInput.addEventListener('change', e => handleXlsxFiles(e.target.files));
+    }
+    function populateCategorySelect(select) {
+        if (!select || !currentBackupData || !currentBackupData.expense_categories) {
+            if (select) select.innerHTML = '<option value="">--</option>';
+            return;
+        }
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">-- Categoría --</option>';
+        const sorted = Object.keys(currentBackupData.expense_categories).sort();
+        sorted.forEach(catName => {
+            if (isFirebaseKeySafe(catName)) {
+                const opt = document.createElement('option');
+                opt.value = catName;
+                opt.textContent = catName;
+                select.appendChild(opt);
+            }
+        });
+        if (sorted.includes(currentValue)) select.value = currentValue;
+        else if (sorted.length > 0) select.value = sorted[0];
+    }
+    function parseImportedRows(rows) {
+        if (rows.length < 2) { alert('Archivo sin datos.'); return; }
+        const headers = rows[0].map(h => String(h).trim().toUpperCase());
+        const idxFecha = headers.indexOf('FECHA');
+        const idxDesc = headers.indexOf('DESCRIPCION');
+        const idxMonto = headers.indexOf('MONTO');
+        if (idxFecha === -1 || idxDesc === -1 || idxMonto === -1) {
+            alert('No se encontraron columnas FECHA, DESCRIPCION y MONTO.');
+            return;
+        }
+        importPreviewTableBody.innerHTML = '';
+        for (let i=1; i<rows.length; i++) {
+            const row = rows[i];
+            if (!row || row.length === 0) continue;
+            const fecha = row[idxFecha];
+            const desc = row[idxDesc];
+            const monto = parseFloat(row[idxMonto]);
+            if (!desc || isNaN(monto)) continue;
+            const exists = (currentBackupData.expenses || []).some(exp => exp.name.trim().toLowerCase() === String(desc).trim().toLowerCase() && parseFloat(exp.amount) === monto);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${fecha}</td><td>${desc}</td><td>${monto}</td>`;
+            const catTd = document.createElement('td');
+            const sel = document.createElement('select');
+            populateCategorySelect(sel);
+            catTd.appendChild(sel);
+            tr.appendChild(catTd);
+            const chkTd = document.createElement('td');
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.checked = !exists;
+            if (exists) chk.disabled = true;
+            chkTd.appendChild(chk);
+            tr.appendChild(chkTd);
+            importPreviewTableBody.appendChild(tr);
+        }
+        importPreview.style.display = 'block';
+    }
+    if (mergeImportButton) {
+        mergeImportButton.addEventListener('click', () => {
+            const rows = importPreviewTableBody.querySelectorAll('tr');
+            rows.forEach(row => {
+                const chk = row.querySelector('input[type="checkbox"]');
+                if (!chk || !chk.checked || chk.disabled) return;
+                const cells = row.querySelectorAll('td');
+                const fecha = cells[0].textContent.trim();
+                const desc = cells[1].textContent.trim();
+                const monto = parseFloat(cells[2].textContent.trim());
+                const cat = row.querySelector('select').value;
+                const date = fecha ? new Date(fecha + 'T00:00:00') : new Date();
+                const entry = { name: desc, amount: monto, category: cat, type: currentBackupData.expense_categories[cat] || 'Variable', frequency:'Único', start_date: date, movement_date: date, end_date:null, is_real:true, payment_method:'Efectivo', credit_card:null, installments:1 };
+                if (!currentBackupData.expenses) currentBackupData.expenses = [];
+                currentBackupData.expenses.push(entry);
+            });
+            renderExpensesTable();
+            renderCashflowTable();
+            importExpensesModal.style.display = 'none';
+            resetImportModal();
+        });
+    }
 
     // Trigger change event on expense frequency select to apply initial state
     expenseFrequencySelect.dispatchEvent(new Event('change'));
