@@ -99,11 +99,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const addExpenseButton = document.getElementById('add-expense-button');
     const cancelEditExpenseButton = document.getElementById('cancel-edit-expense-button');
     const expensesTableView = document.querySelector('#expenses-table-view tbody');
-    const searchExpenseInput = document.getElementById('search-expense-input');
-    const openImportExpensesButton = document.getElementById('open-import-expenses');
-    const importExpensesModal = document.getElementById('import-expenses-modal');
-    const importExpensesModalClose = document.getElementById('import-expenses-modal-close');
-    const expenseDropZone = document.getElementById('expense-drop-zone');
+    const searchExpenseInput = document.getElementById("search-expense-input");
+    const openImportExpensesButtons = document.querySelectorAll(".open-import-expenses");
+    const importExpensesModal = document.getElementById("import-expenses-modal");
+    const importExpensesModalClose = document.getElementById("import-expenses-modal-close");
+    const expenseDropZone = document.getElementById("expense-drop-zone");
     const expenseFileInput = document.getElementById('expense-file-input');
     const columnMappingDiv = document.getElementById('column-mapping');
     const mapDateSelect = document.getElementById('map-date');
@@ -1977,7 +1977,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsArrayBuffer(file);
     }
 
-    if (openImportExpensesButton) openImportExpensesButton.addEventListener('click', showImportExpensesModal);
+    openImportExpensesButtons.forEach(btn => btn.addEventListener("click", showImportExpensesModal));
     if (importExpensesModalClose) importExpensesModalClose.addEventListener('click', closeImportExpensesModal);
     if (importExpensesModal) importExpensesModal.addEventListener('click', (e)=>{ if(e.target===importExpensesModal) closeImportExpensesModal(); });
     if (expenseDropZone) {

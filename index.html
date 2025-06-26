@@ -53,6 +53,7 @@
                 <button class="tab-button" data-tab="presupuestos">Presupuestos</button>
                 <button class="tab-button" data-tab="baby-steps">Baby Steps</button>
                 <button class="tab-button" data-tab="ajustes">Ajustes</button>
+                <button class="tab-button desktop-only" data-tab="carga">Carga</button>
                 <button class="tab-button" data-tab="log">Log</button> </div>
 
             <div id="ajustes" class="tab-content">
@@ -235,7 +236,7 @@
                         <h3>Gastos Registrados</h3>
                         <label for="search-expense-input">Buscar Gasto:</label>
                         <input type="text" id="search-expense-input" placeholder="Escribe para filtrar...">
-                        <button type="button" id="open-import-expenses" class="small-button accent">Importar Gastos</button>
+                        <button type="button" class="open-import-expenses small-button accent desktop-only">Importar Gastos</button>
                         <div class="table-responsive dynamic-table-scroll">
                             <table id="expenses-table-view">
                                 <thead>
@@ -463,6 +464,12 @@
                     <div id="change-log-list">
                         </div>
                 </div>
+            </div>
+
+            <div id="carga" class="tab-content desktop-only">
+                <h2>Carga Masiva de Gastos</h2>
+                <p>Utiliza el asistente para importar gastos desde un archivo Excel.</p>
+                <button type="button" class="open-import-expenses accent">Importar Gastos</button>
             </div>
 
             <div class="save-changes-container">

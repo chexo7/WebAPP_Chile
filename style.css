@@ -1283,3 +1283,16 @@ td.reimbursement-income {
 .duplicate-row {
     background-color: var(--alt-row-bg);
 }
+#import-expenses-modal .modal-content {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+}
+
+.desktop-only { display: none; }
+@media (min-width: 769px) {
+    .desktop-only { display: inline-block; }
+    .tab-content.desktop-only { display: block; }
+}
