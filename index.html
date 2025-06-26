@@ -234,6 +234,7 @@
                         <h3>Gastos Registrados</h3>
                         <label for="search-expense-input">Buscar Gasto:</label>
                         <input type="text" id="search-expense-input" placeholder="Escribe para filtrar...">
+                        <button type="button" id="open-import-wizard-button" class="small-button">Importar desde Excel</button>
                         <div class="table-responsive dynamic-table-scroll">
                             <table id="expenses-table-view">
                                 <thead>
@@ -486,12 +487,30 @@
                     </div>
                 </div>
             </div>
+            <div id="expense-import-modal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <span id="expense-import-close" class="modal-close">&times;</span>
+                    <h3>Importar Gastos desde Excel</h3>
+                    <div id="import-dropzone" class="dropzone">
+                        <input type="file" id="import-file-input" accept=".xls,.xlsx" style="display:none;">
+                        <p>Arrastra aquí el archivo .xlsx o haz clic para seleccionarlo.</p>
+                    </div>
+                    <div id="import-mapping-container" style="display:none;">
+                        <div class="table-responsive">
+                            <table id="import-preview-table"></table>
+                        </div>
+                        <button id="merge-expenses-button" class="accent">Unir</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
     <script src="config.js"></script>
     <script src="app.js"></script>

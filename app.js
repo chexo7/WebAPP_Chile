@@ -100,6 +100,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const cancelEditExpenseButton = document.getElementById('cancel-edit-expense-button');
     const expensesTableView = document.querySelector('#expenses-table-view tbody');
     const searchExpenseInput = document.getElementById('search-expense-input');
+    const openImportWizardButton = document.getElementById('open-import-wizard-button');
+    const expenseImportModal = document.getElementById('expense-import-modal');
+    const expenseImportClose = document.getElementById('expense-import-close');
+    const importDropzone = document.getElementById('import-dropzone');
+    const importFileInput = document.getElementById('import-file-input');
+    const importPreviewTable = document.getElementById('import-preview-table');
+    const importMappingContainer = document.getElementById('import-mapping-container');
+    const mergeExpensesButton = document.getElementById('merge-expenses-button');
     let editingExpenseIndex = null;
 
     // --- BLOQUEO DE EDICIÓN ---
@@ -1840,6 +1848,112 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (editingExpenseIndex !== null && editingExpenseIndex > index) editingExpenseIndex--;
         }
     }
+
+    // --- IMPORTADOR DE GASTOS DESDE EXCEL ---
+    let importedExpenseRows = [];
+
+    function openImportModal() {
+        if (expenseImportModal) expenseImportModal.style.display = 'flex';
+    }
+
+    function closeImportModal() {
+        if (expenseImportModal) expenseImportModal.style.display = 'none';
+        importPreviewTable.innerHTML = '';
+        importMappingContainer.style.display = 'none';
+        importedExpenseRows = [];
+    }
+
+    function handleFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: 'array' });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            displayImportPreview(json);
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function displayImportPreview(rows) {
+        if (!rows || rows.length === 0) return;
+        importPreviewTable.innerHTML = '';
+        const headerRow = importPreviewTable.insertRow();
+        const mappings = ['Omitir', 'Fecha', 'Descripción', 'Monto'];
+        rows[0].forEach(() => {
+            const th = document.createElement('th');
+            const select = document.createElement('select');
+            mappings.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                select.appendChild(opt);
+            });
+            th.appendChild(select);
+            headerRow.appendChild(th);
+        });
+        const previewCount = Math.min(10, rows.length - 1);
+        for (let i = 1; i <= previewCount; i++) {
+            const tr = importPreviewTable.insertRow();
+            rows[i].forEach(cell => {
+                const td = tr.insertCell();
+                td.textContent = cell;
+            });
+        }
+        importedExpenseRows = rows.slice(1);
+        importMappingContainer.style.display = 'block';
+    }
+
+    function processImportedData() {
+        const selects = importPreviewTable.querySelectorAll('select');
+        const mapping = Array.from(selects).map(s => s.value);
+        const newEntries = [];
+        importedExpenseRows.forEach(row => {
+            const entry = {};
+            row.forEach((value, idx) => {
+                const map = mapping[idx];
+                if (map === 'Fecha') entry.movement_date = new Date(value + 'T00:00:00Z');
+                else if (map === 'Descripción') entry.name = String(value);
+                else if (map === 'Monto') entry.amount = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+            });
+            if (entry.name && !isNaN(entry.amount) && entry.movement_date) {
+                entry.category = Object.keys(currentBackupData.expense_categories)[0] || 'General';
+                entry.frequency = 'Único';
+                entry.start_date = entry.movement_date;
+                entry.end_date = null;
+                entry.is_real = true;
+                entry.payment_method = 'Efectivo';
+                entry.installments = 1;
+                newEntries.push(entry);
+            }
+        });
+        const deduped = newEntries.filter(ne => {
+            return !currentBackupData.expenses.some(e => e.name === ne.name && e.amount === ne.amount && getISODateString(new Date(e.movement_date)) === getISODateString(ne.movement_date));
+        });
+        if (deduped.length === 0) {
+            alert('No hay nuevos gastos para agregar.');
+            return;
+        }
+        currentBackupData.expenses.push(...deduped);
+        renderExpensesTable();
+        renderCashflowTable();
+        closeImportModal();
+    }
+
+    if (openImportWizardButton) openImportWizardButton.addEventListener('click', openImportModal);
+    if (expenseImportClose) expenseImportClose.addEventListener('click', closeImportModal);
+    if (expenseImportModal) expenseImportModal.addEventListener('click', (e) => { if (e.target === expenseImportModal) closeImportModal(); });
+    if (importDropzone) {
+        ['dragover','dragenter'].forEach(ev => importDropzone.addEventListener(ev, (e)=>{e.preventDefault(); importDropzone.classList.add('dragover');}));
+        ['dragleave','drop'].forEach(ev => importDropzone.addEventListener(ev, (e)=>{importDropzone.classList.remove('dragover');}));
+        importDropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        importDropzone.addEventListener('click', () => importFileInput.click());
+    }
+    if (importFileInput) importFileInput.addEventListener('change', (e)=>{ if(e.target.files.length) handleFile(e.target.files[0]); });
+    if (mergeExpensesButton) mergeExpensesButton.addEventListener('click', processImportedData);
 
     // --- LÓGICA PESTAÑA PRESUPUESTOS ---
     function resetBudgetForm() {
