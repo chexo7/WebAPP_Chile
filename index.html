@@ -167,6 +167,7 @@
 
             <div id="gastos" class="tab-content">
                 <h2>Gestión de Gastos</h2>
+                <button id="open-import-wizard" class="small-button accent">Importar XLSX</button>
                 <div class="form-and-table-layout">
                     <div class="form-container">
                         <h3>Registrar Nuevo Gasto</h3>
@@ -486,12 +487,38 @@
                     </div>
                 </div>
             </div>
+            <!-- Modal de Importación de Gastos -->
+            <div id="import-expenses-modal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <span id="close-import-modal" class="modal-close">&times;</span>
+                    <h3>Importar Gastos desde Excel</h3>
+                    <div id="drop-zone" class="drop-zone">
+                        <p>Arrastra el archivo .xlsx aquí o haz clic para seleccionar</p>
+                        <input type="file" id="xlsx-file-input" accept=".xlsx" style="display:none;" />
+                    </div>
+                    <div id="import-preview" style="display:none;">
+                        <h4>Vista previa</h4>
+                        <div class="table-responsive" style="max-height:300px;overflow:auto;">
+                            <table id="import-preview-table">
+                                <thead>
+                                    <tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Categoría</th><th>Agregar</th></tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <button id="merge-import-button" class="accent">Unir</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <!-- Librería para leer archivos XLSX -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
     <script src="config.js"></script>
     <script src="app.js"></script>
