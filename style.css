@@ -1299,5 +1299,4 @@ td.reimbursement-income {
 .desktop-only { display: none; }
 @media (min-width: 769px) {
     .desktop-only { display: inline-block; }
-    .tab-content.desktop-only { display: block; }
 }
