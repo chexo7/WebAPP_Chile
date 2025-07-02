@@ -2223,32 +2223,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         currentPaymentViewDate = periodStart;
         paymentsTableView.innerHTML = '';
-        let expensesInPeriodFound = false;
+        let rowsData = [];
         currentBackupData.expenses.forEach(expense => {
             const dates = getExpenseOccurrenceDatesInPeriod(expense, periodStart, periodEnd, currentBackupData.use_instant_expenses);
             dates.forEach(occDate => {
-                expensesInPeriodFound = true;
-                const row = paymentsTableView.insertRow();
-                row.insertCell().textContent = expense.name;
-                row.insertCell().textContent = formatCurrencyJS((expense.installments && expense.installments > 1 && !currentBackupData.use_instant_expenses) ? expense.amount / expense.installments : expense.amount, currentBackupData.display_currency_symbol);
-                row.insertCell().textContent = expense.category;
-                row.insertCell().textContent = currentBackupData.expense_categories[expense.category] || 'Variable';
-                row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
-                const dateCell = row.insertCell();
-                dateCell.textContent = getISODateString(occDate);
-                const paidCell = row.insertCell();
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                const paymentKey = `${expense.name}|${getISODateString(occDate)}`;
-                checkbox.checked = currentBackupData.payments && currentBackupData.payments[paymentKey] === true;
-                checkbox.dataset.paymentKey = paymentKey;
-                checkbox.addEventListener('change', (e) => {
-                    if (!currentBackupData.payments) currentBackupData.payments = {};
-                    currentBackupData.payments[e.target.dataset.paymentKey] = e.target.checked;
+                rowsData.push({
+                    name: expense.name,
+                    amount: (expense.installments && expense.installments > 1 && !currentBackupData.use_instant_expenses) ? expense.amount / expense.installments : expense.amount,
+                    category: expense.category,
+                    type: currentBackupData.expense_categories[expense.category] || 'Variable',
+                    isReal: expense.is_real ? 'Sí' : 'No',
+                    date: getISODateString(occDate),
+                    paymentKey: `${expense.name}|${getISODateString(occDate)}`
                 });
-                paidCell.appendChild(checkbox);
             });
         });
+        rowsData.sort((a, b) => a.category.localeCompare(b.category, undefined, { sensitivity: 'base' }));
+        rowsData.forEach(r => {
+            const row = paymentsTableView.insertRow();
+            row.insertCell().textContent = r.name;
+            row.insertCell().textContent = formatCurrencyJS(r.amount, currentBackupData.display_currency_symbol);
+            row.insertCell().textContent = r.category;
+            row.insertCell().textContent = r.type;
+            row.insertCell().textContent = r.isReal;
+            row.insertCell().textContent = r.date;
+            const paidCell = row.insertCell();
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = currentBackupData.payments && currentBackupData.payments[r.paymentKey] === true;
+            checkbox.dataset.paymentKey = r.paymentKey;
+            checkbox.addEventListener('change', (e) => {
+                if (!currentBackupData.payments) currentBackupData.payments = {};
+                currentBackupData.payments[e.target.dataset.paymentKey] = e.target.checked;
+            });
+            paidCell.appendChild(checkbox);
+        });
+        const expensesInPeriodFound = rowsData.length > 0;
         if (!expensesInPeriodFound) {
             const row = paymentsTableView.insertRow();
             const cell = row.insertCell();
