@@ -3629,7 +3629,8 @@ function getMondayOfWeek(year, week) {
         const otherCols = headers.slice(1);
         let offset = 0;
         let startY = margin.top;
-        doc.setFontSize(12);
+        // Reduce font size to minimize table row height
+        doc.setFontSize(9);
         doc.text(title, margin.left, startY - 10);
         while (offset < otherCols.length) {
             const slice = otherCols.slice(offset, offset + colsPerPage);
@@ -3640,7 +3641,7 @@ function getMondayOfWeek(year, week) {
                 body: pageRows,
                 startY,
                 theme: 'grid',
-                styles: { fontSize: 8 },
+                styles: { fontSize: 6 },
                 margin
             });
             offset += colsPerPage;
