@@ -110,10 +110,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const mapDescSelect = document.getElementById('map-description');
     const mapAmountSelect = document.getElementById('map-amount');
     const importTableContainer = document.getElementById('import-table-container');
+    const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
+    const bankProfiles = {
+        falabella: {
+            matchFileName: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.xlsx$/i,
+            columns: { date: 'FECHA', desc: 'DESCRIPCION', amount: 'MONTO' }
+        }
+    };
 
     // --- BLOQUEO DE EDICIÓN ---
     let editLockAcquired = false;
@@ -1864,6 +1871,9 @@ document.addEventListener('DOMContentLoaded', () => {
         importHeaders = [];
         if (importTableContainer) importTableContainer.innerHTML = '';
         if (columnMappingDiv) columnMappingDiv.style.display = 'none';
+        if (bankProfileSelect) bankProfileSelect.value = 'auto';
+        const bankProfileDiv = document.getElementById('bank-profile');
+        if (bankProfileDiv) bankProfileDiv.style.display = 'none';
     }
     function parseExcelDate(val) {
         if (val === undefined || val === null) return null;
@@ -1909,6 +1919,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return sel;
     }
+    function applyBankProfile(profileKey) {
+        const profile = bankProfiles[profileKey];
+        if (profile && profile.columns) {
+            mapDateSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.date.toLowerCase()) || '';
+            mapDescSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.desc.toLowerCase()) || '';
+            mapAmountSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.amount.toLowerCase()) || '';
+        } else {
+            mapDateSelect.value = importHeaders.find(h => /fecha/i.test(h)) || '';
+            mapDescSelect.value = importHeaders.find(h => /desc/i.test(h)) || '';
+            mapAmountSelect.value = importHeaders.find(h => /monto/i.test(h)) || '';
+        }
+        renderImportTable();
+    }
     function renderMappingSelectors() {
         if (!columnMappingDiv) return;
         const selects = [mapDateSelect, mapDescSelect, mapAmountSelect];
@@ -1918,10 +1941,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const opt = document.createElement('option'); opt.value = h; opt.textContent = h; sel.appendChild(opt);
             });
         });
-        mapDateSelect.value = importHeaders.find(h => /fecha/i.test(h)) || '';
-        mapDescSelect.value = importHeaders.find(h => /desc/i.test(h)) || '';
-        mapAmountSelect.value = importHeaders.find(h => /monto/i.test(h)) || '';
+        applyBankProfile(bankProfileSelect ? bankProfileSelect.value : 'auto');
         columnMappingDiv.style.display = 'flex';
+        const bankProfileDiv = document.getElementById('bank-profile');
+        if (bankProfileDiv) bankProfileDiv.style.display = 'flex';
     }
     function renderImportTable() {
         if (!importTableContainer) return;
@@ -1971,8 +1994,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 importHeaders.forEach((h,i)=>{ obj[h] = r[i]; });
                 return obj;
             });
+            let detected = 'auto';
+            for (const [key, prof] of Object.entries(bankProfiles)) {
+                if (prof.matchFileName && prof.matchFileName.test(file.name)) {
+                    detected = key; break;
+                }
+            }
+            if (bankProfileSelect) bankProfileSelect.value = detected;
             renderMappingSelectors();
-            renderImportTable();
         };
         reader.readAsArrayBuffer(file);
     }
@@ -1990,6 +2019,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (mapDateSelect) mapDateSelect.addEventListener('change', renderImportTable);
     if (mapDescSelect) mapDescSelect.addEventListener('change', renderImportTable);
     if (mapAmountSelect) mapAmountSelect.addEventListener('change', renderImportTable);
+    if (bankProfileSelect) bankProfileSelect.addEventListener('change', () => applyBankProfile(bankProfileSelect.value));
     if (mergeExpensesButton) mergeExpensesButton.addEventListener('click', () => {
         const dateCol = mapDateSelect.value;
         const descCol = mapDescSelect.value;

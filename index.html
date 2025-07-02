@@ -501,6 +501,12 @@
                     <h3>Importar Gastos desde Excel</h3>
                     <div id="expense-drop-zone">Arrastra el archivo .xlsx aquí o haz clic para seleccionar</div>
                     <input type="file" id="expense-file-input" accept=".xlsx,.xls" style="display:none;">
+                    <div id="bank-profile" style="display:none;">
+                        <label>Perfil<select id="import-bank-profile">
+                            <option value="auto">Automático</option>
+                            <option value="falabella">Banco Falabella</option>
+                        </select></label>
+                    </div>
                     <div id="column-mapping" style="display:none;">
                         <label>Fecha<select id="map-date"></select></label>
                         <label>Descripción<select id="map-description"></select></label>
