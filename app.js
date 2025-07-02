@@ -3691,10 +3691,14 @@ function getMondayOfWeek(year, week) {
                     if (cls.includes('current-period')) {
                         const spacing = 4;
                         const { x, y, width, height } = data.cell;
-                        doc.setLineWidth(0.5);
-                        doc.setDrawColor(56, 103, 214);
+                        doc.setLineWidth(0.25);
+                        doc.setDrawColor(235, 240, 251);
                         for (let i = -height; i < width; i += spacing) {
-                            doc.line(x + i, y, x + i + height, y + height);
+                            const xStart = x + Math.max(i, 0);
+                            const yStart = y + Math.max(-i, 0);
+                            const xEnd = x + Math.min(width, i + height);
+                            const yEnd = y + Math.min(height, height + i);
+                            doc.line(xStart, yStart, xEnd, yEnd);
                         }
                     }
                 }
