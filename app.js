@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const instantExpenseToggle = document.getElementById('instant-expense-toggle');
     const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
+    const printSummaryButton = document.getElementById('print-summary-button');
     const creditCardForm = document.getElementById('credit-card-form');
     const creditCardNameInput = document.getElementById('credit-card-name');
     const creditCardCutoffInput = document.getElementById('credit-card-cutoff');
@@ -1380,6 +1381,10 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBudgetsTable();
         renderBudgetSummaryTable();
     });
+
+    if (printSummaryButton) {
+        printSummaryButton.addEventListener('click', printCashflowSummary);
+    }
 
     if (creditCardForm) {
         creditCardCutoffInput.addEventListener('input', updateCreditCardExample);
@@ -3600,6 +3605,41 @@ function getMondayOfWeek(year, week) {
             }
         });
         return rows;
+    }
+
+    function printCashflowSummary() {
+        if (!window.jspdf || !window.jspdf.jsPDF || !window.jspdf.autoTable) {
+            alert('La librería jsPDF no está disponible');
+            return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
+
+        doc.text('Flujo de Caja - Mensual', 40, 30);
+        window.jspdf.autoTable(doc, {
+            html: '#cashflow-mensual-table',
+            startY: 40,
+            theme: 'grid',
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [220, 220, 220] },
+            horizontalPageBreak: true,
+            horizontalPageBreakRepeat: 0
+        });
+
+        doc.addPage('letter', 'landscape');
+        doc.text('Flujo de Caja - Semanal', 40, 30);
+        window.jspdf.autoTable(doc, {
+            html: '#cashflow-semanal-table',
+            startY: 40,
+            theme: 'grid',
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [220, 220, 220] },
+            horizontalPageBreak: true,
+            horizontalPageBreakRepeat: 0
+        });
+
+        doc.save('resumen_flujo_de_caja.pdf');
     }
 
     if (cashflowChartCanvas) {
