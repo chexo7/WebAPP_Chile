@@ -3696,8 +3696,8 @@ function getMondayOfWeek(year, week) {
                         doc.rect(x, y, width, height, 'F');
                         const spacing = 6;
                         doc.setLineWidth(0.4);
-                        // soft blue hatch similar to CSS background with subtle fade
-                        doc.setDrawColor(182, 200, 242);
+                        // soft blue hatch as subtle background
+                        doc.setDrawColor(206, 218, 246);
                         for (let i = -height; i < width; i += spacing) {
                             const x1 = Math.max(x, x + i);
                             const y1 = y + (x1 - (x + i));
