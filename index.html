@@ -8,6 +8,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -78,6 +80,7 @@
                         <p id="usd-clp-info-label" class="small-text informative-rate">1 USD = $CLP (Obteniendo...)</p>
 
                         <button type="button" id="apply-settings-button" class="accent">Aplicar Ajustes y Recalcular</button>
+                        <button type="button" id="print-summary-button" class="accent">Imprimir Resumen</button>
                     </form>
                 </div>
                 <div class="form-container settings-form-container" id="credit-card-settings-container">

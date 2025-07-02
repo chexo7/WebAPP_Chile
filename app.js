@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const instantExpenseToggle = document.getElementById('instant-expense-toggle');
     const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
+    const printSummaryButton = document.getElementById("print-summary-button");
     const creditCardForm = document.getElementById('credit-card-form');
     const creditCardNameInput = document.getElementById('credit-card-name');
     const creditCardCutoffInput = document.getElementById('credit-card-cutoff');
@@ -1380,6 +1381,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBudgetsTable();
         renderBudgetSummaryTable();
     });
+    if (printSummaryButton) printSummaryButton.addEventListener("click", printCashflowSummaryPDF);
 
     if (creditCardForm) {
         creditCardCutoffInput.addEventListener('input', updateCreditCardExample);
@@ -3399,6 +3401,33 @@ function getMondayOfWeek(year, week) {
             if (row.cells[idx + 1]) row.cells[idx + 1].classList.add('current-period');
         });
     }
+    function printCashflowSummaryPDF() {
+        const { jsPDF } = window.jspdf || window;
+        if (!jsPDF) { alert("jsPDF no disponible"); return; }
+        const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
+        const tables = [
+            { id: "cashflow-mensual-table", title: "Flujo de Caja - Mensual" },
+            { id: "cashflow-semanal-table", title: "Flujo de Caja - Semanal" }
+        ];
+        tables.forEach((tbl, tIdx) => {
+            const table = document.getElementById(tbl.id);
+            if (!table) return;
+            const headers = Array.from(table.querySelectorAll("thead th")).map(th => th.textContent.trim());
+            const rows = Array.from(table.querySelectorAll("tbody tr")).map(tr => Array.from(tr.children).map(td => td.textContent.trim()));
+            const firstHeader = headers[0];
+            const otherHeaders = headers.slice(1);
+            const maxCols = 6;
+            for (let i = 0; i < otherHeaders.length; i += maxCols) {
+                if (tIdx > 0 || i > 0) doc.addPage("letter", "landscape");
+                doc.text(tbl.title, 40, 40);
+                const pageHeaders = [firstHeader, ...otherHeaders.slice(i, i + maxCols)];
+                const body = rows.map(r => [r[0], ...r.slice(i + 1, i + 1 + maxCols)]);
+                doc.autoTable({ head: [pageHeaders], body, startY: 60, margin: { left: 40, right: 40 }, theme: "grid", styles: { fontSize: 8 } });
+            }
+        });
+        doc.save("resumen_flujo_caja.pdf");
+    }
+
 
 
     // --- INICIALIZACIÓN ---
