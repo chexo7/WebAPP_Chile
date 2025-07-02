@@ -3610,17 +3610,32 @@ function getMondayOfWeek(year, week) {
 
     function extractTableData(tableEl) {
         const headers = [];
-        tableEl.querySelectorAll('thead th').forEach(th => headers.push(th.textContent.trim()));
+        const headerClasses = [];
+        tableEl.querySelectorAll('thead th').forEach(th => {
+            headers.push(th.textContent.trim());
+            headerClasses.push(th.className || '');
+        });
+
         const rows = [];
+        const rowClasses = [];
+        const cellClasses = [];
+
         tableEl.querySelectorAll('tbody tr').forEach(tr => {
             const cells = [];
-            tr.querySelectorAll('td').forEach(td => cells.push(td.textContent.trim()));
+            const classes = [];
+            tr.querySelectorAll('td').forEach(td => {
+                cells.push(td.textContent.trim());
+                classes.push(td.className || '');
+            });
             rows.push(cells);
+            rowClasses.push(tr.className || '');
+            cellClasses.push(classes);
         });
-        return { headers, rows };
+        return { headers, headerClasses, rows, rowClasses, cellClasses };
     }
 
-    function addTableSectionsToPdf(doc, title, headers, rows, margin) {
+    function addTableSectionsToPdf(doc, title, data, margin) {
+        const { headers, headerClasses, rows, rowClasses, cellClasses } = data;
         const pageWidth = doc.internal.pageSize.getWidth() - margin.left - margin.right;
         const firstColWidth = 110;
         const colWidth = 65;
@@ -3629,19 +3644,66 @@ function getMondayOfWeek(year, week) {
         const otherCols = headers.slice(1);
         let offset = 0;
         let startY = margin.top;
-        doc.setFontSize(12);
+        // Reduce font size to minimize table row height
+        doc.setFontSize(9);
         doc.text(title, margin.left, startY - 10);
         while (offset < otherCols.length) {
             const slice = otherCols.slice(offset, offset + colsPerPage);
             const pageHeaders = [firstCol, ...slice];
-            const pageRows = rows.map(r => [r[0], ...r.slice(offset + 1, offset + 1 + colsPerPage)]);
+            const pageRows = rows.map((r) => [r[0], ...r.slice(offset + 1, offset + 1 + colsPerPage)]);
+            const pageCellClasses = cellClasses.map(c => [c[0], ...c.slice(offset + 1, offset + 1 + colsPerPage)]);
+            const pageHeaderClasses = [headerClasses[0], ...headerClasses.slice(offset + 1, offset + 1 + colsPerPage)];
+
+            const colorMap = {
+                'text-red': '#eb3b5a',
+                'text-blue': '#3867d6',
+                'text-green': '#20bf6b',
+                'text-orange': '#fa8231'
+            };
+
             doc.autoTable({
                 head: [pageHeaders],
                 body: pageRows,
                 startY,
                 theme: 'grid',
-                styles: { fontSize: 8 },
-                margin
+                styles: { fontSize: 6, textColor: '#2d3436' },
+                headStyles: { fillColor: '#f1f6fb', textColor: '#3867d6', fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: '#f8f9fa' },
+                margin,
+                didParseCell: function (data) {
+                    if (data.section === 'body') {
+                        const rowCls = rowClasses[data.row.index] || '';
+                        const cellCls = pageCellClasses[data.row.index][data.column.index] || '';
+                        if (rowCls.includes('bg-header')) data.cell.styles.fillColor = '#eef3f8';
+                        if (cellCls.includes('bold')) data.cell.styles.fontStyle = 'bold';
+                        for (const cls in colorMap) {
+                            if (cellCls.includes(cls)) { data.cell.styles.textColor = colorMap[cls]; break; }
+                        }
+                    } else if (data.section === 'head') {
+                        const cls = pageHeaderClasses[data.column.index] || '';
+                        if (cls.includes('current-period')) data.cell.styles.fillColor = '#eef3f8';
+                    }
+                },
+                didDrawCell: function (data) {
+                    const cls = data.section === 'body'
+                        ? pageCellClasses[data.row.index][data.column.index] || ''
+                        : pageHeaderClasses[data.column.index] || '';
+                    if (cls.includes('current-period')) {
+                        const spacing = 4;
+                        const { x, y, width, height } = data.cell;
+                        doc.saveGraphicsState();
+                        if (typeof doc.setGState === 'function') {
+                            doc.setGState(new doc.GState({ opacity: 0.15 }));
+                        }
+                        doc.setLineWidth(0.4);
+                        doc.setDrawColor(56, 103, 214);
+                        doc.rect(x, y, width, height, 'clip');
+                        for (let i = -height; i < width; i += spacing) {
+                            doc.line(x + i, y, x + i + height, y + height);
+                        }
+                        doc.restoreGraphicsState();
+                    }
+                }
             });
             offset += colsPerPage;
             if (offset < otherCols.length) {
@@ -3668,10 +3730,10 @@ function getMondayOfWeek(year, week) {
         }
         const margin = { top: 40, left: 40, right: 40 };
         const mensualData = extractTableData(document.getElementById('cashflow-mensual-table'));
-        addTableSectionsToPdf(doc, 'Flujo de Caja - Mensual', mensualData.headers, mensualData.rows, margin);
+        addTableSectionsToPdf(doc, 'Flujo de Caja - Mensual', mensualData, margin);
         doc.addPage('letter', 'landscape');
         const semanalData = extractTableData(document.getElementById('cashflow-semanal-table'));
-        addTableSectionsToPdf(doc, 'Flujo de Caja - Semanal', semanalData.headers, semanalData.rows, margin);
+        addTableSectionsToPdf(doc, 'Flujo de Caja - Semanal', semanalData, margin);
         doc.save('resumen_flujo_caja.pdf');
     }
 
