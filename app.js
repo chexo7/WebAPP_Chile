@@ -99,8 +99,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const addExpenseButton = document.getElementById('add-expense-button');
     const cancelEditExpenseButton = document.getElementById('cancel-edit-expense-button');
     const expensesTableView = document.querySelector('#expenses-table-view tbody');
-    const searchExpenseInput = document.getElementById('search-expense-input');
+    const searchExpenseInput = document.getElementById("search-expense-input");
+    const openImportExpensesButtons = document.querySelectorAll(".open-import-expenses");
+    const importExpensesModal = document.getElementById("import-expenses-modal");
+    const importExpensesModalClose = document.getElementById("import-expenses-modal-close");
+    const expenseDropZone = document.getElementById("expense-drop-zone");
+    const expenseFileInput = document.getElementById('expense-file-input');
+    const columnMappingDiv = document.getElementById('column-mapping');
+    const mapDateSelect = document.getElementById('map-date');
+    const mapDescSelect = document.getElementById('map-description');
+    const mapAmountSelect = document.getElementById('map-amount');
+    const importTableContainer = document.getElementById('import-table-container');
+    const bankProfileSelect = document.getElementById('import-bank-profile');
+    const mergeExpensesButton = document.getElementById('merge-expenses-button');
     let editingExpenseIndex = null;
+    let parsedImportData = [];
+    let importHeaders = [];
+    const bankProfiles = {
+        falabella: {
+            matchFileName: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.xlsx$/i,
+            columns: { date: 'FECHA', desc: 'DESCRIPCION', amount: 'MONTO' }
+        }
+    };
 
     // --- BLOQUEO DE EDICIÓN ---
     let editLockAcquired = false;
@@ -1840,6 +1860,190 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (editingExpenseIndex !== null && editingExpenseIndex > index) editingExpenseIndex--;
         }
     }
+
+    // --- IMPORTACIÓN MASIVA DE GASTOS ---
+    function showImportExpensesModal() {
+        if (importExpensesModal) importExpensesModal.style.display = 'flex';
+    }
+    function closeImportExpensesModal() {
+        if (importExpensesModal) importExpensesModal.style.display = 'none';
+        parsedImportData = [];
+        importHeaders = [];
+        if (importTableContainer) importTableContainer.innerHTML = '';
+        if (columnMappingDiv) columnMappingDiv.style.display = 'none';
+        if (bankProfileSelect) bankProfileSelect.value = 'auto';
+        const bankProfileDiv = document.getElementById('bank-profile');
+        if (bankProfileDiv) bankProfileDiv.style.display = 'none';
+    }
+    function parseExcelDate(val) {
+        if (val === undefined || val === null) return null;
+        if (typeof val === 'number') {
+            const d = XLSX.SSF.parse_date_code(val);
+            if (!d) return null;
+            return new Date(Date.UTC(d.y, d.m - 1, d.d));
+        }
+        const tryDate = new Date(val);
+        if (!isNaN(tryDate)) {
+            return new Date(Date.UTC(tryDate.getFullYear(), tryDate.getMonth(), tryDate.getDate()));
+        }
+        const parts = String(val).split(/[\/\-]/);
+        if (parts.length === 3) {
+            let [p1,p2,p3] = parts.map(p=>p.trim());
+            if (p3.length === 2) p3 = '20'+p3;
+            let day = parseInt(p1,10), month = parseInt(p2,10);
+            if (day > 12 && month <= 12) { const tmp = day; day = month; month = tmp; }
+            const y = parseInt(p3,10);
+            if (!isNaN(day) && !isNaN(month) && !isNaN(y)) {
+                return new Date(Date.UTC(y, month-1, day));
+            }
+        }
+        return null;
+    }
+    function checkExpenseDuplicate(name, dateStr, amount) {
+        return (currentBackupData.expenses || []).some(exp => {
+            const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
+            return expDate === dateStr && exp.name === name && parseFloat(exp.amount) === parseFloat(amount);
+        });
+    }
+    function createCategorySelect() {
+        const sel = document.createElement('select');
+        if (currentBackupData && currentBackupData.expense_categories) {
+            const cats = Object.keys(currentBackupData.expense_categories).sort();
+            cats.forEach(c => {
+                if (isFirebaseKeySafe(c)) {
+                    const opt = document.createElement('option');
+                    opt.value = c; opt.textContent = c;
+                    sel.appendChild(opt);
+                }
+            });
+        }
+        return sel;
+    }
+    function applyBankProfile(profileKey) {
+        const profile = bankProfiles[profileKey];
+        if (profile && profile.columns) {
+            mapDateSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.date.toLowerCase()) || '';
+            mapDescSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.desc.toLowerCase()) || '';
+            mapAmountSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.amount.toLowerCase()) || '';
+        } else {
+            mapDateSelect.value = importHeaders.find(h => /fecha/i.test(h)) || '';
+            mapDescSelect.value = importHeaders.find(h => /desc/i.test(h)) || '';
+            mapAmountSelect.value = importHeaders.find(h => /monto/i.test(h)) || '';
+        }
+        renderImportTable();
+    }
+    function renderMappingSelectors() {
+        if (!columnMappingDiv) return;
+        const selects = [mapDateSelect, mapDescSelect, mapAmountSelect];
+        selects.forEach(sel => { sel.innerHTML = '<option value="">--</option>'; });
+        importHeaders.forEach(h => {
+            selects.forEach(sel => {
+                const opt = document.createElement('option'); opt.value = h; opt.textContent = h; sel.appendChild(opt);
+            });
+        });
+        applyBankProfile(bankProfileSelect ? bankProfileSelect.value : 'auto');
+        columnMappingDiv.style.display = 'flex';
+        const bankProfileDiv = document.getElementById('bank-profile');
+        if (bankProfileDiv) bankProfileDiv.style.display = 'flex';
+    }
+    function renderImportTable() {
+        if (!importTableContainer) return;
+        importTableContainer.innerHTML = '';
+        const dateCol = mapDateSelect.value;
+        const descCol = mapDescSelect.value;
+        const amountCol = mapAmountSelect.value;
+        if (!dateCol || !descCol || !amountCol) return;
+        const table = document.createElement('table');
+        table.classList.add('import-preview-table');
+        const thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th>Importar</th><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Categoría</th><th>Duplicado?</th></tr>';
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        parsedImportData.forEach((row, idx) => {
+            const dateObj = parseExcelDate(row[dateCol]);
+            const dateStr = dateObj ? getISODateString(dateObj) : '';
+            const desc = row[descCol] !== undefined ? String(row[descCol]) : '';
+            const amt = row[amountCol];
+            const isDup = checkExpenseDuplicate(desc, dateStr, parseFloat(amt));
+            const tr = document.createElement('tr');
+            if (isDup) tr.classList.add('duplicate-row');
+            const chkCell = tr.insertCell();
+            const chk = document.createElement('input'); chk.type='checkbox'; chk.dataset.index = idx; chk.checked = !isDup; if (isDup) chk.disabled = true; chkCell.appendChild(chk);
+            tr.insertCell().textContent = dateStr || String(row[dateCol] || '');
+            tr.insertCell().textContent = desc;
+            tr.insertCell().textContent = amt;
+            const catCell = tr.insertCell();
+            const sel = createCategorySelect(); sel.dataset.index = idx; catCell.appendChild(sel);
+            tr.insertCell().textContent = isDup ? 'Sí' : 'No';
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        importTableContainer.appendChild(table);
+    }
+    function handleExpenseFile(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: 'array' });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            if (!json.length) return;
+            importHeaders = json[0];
+            parsedImportData = json.slice(1).map(r => {
+                const obj = {};
+                importHeaders.forEach((h,i)=>{ obj[h] = r[i]; });
+                return obj;
+            });
+            let detected = 'auto';
+            for (const [key, prof] of Object.entries(bankProfiles)) {
+                if (prof.matchFileName && prof.matchFileName.test(file.name)) {
+                    detected = key; break;
+                }
+            }
+            if (bankProfileSelect) bankProfileSelect.value = detected;
+            renderMappingSelectors();
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    openImportExpensesButtons.forEach(btn => btn.addEventListener("click", showImportExpensesModal));
+    if (importExpensesModalClose) importExpensesModalClose.addEventListener('click', closeImportExpensesModal);
+    if (importExpensesModal) importExpensesModal.addEventListener('click', (e)=>{ if(e.target===importExpensesModal) closeImportExpensesModal(); });
+    if (expenseDropZone) {
+        expenseDropZone.addEventListener('click', () => { if(expenseFileInput) expenseFileInput.click(); });
+        expenseDropZone.addEventListener('dragover', e => { e.preventDefault(); expenseDropZone.classList.add('dragover'); });
+        expenseDropZone.addEventListener('dragleave', () => expenseDropZone.classList.remove('dragover'));
+        expenseDropZone.addEventListener('drop', e => { e.preventDefault(); expenseDropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleExpenseFile(e.dataTransfer.files[0]); });
+    }
+    if (expenseFileInput) expenseFileInput.addEventListener('change', e => { if (e.target.files[0]) handleExpenseFile(e.target.files[0]); });
+    if (mapDateSelect) mapDateSelect.addEventListener('change', renderImportTable);
+    if (mapDescSelect) mapDescSelect.addEventListener('change', renderImportTable);
+    if (mapAmountSelect) mapAmountSelect.addEventListener('change', renderImportTable);
+    if (bankProfileSelect) bankProfileSelect.addEventListener('change', () => applyBankProfile(bankProfileSelect.value));
+    if (mergeExpensesButton) mergeExpensesButton.addEventListener('click', () => {
+        const dateCol = mapDateSelect.value;
+        const descCol = mapDescSelect.value;
+        const amountCol = mapAmountSelect.value;
+        if (!dateCol || !descCol || !amountCol) { alert('Mapea las columnas requeridas'); return; }
+        const checkboxes = importTableContainer ? importTableContainer.querySelectorAll('input[type="checkbox"][data-index]') : [];
+        checkboxes.forEach(chk => {
+            if (chk.checked) {
+                const idx = parseInt(chk.dataset.index,10);
+                const row = parsedImportData[idx];
+                const dateObj = parseExcelDate(row[dateCol]);
+                const desc = row[descCol] !== undefined ? String(row[descCol]) : '';
+                const amt = parseFloat(row[amountCol] || 0);
+                const catSel = importTableContainer.querySelector(`select[data-index="${idx}"]`);
+                const cat = catSel ? catSel.value : '';
+                const entry = { name: desc, amount: amt, category: cat, type: currentBackupData.expense_categories[cat] || 'Variable', frequency: 'Único', start_date: dateObj, end_date: null, is_real: true, movement_date: dateObj, payment_method: 'Efectivo', credit_card: null, installments: 1 };
+                if (!currentBackupData.expenses) currentBackupData.expenses = [];
+                currentBackupData.expenses.push(entry);
+            }
+        });
+        renderExpensesTable();
+        renderCashflowTable();
+        closeImportExpensesModal();
+    });
 
     // --- LÓGICA PESTAÑA PRESUPUESTOS ---
     function resetBudgetForm() {
