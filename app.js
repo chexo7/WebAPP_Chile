@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const instantExpenseToggle = document.getElementById('instant-expense-toggle');
     const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
+    const printSummaryButton = document.getElementById('print-summary-button');
     const creditCardForm = document.getElementById('credit-card-form');
     const creditCardNameInput = document.getElementById('credit-card-name');
     const creditCardCutoffInput = document.getElementById('credit-card-cutoff');
@@ -1380,6 +1381,10 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBudgetsTable();
         renderBudgetSummaryTable();
     });
+
+    if (printSummaryButton) {
+        printSummaryButton.addEventListener('click', printCashflowSummary);
+    }
 
     if (creditCardForm) {
         creditCardCutoffInput.addEventListener('input', updateCreditCardExample);
@@ -3600,6 +3605,51 @@ function getMondayOfWeek(year, week) {
             }
         });
         return rows;
+    }
+
+    function printCashflowSummary() {
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            alert('Biblioteca jsPDF no cargada');
+            return;
+        }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', format: 'letter' });
+        const tables = [
+            { el: document.getElementById('cashflow-mensual-table'), title: 'Flujo de Caja - Mensual' },
+            { el: document.getElementById('cashflow-semanal-table'), title: 'Flujo de Caja - Semanal' }
+        ];
+        let first = true;
+        tables.forEach(tbl => {
+            if (!tbl.el) return;
+            if (!first) doc.addPage('letter', 'landscape');
+            first = false;
+            doc.text(tbl.title, 14, 10);
+            const headRows = [];
+            tbl.el.querySelectorAll('thead tr').forEach(tr => {
+                const row = [];
+                tr.querySelectorAll('th').forEach(th => row.push(th.textContent));
+                headRows.push(row);
+            });
+            const bodyRows = [];
+            tbl.el.querySelectorAll('tbody tr').forEach(tr => {
+                const row = [];
+                tr.querySelectorAll('td').forEach(td => row.push(td.textContent));
+                bodyRows.push(row);
+            });
+            doc.autoTable({
+                head: headRows,
+                body: bodyRows,
+                startY: 14,
+                theme: 'grid',
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [224,224,224] },
+                margin: { top: 14 },
+                showHead: 'everyPage',
+                horizontalPageBreak: true,
+                horizontalPageBreakRepeat: 1
+            });
+        });
+        doc.save('Resumen_Flujo_Caja.pdf');
     }
 
     if (cashflowChartCanvas) {
