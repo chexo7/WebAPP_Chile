@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const instantExpenseToggle = document.getElementById('instant-expense-toggle');
     const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
+    const printSummaryButton = document.getElementById('print-summary-button');
     const creditCardForm = document.getElementById('credit-card-form');
     const creditCardNameInput = document.getElementById('credit-card-name');
     const creditCardCutoffInput = document.getElementById('credit-card-cutoff');
@@ -1378,8 +1379,13 @@ document.addEventListener('DOMContentLoaded', () => {
         setupPaymentPeriodSelectors();
         setPaymentPeriodicity(activePaymentsPeriodicity);
         renderBudgetsTable();
+
         renderBudgetSummaryTable();
     });
+
+    if (printSummaryButton) {
+        printSummaryButton.addEventListener('click', printCashflowSummary);
+    }
 
     if (creditCardForm) {
         creditCardCutoffInput.addEventListener('input', updateCreditCardExample);
@@ -3600,6 +3606,73 @@ function getMondayOfWeek(year, week) {
             }
         });
         return rows;
+    }
+
+    function extractTableData(tableEl) {
+        const headers = [];
+        tableEl.querySelectorAll('thead th').forEach(th => headers.push(th.textContent.trim()));
+        const rows = [];
+        tableEl.querySelectorAll('tbody tr').forEach(tr => {
+            const cells = [];
+            tr.querySelectorAll('td').forEach(td => cells.push(td.textContent.trim()));
+            rows.push(cells);
+        });
+        return { headers, rows };
+    }
+
+    function addTableSectionsToPdf(doc, title, headers, rows, margin) {
+        const pageWidth = doc.internal.pageSize.getWidth() - margin.left - margin.right;
+        const firstColWidth = 110;
+        const colWidth = 65;
+        const colsPerPage = Math.max(1, Math.floor((pageWidth - firstColWidth) / colWidth));
+        const firstCol = headers[0];
+        const otherCols = headers.slice(1);
+        let offset = 0;
+        let startY = margin.top;
+        doc.setFontSize(12);
+        doc.text(title, margin.left, startY - 10);
+        while (offset < otherCols.length) {
+            const slice = otherCols.slice(offset, offset + colsPerPage);
+            const pageHeaders = [firstCol, ...slice];
+            const pageRows = rows.map(r => [r[0], ...r.slice(offset + 1, offset + 1 + colsPerPage)]);
+            doc.autoTable({
+                head: [pageHeaders],
+                body: pageRows,
+                startY,
+                theme: 'grid',
+                styles: { fontSize: 8 },
+                margin
+            });
+            offset += colsPerPage;
+            if (offset < otherCols.length) {
+                doc.addPage('letter', 'landscape');
+                startY = margin.top;
+                doc.text(title, margin.left, startY - 10);
+            } else {
+                startY = doc.lastAutoTable.finalY + 10;
+            }
+        }
+        return startY;
+    }
+
+    function printCashflowSummary() {
+        const { jsPDF } = window.jspdf || {};
+        if (!jsPDF) {
+            alert('Biblioteca jsPDF no cargada.');
+            return;
+        }
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
+        if (typeof doc.autoTable !== 'function') {
+            alert('Plugin AutoTable no disponible.');
+            return;
+        }
+        const margin = { top: 40, left: 40, right: 40 };
+        const mensualData = extractTableData(document.getElementById('cashflow-mensual-table'));
+        addTableSectionsToPdf(doc, 'Flujo de Caja - Mensual', mensualData.headers, mensualData.rows, margin);
+        doc.addPage('letter', 'landscape');
+        const semanalData = extractTableData(document.getElementById('cashflow-semanal-table'));
+        addTableSectionsToPdf(doc, 'Flujo de Caja - Semanal', semanalData.headers, semanalData.rows, margin);
+        doc.save('resumen_flujo_caja.pdf');
     }
 
     if (cashflowChartCanvas) {
