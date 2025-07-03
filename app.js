@@ -3602,6 +3602,9 @@ function getMondayOfWeek(year, week) {
     }
     function closeCellDetailsModal() {
         if (cellDetailsModal) cellDetailsModal.style.display = 'none';
+        if (cellDetailsTableBody) cellDetailsTableBody.innerHTML = '';
+        if (cellDetailsEquation) cellDetailsEquation.textContent = '';
+        if (cellDetailsTitle) cellDetailsTitle.textContent = '';
     }
     function closeChartModal() {
         if (chartModal) chartModal.style.display = "none";
