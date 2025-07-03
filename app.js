@@ -202,6 +202,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullChartData = null;
     let activeCashflowPeriodicity = 'Mensual';
     let activePaymentsPeriodicity = 'Mensual';
+    const cashflowTableData = { Mensual: null, Semanal: null };
+    let breakdownPopup = null;
+    let breakdownTimer = null;
+    let breakdownOutsideHandler = null;
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -2322,6 +2326,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData);
+        cashflowTableData[periodicity] = { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p, initialBalance: parseFloat(currentBackupData.analysis_initial_balance) };
 
         if (!periodDates || periodDates.length === 0) {
             tableBodyEl.innerHTML = '<tr><td colspan="2">No hay datos para el período.</td></tr>';
@@ -2406,6 +2411,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 tdValue.textContent = formatCurrencyJS(value, symbol);
                 if (colorClass) tdValue.classList.add(colorClass);
                 if (def.isBold) tdValue.classList.add('bold');
+                tdValue.dataset.periodicity = periodicity;
+                tdValue.dataset.rowKey = def.key;
+                tdValue.dataset.periodIndex = i;
+                if (def.category) tdValue.dataset.category = def.category;
+                if (!isTouchDevice) {
+                    tdValue.addEventListener('mouseenter', handleCellMouseEnter);
+                    tdValue.addEventListener('mouseleave', handleCellMouseLeave);
+                }
             }
         });
 
@@ -3404,6 +3417,95 @@ function getMondayOfWeek(year, week) {
         Array.from(bodyEl.rows).forEach(row => {
             if (row.cells[idx + 1]) row.cells[idx + 1].classList.add('current-period');
         });
+    }
+
+    function handleCellMouseEnter(e) {
+        if (breakdownTimer) clearTimeout(breakdownTimer);
+        const cell = e.currentTarget;
+        breakdownTimer = setTimeout(() => { showBreakdownPopup(cell); }, 1000);
+    }
+
+    function handleCellMouseLeave() {
+        if (breakdownTimer) { clearTimeout(breakdownTimer); breakdownTimer = null; }
+        hideBreakdownPopup();
+    }
+
+    function hideBreakdownPopup() {
+        if (breakdownPopup) {
+            document.body.removeChild(breakdownPopup);
+            breakdownPopup = null;
+        }
+        if (breakdownOutsideHandler) {
+            document.removeEventListener('click', breakdownOutsideHandler);
+            breakdownOutsideHandler = null;
+        }
+    }
+
+    function showBreakdownPopup(cell) {
+        hideBreakdownPopup();
+        const html = generateBreakdownHtml(cell.dataset.periodicity, cell.dataset.rowKey, parseInt(cell.dataset.periodIndex, 10), cell.dataset.category || null);
+        if (!html) return;
+        breakdownPopup = document.createElement('div');
+        breakdownPopup.className = 'cell-breakdown-popup';
+        breakdownPopup.innerHTML = html;
+        document.body.appendChild(breakdownPopup);
+        const rect = cell.getBoundingClientRect();
+        breakdownPopup.style.top = `${window.scrollY + rect.bottom + 5}px`;
+        breakdownPopup.style.left = `${window.scrollX + rect.left}px`;
+        breakdownOutsideHandler = (ev) => { if (breakdownPopup && !breakdownPopup.contains(ev.target)) hideBreakdownPopup(); };
+        document.addEventListener('click', breakdownOutsideHandler);
+    }
+
+    function generateBreakdownHtml(periodicity, rowKey, periodIdx, category) {
+        const data = cashflowTableData[periodicity];
+        if (!data) return '';
+        const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p, initialBalance } = data;
+        const symbol = currentBackupData.display_currency_symbol || '$';
+        const fc = (v) => formatCurrencyJS(v, symbol);
+        const pStart = periodDates[periodIdx];
+        const allTrans = gatherPeriodTransactions(pStart, periodicity);
+
+        if (rowKey === 'START_BALANCE') {
+            const prev = periodIdx === 0 ? initialBalance : end_bal_p[periodIdx - 1];
+            return `<strong>${fc(prev)}</strong>`;
+        }
+        if (rowKey === 'NET_INCOME') {
+            const items = allTrans.filter(t => t.type === 'Ingreso');
+            if (items.length === 0) return `<strong>${fc(0)}</strong>`;
+            let html = items.map(it => `${it.name}: +${fc(it.amount)}`).join('<br>');
+            html += `<br><strong>Total: ${fc(income_p[periodIdx])}</strong>`;
+            return html;
+        }
+        if (rowKey === 'FIXED_EXP_TOTAL' || rowKey === 'VAR_EXP_TOTAL') {
+            const typeCats = Object.keys(currentBackupData.expense_categories || {}).filter(c => currentBackupData.expense_categories[c] === (rowKey === 'FIXED_EXP_TOTAL' ? 'Fijo' : 'Variable'));
+            const items = allTrans.filter(t => typeCats.includes(t.category));
+            if (items.length === 0) return `<strong>${fc(0)}</strong>`;
+            let total = 0;
+            let html = items.map(it => {
+                const sign = it.type === 'Gasto' ? '-' : '+';
+                total += (it.type === 'Gasto' ? -it.amount : it.amount);
+                return `${it.name}: ${sign}${fc(it.amount)}`;
+            }).join('<br>');
+            const dispTotal = rowKey === 'FIXED_EXP_TOTAL' ? -fixed_exp_p[periodIdx] : -var_exp_p[periodIdx];
+            html += `<br><strong>Total: ${fc(dispTotal)}</strong>`;
+            return html;
+        }
+        if (rowKey.startsWith('CAT_') && category) {
+            const items = allTrans.filter(t => t.category === category);
+            if (items.length === 0) return `<strong>${fc(0)}</strong>`;
+            let html = items.map(it => `${it.name}: ${it.type === 'Gasto' ? '-' : '+'}${fc(it.amount)}`).join('<br>');
+            html += `<br><strong>Total: ${fc(-expenses_by_cat_p[periodIdx][category])}</strong>`;
+            return html;
+        }
+        if (rowKey === 'NET_FLOW') {
+            const html = `Ingreso: ${fc(income_p[periodIdx])} - Fijos: ${fc(fixed_exp_p[periodIdx])} - Variables: ${fc(var_exp_p[periodIdx])} = <strong>${fc(net_flow_p[periodIdx])}</strong>`;
+            return html;
+        }
+        if (rowKey === 'END_BALANCE') {
+            const startBal = periodIdx === 0 ? initialBalance : end_bal_p[periodIdx - 1];
+            return `Inicio: ${fc(startBal)} + Flujo: ${fc(net_flow_p[periodIdx])} = <strong>${fc(end_bal_p[periodIdx])}</strong>`;
+        }
+        return '';
     }
 
 

@@ -1249,6 +1249,19 @@ td.reimbursement-income {
     cursor: pointer;
 }
 
+/* Popup de desglose para celdas de flujo de caja (solo escritorio) */
+.cell-breakdown-popup {
+    position: absolute;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 8px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    z-index: 1100;
+    font-size: 0.85rem;
+    max-width: 250px;
+}
+
 #expense-drop-zone {
     border: 2px dashed var(--border-color);
     padding: 20px;
