@@ -1300,3 +1300,6 @@ td.reimbursement-income {
 @media (min-width: 769px) {
     .desktop-only { display: inline-block; }
 }
+
+.cashflow-clickable { cursor: pointer; }
+.cashflow-clickable:hover { background-color: var(--row-hover-bg); }
