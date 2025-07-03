@@ -158,6 +158,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const cashflowMensualContainer = document.getElementById('cashflow-mensual-container');
     const cashflowSemanalContainer = document.getElementById('cashflow-semanal-container');
 
+    if (!isTouchDevice) {
+        [cashflowMensualTableBody, cashflowSemanalTableBody].forEach(tb => {
+            if (tb) {
+                tb.addEventListener('mouseenter', handleCellMouseEnter, true);
+                tb.addEventListener('mouseleave', handleCellMouseLeave, true);
+            }
+        });
+        document.addEventListener('click', function(e) {
+            if (cellPopupEl && !cellPopupEl.contains(e.target)) hideCellPopup();
+        });
+    }
+
     // --- ELEMENTOS PESTAÑA GRÁFICO ---
     const cashflowChartCanvas = document.getElementById('cashflow-chart');
     const chartMessage = document.getElementById('chart-message');
@@ -202,6 +214,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullChartData = null;
     let activeCashflowPeriodicity = 'Mensual';
     let activePaymentsPeriodicity = 'Mensual';
+
+    // --- POPUP CELDAS FLUJO DE CAJA ---
+    let cellPopupEl = null;
+    let cellHoverTimeout = null;
+    let activePopupCell = null;
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -2322,6 +2339,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData);
+        const transactionsByPeriod = periodDates.map(d => gatherPeriodTransactions(d, periodicity));
 
         if (!periodDates || periodDates.length === 0) {
             tableBodyEl.innerHTML = '<tr><td colspan="2">No hay datos para el período.</td></tr>';
@@ -2338,6 +2356,64 @@ document.addEventListener('DOMContentLoaded', () => {
         const startQDate = analysisStart;
         const startStr = `${('0' + startQDate.getUTCDate()).slice(-2)}/${('0' + (startQDate.getUTCMonth() + 1)).slice(-2)}/${startQDate.getUTCFullYear()}`;
         titleEl.textContent = `Proyección Flujo de Caja ${periodicity} (${currentBackupData.analysis_duration} Meses desde ${startStr})`;
+
+        function buildCashflowCellDetails(def, idx, cellValue) {
+            const txs = transactionsByPeriod[idx] || [];
+            const lines = [];
+            const startBal = (idx === 0) ? initialBalance : end_bal_p[idx - 1];
+            let total;
+            switch (def.key) {
+                case 'START_BALANCE':
+                    lines.push(idx === 0 ?
+                        `Saldo inicial configurado: ${formatCurrencyJS(startBal, symbol)}` :
+                        `Saldo final período anterior: ${formatCurrencyJS(startBal, symbol)}`);
+                    break;
+                case 'NET_INCOME':
+                    txs.filter(t => t.type === 'Ingreso').forEach(t => {
+                        lines.push(`+ ${t.name}: ${formatCurrencyJS(t.amount, symbol)}`);
+                    });
+                    total = income_p[idx];
+                    break;
+                case 'FIXED_EXP_TOTAL':
+                    txs.filter(t => fixedCategories.includes(t.category)).forEach(t => {
+                        const sign = t.type === 'Gasto' ? '-' : '+';
+                        lines.push(`${sign} ${t.name}: ${formatCurrencyJS(t.amount, symbol)}`);
+                    });
+                    total = -fixed_exp_p[idx];
+                    break;
+                case 'VAR_EXP_TOTAL':
+                    txs.filter(t => variableCategories.includes(t.category)).forEach(t => {
+                        const sign = t.type === 'Gasto' ? '-' : '+';
+                        lines.push(`${sign} ${t.name}: ${formatCurrencyJS(t.amount, symbol)}`);
+                    });
+                    total = -var_exp_p[idx];
+                    break;
+                case 'NET_FLOW':
+                    txs.forEach(t => {
+                        const sign = t.type === 'Gasto' ? '-' : '+';
+                        lines.push(`${sign} ${t.name}: ${formatCurrencyJS(t.amount, symbol)}`);
+                    });
+                    total = net_flow_p[idx];
+                    break;
+                case 'END_BALANCE':
+                    lines.push(`Saldo inicial: ${formatCurrencyJS(startBal, symbol)}`);
+                    lines.push(`Flujo neto: ${formatCurrencyJS(net_flow_p[idx], symbol)}`);
+                    total = end_bal_p[idx];
+                    break;
+                default:
+                    if (def.category) {
+                        txs.filter(t => t.category === def.category).forEach(t => {
+                            const sign = t.type === 'Gasto' ? '-' : '+';
+                            lines.push(`${sign} ${t.name}: ${formatCurrencyJS(t.amount, symbol)}`);
+                        });
+                        total = cellValue;
+                    }
+            }
+            if (typeof total !== 'undefined' && def.key !== 'START_BALANCE') {
+                lines.push('<hr><strong>Total: ' + formatCurrencyJS(total, symbol) + '</strong>');
+            }
+            return lines.join('<br>');
+        }
 
         const headerRow = tableHeadEl.insertRow();
         const thConcept = document.createElement('th');
@@ -2406,6 +2482,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 tdValue.textContent = formatCurrencyJS(value, symbol);
                 if (colorClass) tdValue.classList.add(colorClass);
                 if (def.isBold) tdValue.classList.add('bold');
+
+                if (!isTouchDevice) {
+                    const detailsHtml = buildCashflowCellDetails(def, i, value);
+                    if (detailsHtml) tdValue.setAttribute('data-details', detailsHtml);
+                }
             }
         });
 
@@ -3606,6 +3687,46 @@ function getMondayOfWeek(year, week) {
             }
         });
         return rows;
+    }
+
+    function showCellPopup(cell, html) {
+        if (!cellPopupEl) {
+            cellPopupEl = document.createElement('div');
+            cellPopupEl.className = 'cashflow-cell-popup';
+            document.body.appendChild(cellPopupEl);
+        }
+        cellPopupEl.innerHTML = html;
+        const rect = cell.getBoundingClientRect();
+        cellPopupEl.style.left = (rect.left + window.scrollX + rect.width / 2) + 'px';
+        cellPopupEl.style.top = (rect.top + window.scrollY + rect.height + 8) + 'px';
+        cellPopupEl.classList.add('show');
+        activePopupCell = cell;
+    }
+
+    function hideCellPopup() {
+        if (cellPopupEl) {
+            cellPopupEl.classList.remove('show');
+        }
+        activePopupCell = null;
+    }
+
+    function handleCellMouseEnter(e) {
+        const cell = e.target.closest('td[data-details]');
+        if (!cell) return;
+        if (cellHoverTimeout) clearTimeout(cellHoverTimeout);
+        cellHoverTimeout = setTimeout(() => {
+            if (cell === activePopupCell) return;
+            showCellPopup(cell, cell.getAttribute('data-details'));
+        }, 1000);
+    }
+
+    function handleCellMouseLeave(e) {
+        const cell = e.target.closest('td[data-details]');
+        if (!cell) return;
+        if (cellHoverTimeout) {
+            clearTimeout(cellHoverTimeout);
+            cellHoverTimeout = null;
+        }
     }
 
     function extractTableData(tableEl) {
