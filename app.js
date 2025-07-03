@@ -113,6 +113,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const aiStatusIndicator = document.getElementById('ai-status-indicator');
+    const aiChatBox = document.getElementById('ai-chat-box');
+    const aiChatLog = document.getElementById('ai-chat-log');
+    const aiChatInput = document.getElementById('ai-chat-input');
+    const aiChatSend = document.getElementById('ai-chat-send');
+    let aiAvailable = false;
+    const aiDuplicateMap = {};
+    const AI_INSTRUCTIONS = "Eres asistente del Gestor Financiero Web. Cada gasto tiene campos: name, amount, category, frequency, start_date, end_date, movement_date, payment_method, is_real, credit_card e installments.";
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
@@ -1876,6 +1884,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- IMPORTACIÓN MASIVA DE GASTOS ---
     function showImportExpensesModal() {
         if (importExpensesModal) importExpensesModal.style.display = 'flex';
+        checkAIAvailability();
     }
     function closeImportExpensesModal() {
         if (importExpensesModal) importExpensesModal.style.display = 'none';
@@ -1916,6 +1925,64 @@ document.addEventListener('DOMContentLoaded', () => {
             const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
             return expDate === dateStr && exp.name === name && parseFloat(exp.amount) === parseFloat(amount);
         });
+    }
+
+    async function checkAIAvailability() {
+        try {
+            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: 'ping' }] }] })
+            });
+            aiAvailable = resp.ok;
+        } catch(err) {
+            aiAvailable = false;
+        }
+        if (aiStatusIndicator) aiStatusIndicator.textContent = aiAvailable ? 'Disponible' : 'No disponible';
+        if (aiChatBox) aiChatBox.style.display = aiAvailable ? 'block' : 'none';
+    }
+
+    async function aiCheckDuplicates(dateCol, descCol, amountCol) {
+        const existing = (currentBackupData.expenses || []).map(e => ({ name: e.name, amount: e.amount, date: e.movement_date || e.start_date }));
+        const toCheck = parsedImportData.map(row => ({
+            name: row[descCol] !== undefined ? String(row[descCol]) : '',
+            amount: row[amountCol],
+            date: parseExcelDate(row[dateCol]) ? getISODateString(parseExcelDate(row[dateCol])) : row[dateCol]
+        }));
+        const prompt = `${AI_INSTRUCTIONS} Indica con JSON array si cada gasto nuevo ya existe comparando name, date y amount. Existentes: ${JSON.stringify(existing)}. Nuevos: ${JSON.stringify(toCheck)}.`;
+        try {
+            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+            const data = await resp.json();
+            const text = data.candidates && data.candidates[0] && data.candidates[0].content.parts[0].text;
+            const result = JSON.parse(text || '[]');
+            result.forEach((val, idx) => { aiDuplicateMap[idx] = !!val; });
+        } catch(err) {
+            console.error('AI duplicate check error', err);
+        }
+    }
+
+    async function sendAIMessage(text) {
+        if (!aiAvailable) return;
+        const body = { contents: [{ parts: [{ text: `${AI_INSTRUCTIONS} ${text}` }] }] };
+        try {
+            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await resp.json();
+            const reply = data.candidates && data.candidates[0] && data.candidates[0].content.parts[0].text;
+            const div = document.createElement('div');
+            div.textContent = 'IA: ' + reply;
+            if (aiChatLog) aiChatLog.appendChild(div);
+            if (aiChatLog) aiChatLog.scrollTop = aiChatLog.scrollHeight;
+        } catch(err) {
+            console.error('AI chat error', err);
+        }
     }
     function createCategorySelect() {
         const sel = document.createElement('select');
@@ -1958,13 +2025,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const bankProfileDiv = document.getElementById('bank-profile');
         if (bankProfileDiv) bankProfileDiv.style.display = 'flex';
     }
-    function renderImportTable() {
+    async function renderImportTable() {
         if (!importTableContainer) return;
         importTableContainer.innerHTML = '';
         const dateCol = mapDateSelect.value;
         const descCol = mapDescSelect.value;
         const amountCol = mapAmountSelect.value;
         if (!dateCol || !descCol || !amountCol) return;
+        if (aiAvailable) {
+            await aiCheckDuplicates(dateCol, descCol, amountCol);
+        }
         const table = document.createElement('table');
         table.classList.add('import-preview-table');
         const thead = document.createElement('thead');
@@ -1976,7 +2046,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateStr = dateObj ? getISODateString(dateObj) : '';
             const desc = row[descCol] !== undefined ? String(row[descCol]) : '';
             const amt = row[amountCol];
-            const isDup = checkExpenseDuplicate(desc, dateStr, parseFloat(amt));
+            let isDup;
+            if (aiAvailable && aiDuplicateMap[idx] !== undefined) {
+                isDup = aiDuplicateMap[idx];
+            } else {
+                isDup = checkExpenseDuplicate(desc, dateStr, parseFloat(amt));
+            }
             const tr = document.createElement('tr');
             if (isDup) tr.classList.add('duplicate-row');
             const chkCell = tr.insertCell();
@@ -2056,6 +2131,16 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCashflowTable();
         closeImportExpensesModal();
     });
+    if (aiChatSend) aiChatSend.addEventListener('click', () => {
+        const txt = aiChatInput.value.trim();
+        if (!txt) return;
+        const div = document.createElement('div');
+        div.textContent = 'Yo: ' + txt;
+        aiChatLog.appendChild(div);
+        aiChatInput.value = '';
+        sendAIMessage(txt);
+    });
+    checkAIAvailability();
 
     // --- LÓGICA PESTAÑA PRESUPUESTOS ---
     function resetBudgetForm() {
