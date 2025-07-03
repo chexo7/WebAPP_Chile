@@ -508,6 +508,7 @@ td.reimbursement-income {
 .text-green { color: var(--text-green) !important; }
 .text-orange { color: var(--text-orange) !important; }
 .small-text { font-size: 0.8em; color: var(--light-text); }
+.cf-value { cursor: pointer; }
 
 /* Column highlight for el período actual */
 #cashflow-mensual-table th.current-period,
