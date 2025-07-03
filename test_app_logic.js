@@ -267,7 +267,7 @@ function getPeriodEndDate(date, periodicity) {
 }
 
 // calculateCashFlowData (Updated to reflect app.js state after Turn 11 fixes)
-function calculateCashFlowData(data) {
+function calculateCashFlowData(data, withDetails = false) {
     const startDate = data.analysis_start_date; 
     const duration = parseInt(data.analysis_duration, 10); 
     const periodicity = data.analysis_periodicity;

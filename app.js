@@ -202,6 +202,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullChartData = null;
     let activeCashflowPeriodicity = 'Mensual';
     let activePaymentsPeriodicity = 'Mensual';
+    const cashflowDetailTooltip = document.createElement('div');
+    cashflowDetailTooltip.id = 'cashflow-detail-tooltip';
+    cashflowDetailTooltip.className = 'cell-tooltip';
+    document.body.appendChild(cashflowDetailTooltip);
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -2321,7 +2325,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }))
         };
 
-        const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData);
+        const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p, details } = calculateCashFlowData(tempCalcData, true);
 
         if (!periodDates || periodDates.length === 0) {
             tableBodyEl.innerHTML = '<tr><td colspan="2">No hay datos para el período.</td></tr>';
@@ -2406,10 +2410,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 tdValue.textContent = formatCurrencyJS(value, symbol);
                 if (colorClass) tdValue.classList.add(colorClass);
                 if (def.isBold) tdValue.classList.add('bold');
+
+                let detail = '';
+                switch (def.key) {
+                    case 'START_BALANCE':
+                        detail = `Saldo base: ${formatCurrencyJS((i === 0 ? initialBalance : end_bal_p[i - 1]), symbol)}`;
+                        break;
+                    case 'NET_INCOME':
+                        const incLines = (details && details.incomes[i]) ? details.incomes[i].map(d => `${d.name}: +${formatCurrencyJS(d.amount, symbol)}`) : [];
+                        detail = (incLines.length ? incLines.join('<br>') : 'Sin ingresos') + `<br>Total: ${formatCurrencyJS(income_p[i], symbol)}`;
+                        break;
+                    case 'FIXED_EXP_TOTAL':
+                        const fxParts = fixedCategories.map(cat => `${cat}: ${formatCurrencyJS(-(expenses_by_cat_p[i][cat] || 0), symbol)}`);
+                        detail = (fxParts.length ? fxParts.join('<br>') : 'Sin gastos') + `<br>Total: ${formatCurrencyJS(-fixed_exp_p[i], symbol)}`;
+                        break;
+                    case 'VAR_EXP_TOTAL':
+                        const vrParts = variableCategories.map(cat => `${cat}: ${formatCurrencyJS(-(expenses_by_cat_p[i][cat] || 0), symbol)}`);
+                        detail = (vrParts.length ? vrParts.join('<br>') : 'Sin gastos') + `<br>Total: ${formatCurrencyJS(-var_exp_p[i], symbol)}`;
+                        break;
+                    case 'NET_FLOW':
+                        detail = `Ingreso Neto: ${formatCurrencyJS(income_p[i], symbol)}<br>` +
+                                 `Gastos Fijos: ${formatCurrencyJS(-fixed_exp_p[i], symbol)}<br>` +
+                                 `Gastos Variables: ${formatCurrencyJS(-var_exp_p[i], symbol)}<br>` +
+                                 `Flujo Neto: ${formatCurrencyJS(net_flow_p[i], symbol)}`;
+                        break;
+                    case 'END_BALANCE':
+                        detail = `Saldo Anterior: ${formatCurrencyJS((i === 0 ? initialBalance : end_bal_p[i - 1]), symbol)}<br>` +
+                                 `Flujo Neto: ${formatCurrencyJS(net_flow_p[i], symbol)}<br>` +
+                                 `Saldo Final: ${formatCurrencyJS(end_bal_p[i], symbol)}`;
+                        break;
+                    default:
+                        if (def.category && details && details.expenses[i]) {
+                            const ed = details.expenses[i][def.category] || { expenses: [], reimbursements: [] };
+                            const lines = [];
+                            ed.expenses.forEach(e => lines.push(`${e.name}: -${formatCurrencyJS(e.amount, symbol)}`));
+                            ed.reimbursements.forEach(r => lines.push(`${r.name}: +${formatCurrencyJS(r.amount, symbol)}`));
+                            detail = (lines.length ? lines.join('<br>') : 'Sin movimientos') + `<br>Total: ${formatCurrencyJS(-(expenses_by_cat_p[i][def.category] || 0), symbol)}`;
+                        }
+                }
+                if (detail) tdValue.dataset.detail = detail;
+                tdValue.classList.add('cashflow-cell');
             }
         });
 
         highlightCurrentPeriodColumn(periodicity, tableHeadEl, tableBodyEl, periodDates);
+        attachCashflowCellTooltips(tableBodyEl);
 
         if (periodicity === activeCashflowPeriodicity) {
             renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p);
@@ -2418,14 +2463,16 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBudgetSummaryTable();
     }
 
-    function calculateCashFlowData(data) {
+    function calculateCashFlowData(data, withDetails = false) {
         const startDate = data.analysis_start_date; const duration = parseInt(data.analysis_duration, 10); const periodicity = data.analysis_periodicity; const initialBalance = parseFloat(data.analysis_initial_balance);
         let periodDates = []; let income_p = Array(duration).fill(0.0); let fixed_exp_p = Array(duration).fill(0.0); let var_exp_p = Array(duration).fill(0.0); let net_flow_p = Array(duration).fill(0.0); let end_bal_p = Array(duration).fill(0.0); let expenses_by_cat_p = Array(duration).fill(null).map(() => ({}));
+        let income_details = withDetails ? Array(duration).fill(null).map(() => []) : null;
+        let expense_details = withDetails ? Array(duration).fill(null).map(() => ({})) : null;
         let currentDate = new Date(startDate.getTime()); let currentBalance = initialBalance;
         const fixedCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Fijo").sort() : [];
         const variableCategories = data.expense_categories ? Object.keys(data.expense_categories).filter(cat => data.expense_categories[cat] === "Variable").sort() : [];
         const orderedCategories = [...fixedCategories, ...variableCategories];
-        orderedCategories.forEach(cat => { for (let i = 0; i < duration; i++) { expenses_by_cat_p[i][cat] = 0.0; } });
+        orderedCategories.forEach(cat => { for (let i = 0; i < duration; i++) { expenses_by_cat_p[i][cat] = 0.0; if (withDetails) expense_details[i][cat] = { expenses: [], reimbursements: [] }; } });
 
         for (let i = 0; i < duration; i++) {
             // const p_start = new Date(currentDate.getTime()); let p_end; // OLD LOGIC
@@ -2534,6 +2581,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         current_payment_date = addWeeks(current_payment_date, 2);
                     }
+                }
+                if (withDetails && income_to_add > 0) {
+                    income_details[i].push({ name: inc.name || 'Ingreso', amount: income_to_add });
                 }
                 p_inc_total += income_to_add;
             });
@@ -2645,6 +2695,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (exp_add_this_period > 0) {
                     expenses_by_cat_p[i][cat] = (expenses_by_cat_p[i][cat] || 0) + exp_add_this_period;
+                    if (withDetails) {
+                        expense_details[i][cat].expenses.push({ name: exp.name || 'Gasto', amount: exp_add_this_period });
+                    }
                     // Totals will be recalculated after reimbursements
                 }
             });
@@ -2744,6 +2797,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Apply reimbursement even if it exceeds expenses to allow negative balance
                 if (amount_of_reimbursement_in_this_period > 0 && expenses_by_cat_p[i][reimb_cat] !== undefined) {
                     expenses_by_cat_p[i][reimb_cat] = (expenses_by_cat_p[i][reimb_cat] || 0) - amount_of_reimbursement_in_this_period;
+                    if (withDetails) {
+                        expense_details[i][reimb_cat].reimbursements.push({ name: reimbInc.name || 'Reembolso', amount: amount_of_reimbursement_in_this_period });
+                    }
                 }
             });
             
@@ -2767,7 +2823,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const end_bal = currentBalance + net_flow; end_bal_p[i] = end_bal;
             currentBalance = end_bal; currentDate = (periodicity === "Mensual") ? addMonths(currentDate, 1) : addWeeks(currentDate, 1);
         }
-        return { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p };
+        return { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p, details: withDetails ? { incomes: income_details, expenses: expense_details } : undefined };
     }
 
     // --- LÓGICA PESTAÑA GRÁFICO ---
@@ -3405,6 +3461,38 @@ function getMondayOfWeek(year, week) {
             if (row.cells[idx + 1]) row.cells[idx + 1].classList.add('current-period');
         });
     }
+
+    function attachCashflowCellTooltips(tbodyEl) {
+        if (isTouchDevice) return;
+        tbodyEl.querySelectorAll('td[data-detail]').forEach(cell => {
+            let timer = null;
+            cell.addEventListener('mouseenter', () => {
+                timer = setTimeout(() => showDetailTooltip(cell), 1000);
+            });
+            cell.addEventListener('mouseleave', () => {
+                if (timer) clearTimeout(timer);
+                hideDetailTooltip();
+            });
+        });
+    }
+
+    function showDetailTooltip(cell) {
+        const content = cell.dataset.detail;
+        if (!content) return;
+        cashflowDetailTooltip.innerHTML = content;
+        const rect = cell.getBoundingClientRect();
+        cashflowDetailTooltip.style.left = `${rect.left + window.scrollX}px`;
+        cashflowDetailTooltip.style.top = `${rect.bottom + window.scrollY + 5}px`;
+        cashflowDetailTooltip.style.display = 'block';
+    }
+
+    function hideDetailTooltip() {
+        cashflowDetailTooltip.style.display = 'none';
+    }
+
+    document.addEventListener('click', (e) => {
+        if (!cashflowDetailTooltip.contains(e.target)) hideDetailTooltip();
+    });
 
 
     // --- INICIALIZACIÓN ---

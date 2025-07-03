@@ -1288,6 +1288,23 @@ td.reimbursement-income {
 .duplicate-row {
     background-color: var(--alt-row-bg);
 }
+# Tooltip para detalles de celdas en flujo de caja
+.cell-tooltip {
+    position: absolute;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 6px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    display: none;
+    z-index: 2000;
+    max-width: 250px;
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+.cashflow-cell[data-detail] {
+    cursor: help;
+}
 #import-expenses-modal .modal-content {
     width: 100%;
     height: 100%;
