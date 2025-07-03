@@ -194,6 +194,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const chartModalClose = document.getElementById('chart-modal-close');
     const chartModalTitle = document.getElementById('chart-modal-title');
     const chartModalTableBody = document.querySelector('#chart-modal-table tbody');
+    const cashflowDetailModal = document.getElementById("cashflow-detail-modal");
+    const cashflowDetailModalClose = document.getElementById("cashflow-detail-modal-close");
+    const cashflowDetailModalTitle = document.getElementById("cashflow-detail-modal-title");
+    const cashflowDetailModalBody = document.getElementById("cashflow-detail-modal-body");
     let cashflowChartInstance = null;
     const pieMonthChartInstances = [null, null, null];
     const pieWeekChartInstances = [null, null, null];
@@ -201,6 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
     let fullChartData = null;
     let activeCashflowPeriodicity = 'Mensual';
+    let lastCashflowCalc = {};
     let activePaymentsPeriodicity = 'Mensual';
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
@@ -2322,6 +2327,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData);
+        lastCashflowCalc[periodicity] = { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p };
 
         if (!periodDates || periodDates.length === 0) {
             tableBodyEl.innerHTML = '<tr><td colspan="2">No hay datos para el período.</td></tr>';
@@ -2404,6 +2410,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         value = (def.category && expenses_by_cat_p[i]) ? -(expenses_by_cat_p[i][def.category] || 0) : 0;
                 }
                 tdValue.textContent = formatCurrencyJS(value, symbol);
+                tdValue.dataset.rowKey = def.key;
+                tdValue.dataset.periodIndex = i;
+                tdValue.dataset.periodicity = periodicity;
+                tdValue.classList.add("cashflow-clickable");
+                tdValue.addEventListener("click", handleCashflowCellClick);
                 if (colorClass) tdValue.classList.add(colorClass);
                 if (def.isBold) tdValue.classList.add('bold');
             }
@@ -3582,7 +3593,7 @@ function getMondayOfWeek(year, week) {
     }
     if (chartModal) chartModal.addEventListener("click", function(e) { if (e.target === chartModal) closeChartModal(); });
 
-    function gatherPeriodTransactions(pStart, periodicity, categoryFilter = null) {
+function gatherPeriodTransactions(pStart, periodicity, categoryFilter = null) {
         const pEnd = getPeriodEndDate(pStart, periodicity);
         const rows = [];
         (currentBackupData.incomes || []).forEach(inc => {
@@ -3606,6 +3617,92 @@ function getMondayOfWeek(year, week) {
             }
         });
         return rows;
+    }
+
+    function openCashflowDetailModal(title, html) {
+        if (!cashflowDetailModal || !cashflowDetailModalTitle || !cashflowDetailModalBody) return;
+        cashflowDetailModalTitle.textContent = title;
+        cashflowDetailModalBody.innerHTML = html;
+        cashflowDetailModal.style.display = 'flex';
+    }
+
+    function closeCashflowDetailModal() {
+        if (cashflowDetailModal) cashflowDetailModal.style.display = 'none';
+    }
+
+    if (cashflowDetailModalClose) {
+        cashflowDetailModalClose.addEventListener('click', closeCashflowDetailModal);
+        cashflowDetailModalClose.addEventListener('touchstart', function(e) { e.preventDefault(); closeCashflowDetailModal(); });
+    }
+    if (cashflowDetailModal) {
+        cashflowDetailModal.addEventListener('click', function(e) { if (e.target === cashflowDetailModal) closeCashflowDetailModal(); });
+    }
+
+    function handleCashflowCellClick(e) {
+        const cell = e.currentTarget;
+        const rowKey = cell.dataset.rowKey;
+        const idx = parseInt(cell.dataset.periodIndex, 10);
+        const periodicity = cell.dataset.periodicity;
+        showCashflowCellDetail(rowKey, idx, periodicity);
+    }
+
+    function showCashflowCellDetail(rowKey, periodIndex, periodicity) {
+        const calc = lastCashflowCalc[periodicity];
+        if (!calc || !currentBackupData) return;
+        const symbol = currentBackupData.display_currency_symbol || '$';
+        const pStart = calc.periodDates[periodIndex];
+        const transactions = gatherPeriodTransactions(pStart, periodicity);
+        let title = '';
+        let html = '';
+        if (rowKey === 'START_BALANCE') {
+            const startBal = periodIndex === 0 ? parseFloat(currentBackupData.analysis_initial_balance) : calc.end_bal_p[periodIndex - 1];
+            title = 'Detalle Saldo Inicial';
+            html = `<p>${periodIndex === 0 ? 'Saldo inicial configurado' : 'Saldo final del periodo anterior'}: ${formatCurrencyJS(startBal, symbol)}</p>`;
+        } else if (rowKey === 'NET_INCOME') {
+            title = 'Detalle Ingresos';
+            let total = 0;
+            html = '<ul>';
+            transactions.filter(r => r.type === 'Ingreso').forEach(r => { html += `<li>${r.name}: ${formatCurrencyJS(r.amount, symbol)}</li>`; total += r.amount; });
+            html += '</ul>';
+            html += `<p>Total ingresos: ${formatCurrencyJS(total, symbol)}</p>`;
+        } else if (rowKey === 'FIXED_EXP_TOTAL') {
+            title = 'Detalle Gastos Fijos';
+            const cats = Object.keys(currentBackupData.expense_categories || {}).filter(c => currentBackupData.expense_categories[c] === 'Fijo');
+            let total = 0;
+            html = '<ul>';
+            transactions.filter(r => r.type === 'Gasto' && cats.includes(r.category)).forEach(r => { html += `<li>${r.name} (${r.category}): ${formatCurrencyJS(r.amount, symbol)}</li>`; total += r.amount; });
+            html += '</ul>';
+            html += `<p>Total gastos fijos: ${formatCurrencyJS(total, symbol)}</p>`;
+        } else if (rowKey === 'VAR_EXP_TOTAL') {
+            title = 'Detalle Gastos Variables';
+            const cats = Object.keys(currentBackupData.expense_categories || {}).filter(c => currentBackupData.expense_categories[c] === 'Variable');
+            let total = 0;
+            html = '<ul>';
+            transactions.filter(r => r.type === 'Gasto' && cats.includes(r.category)).forEach(r => { html += `<li>${r.name} (${r.category}): ${formatCurrencyJS(r.amount, symbol)}</li>`; total += r.amount; });
+            html += '</ul>';
+            html += `<p>Total gastos variables: ${formatCurrencyJS(total, symbol)}</p>`;
+        } else if (rowKey === 'NET_FLOW') {
+            title = 'Detalle Flujo Neto';
+            html += `<p>Ingresos netos: ${formatCurrencyJS(calc.income_p[periodIndex], symbol)}</p>`;
+            html += `<p>Gastos fijos: ${formatCurrencyJS(calc.fixed_exp_p[periodIndex], symbol)}</p>`;
+            html += `<p>Gastos variables: ${formatCurrencyJS(calc.var_exp_p[periodIndex], symbol)}</p>`;
+            html += `<p><strong>Flujo Neto = Ingresos - Gastos Fijos - Gastos Variables = ${formatCurrencyJS(calc.net_flow_p[periodIndex], symbol)}</strong></p>`;
+        } else if (rowKey === 'END_BALANCE') {
+            title = 'Detalle Saldo Final';
+            const startBal = periodIndex === 0 ? parseFloat(currentBackupData.analysis_initial_balance) : calc.end_bal_p[periodIndex - 1];
+            html += `<p>Saldo inicial del periodo: ${formatCurrencyJS(startBal, symbol)}</p>`;
+            html += `<p>Flujo Neto del periodo: ${formatCurrencyJS(calc.net_flow_p[periodIndex], symbol)}</p>`;
+            html += `<p><strong>Saldo Final = Saldo Inicial + Flujo Neto = ${formatCurrencyJS(calc.end_bal_p[periodIndex], symbol)}</strong></p>`;
+        } else if (rowKey.startsWith('CAT_')) {
+            const cat = rowKey.slice(4);
+            title = `Detalle ${cat}`;
+            let total = 0;
+            html = '<ul>';
+            transactions.filter(r => r.type === 'Gasto' && r.category === cat).forEach(r => { html += `<li>${r.name}: ${formatCurrencyJS(r.amount, symbol)}</li>`; total += r.amount; });
+            html += '</ul>';
+            html += `<p>Total: ${formatCurrencyJS(total, symbol)}</p>`;
+        }
+        if (html) openCashflowDetailModal(title, html);
     }
 
     function extractTableData(tableEl) {
