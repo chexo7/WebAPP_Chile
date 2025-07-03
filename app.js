@@ -202,6 +202,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullChartData = null;
     let activeCashflowPeriodicity = 'Mensual';
     let activePaymentsPeriodicity = 'Mensual';
+    const cashflowPeriodDatesMap = { Mensual: [], Semanal: [] };
+    const breakdownPopup = document.getElementById('cashflow-breakdown-popup');
+    let hoverTimer = null;
+    let hoverStartX = 0;
+    let hoverStartY = 0;
+    let hoveredCell = null;
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -2322,6 +2328,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData);
+        cashflowPeriodDatesMap[periodicity] = periodDates;
 
         if (!periodDates || periodDates.length === 0) {
             tableBodyEl.innerHTML = '<tr><td colspan="2">No hay datos para el período.</td></tr>';
@@ -2404,12 +2411,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         value = (def.category && expenses_by_cat_p[i]) ? -(expenses_by_cat_p[i][def.category] || 0) : 0;
                 }
                 tdValue.textContent = formatCurrencyJS(value, symbol);
+                tdValue.dataset.periodicity = periodicity;
+                tdValue.dataset.periodIndex = i;
+                tdValue.dataset.rowKey = def.key;
+                if (def.category) tdValue.dataset.category = def.category;
                 if (colorClass) tdValue.classList.add(colorClass);
                 if (def.isBold) tdValue.classList.add('bold');
             }
         });
 
         highlightCurrentPeriodColumn(periodicity, tableHeadEl, tableBodyEl, periodDates);
+        attachCashflowCellListeners(tableBodyEl);
 
         if (periodicity === activeCashflowPeriodicity) {
             renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p);
@@ -3406,6 +3418,104 @@ function getMondayOfWeek(year, week) {
         });
     }
 
+    function attachCashflowCellListeners(tbodyEl) {
+        if (isTouchDevice || !tbodyEl) return;
+        const cells = tbodyEl.querySelectorAll('td[data-period-index]');
+        cells.forEach(cell => {
+            cell.addEventListener('mouseenter', onCellMouseEnter);
+            cell.addEventListener('mousemove', onCellMouseMove);
+            cell.addEventListener('mouseleave', onCellMouseLeave);
+        });
+    }
+
+    function onCellMouseEnter(e) {
+        hoveredCell = e.currentTarget;
+        hoverStartX = e.clientX;
+        hoverStartY = e.clientY;
+        clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => { showBreakdownPopup(hoveredCell); }, 1000);
+    }
+
+    function onCellMouseMove(e) {
+        if (!hoveredCell) return;
+        if (Math.abs(e.clientX - hoverStartX) > 3 || Math.abs(e.clientY - hoverStartY) > 3) {
+            clearTimeout(hoverTimer);
+            hoverStartX = e.clientX;
+            hoverStartY = e.clientY;
+            hoverTimer = setTimeout(() => { showBreakdownPopup(hoveredCell); }, 1000);
+        }
+    }
+
+    function onCellMouseLeave() {
+        clearTimeout(hoverTimer);
+        hoveredCell = null;
+        hideBreakdownPopup();
+    }
+
+    function showBreakdownPopup(cell) {
+        if (!cell || !breakdownPopup) return;
+        const periodicity = cell.dataset.periodicity;
+        const idx = parseInt(cell.dataset.periodIndex, 10);
+        const rowKey = cell.dataset.rowKey || '';
+        const category = cell.dataset.category || null;
+        const startDate = cashflowPeriodDatesMap[periodicity] && cashflowPeriodDatesMap[periodicity][idx];
+        if (!startDate) return;
+        let rows = gatherPeriodTransactions(startDate, periodicity, category);
+        if (rowKey === 'NET_INCOME') {
+            rows = rows.filter(r => r.type !== 'Gasto');
+        } else if (rowKey === 'FIXED_EXP_TOTAL' || rowKey === 'VAR_EXP_TOTAL') {
+            const desiredType = rowKey === 'FIXED_EXP_TOTAL' ? 'Fijo' : 'Variable';
+            rows = rows.filter(r => {
+                if (r.type === 'Ingreso') return false;
+                const t = currentBackupData.expense_categories[r.category] || 'Variable';
+                return (t === desiredType);
+            });
+        }
+        const symbol = currentBackupData && currentBackupData.display_currency_symbol ? currentBackupData.display_currency_symbol : '$';
+        if (!rows || rows.length === 0) {
+            breakdownPopup.innerHTML = '<em>Sin transacciones</em>';
+        } else {
+            let total = 0;
+            const items = rows.map(r => {
+                let sign, amt;
+                if (r.type === 'Gasto') {
+                    sign = '-';
+                    amt = formatCurrencyJS(r.amount, symbol);
+                    total -= r.amount;
+                    const orig = formatCurrencyJS(r.originalAmount, symbol);
+                    const extra = r.installments && r.installments > 1 && !currentBackupData.use_instant_expenses ? ` [${orig} / ${r.installments}]` : ` [${orig}]`;
+                    return `<li>${sign} ${amt}${extra} - ${r.name} (${r.date})</li>`;
+                } else if (r.type === 'Ingreso') {
+                    sign = '+';
+                    amt = formatCurrencyJS(r.amount, symbol);
+                    total += r.amount;
+                    return `<li>${sign} ${amt} - ${r.name} (${r.date})</li>`;
+                } else { // Reembolso
+                    sign = '-';
+                    amt = formatCurrencyJS(r.amount, symbol);
+                    total -= r.amount;
+                    return `<li>${sign} ${amt} - Reembolso (${r.date})</li>`;
+                }
+            }).join('');
+            breakdownPopup.innerHTML = `<ul>${items}</ul><strong>Total: ${formatCurrencyJS(total, symbol)}</strong>`;
+        }
+        breakdownPopup.style.display = 'block';
+        const rect = cell.getBoundingClientRect();
+        const popupRect = breakdownPopup.getBoundingClientRect();
+        breakdownPopup.style.left = (rect.left + window.scrollX + rect.width / 2 - popupRect.width / 2) + 'px';
+        breakdownPopup.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+    }
+
+    function hideBreakdownPopup() {
+        if (breakdownPopup) breakdownPopup.style.display = 'none';
+    }
+
+    document.addEventListener('click', (e) => {
+        if (breakdownPopup && breakdownPopup.style.display === 'block' && !breakdownPopup.contains(e.target)) {
+            hideBreakdownPopup();
+        }
+    });
+
 
     // --- INICIALIZACIÓN ---
     showLoginScreen();
@@ -3588,21 +3698,42 @@ function getMondayOfWeek(year, week) {
         (currentBackupData.incomes || []).forEach(inc => {
             const occ = getIncomeOccurrencesInPeriod(inc, pStart, pEnd, periodicity);
             if (occ > 0) {
-                const amount = parseFloat(inc.net_monthly || 0) * occ;
+                const monthly = parseFloat(inc.net_monthly || 0);
+                const amount = monthly * occ;
                 const category = inc.is_reimbursement ? inc.reimbursement_category : '';
                 if (categoryFilter && categoryFilter !== category) return;
-                rows.push({ type: inc.is_reimbursement ? 'Reembolso' : 'Ingreso', name: inc.name, amount, category, date: getISODateString(new Date(inc.start_date)) });
+                rows.push({
+                    type: inc.is_reimbursement ? 'Reembolso' : 'Ingreso',
+                    name: inc.name,
+                    amount,
+                    originalAmount: monthly,
+                    occurrences: occ,
+                    category,
+                    date: getISODateString(new Date(inc.start_date))
+                });
             }
         });
         (currentBackupData.expenses || []).forEach(exp => {
             if (categoryFilter && categoryFilter !== exp.category) return;
             const occ = getExpenseOccurrencesInPeriod(exp, pStart, pEnd, periodicity, currentBackupData.use_instant_expenses);
             if (occ > 0) {
-                let amount = parseFloat(exp.amount || 0);
+                const baseAmount = parseFloat(exp.amount || 0);
                 const inst = parseInt(exp.installments || 1);
-                if (inst > 1 && !currentBackupData.use_instant_expenses) amount = amount / inst;
-                amount = amount * occ;
-                rows.push({ type: 'Gasto', name: exp.name, amount, category: exp.category, date: getISODateString(new Date(exp.start_date)) });
+                let perPeriodAmount = baseAmount;
+                if (inst > 1 && !currentBackupData.use_instant_expenses) {
+                    perPeriodAmount = baseAmount / inst;
+                }
+                const amount = perPeriodAmount * occ;
+                rows.push({
+                    type: 'Gasto',
+                    name: exp.name,
+                    amount,
+                    originalAmount: baseAmount,
+                    installments: inst,
+                    occurrences: occ,
+                    category: exp.category,
+                    date: getISODateString(new Date(exp.start_date))
+                });
             }
         });
         return rows;
