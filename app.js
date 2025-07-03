@@ -3617,8 +3617,13 @@ function getMondayOfWeek(year, week) {
     if (chartModal) chartModal.addEventListener("click", function(e) { if (e.target === chartModal) closeChartModal(); });
 
     if (cellDetailsClose) {
-        cellDetailsClose.addEventListener("click", closeCellDetailsModal);
-        cellDetailsClose.addEventListener("touchstart", function(e) { e.preventDefault(); closeCellDetailsModal(); });
+        const closeHandler = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeCellDetailsModal();
+        };
+        cellDetailsClose.addEventListener("click", closeHandler);
+        cellDetailsClose.addEventListener("touchstart", closeHandler);
     }
     if (cellDetailsModal) cellDetailsModal.addEventListener("click", function(e) { if (e.target === cellDetailsModal) closeCellDetailsModal(); });
 
