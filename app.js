@@ -202,6 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullChartData = null;
     let activeCashflowPeriodicity = 'Mensual';
     let activePaymentsPeriodicity = 'Mensual';
+    const cashflowCalcCache = { Mensual: null, Semanal: null };
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -2406,6 +2407,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 tdValue.textContent = formatCurrencyJS(value, symbol);
                 if (colorClass) tdValue.classList.add(colorClass);
                 if (def.isBold) tdValue.classList.add('bold');
+                tdValue.dataset.rowKey = def.key;
+                tdValue.dataset.rowLabel = def.label;
+                tdValue.dataset.periodIndex = i;
+                tdValue.dataset.periodicity = periodicity;
+                tdValue.classList.add('cf-value');
             }
         });
 
@@ -2416,6 +2422,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         renderBudgetSummaryTable();
+
+        cashflowCalcCache[periodicity] = {
+            periodDates,
+            income_p,
+            fixed_exp_p,
+            var_exp_p,
+            net_flow_p,
+            end_bal_p,
+            expenses_by_cat_p,
+            initialBalance
+        };
+
+        tableBodyEl.removeEventListener('click', cashflowCellClickHandler);
+        tableBodyEl.addEventListener('click', cashflowCellClickHandler);
     }
 
     function calculateCashFlowData(data) {
@@ -3606,6 +3626,63 @@ function getMondayOfWeek(year, week) {
             }
         });
         return rows;
+    }
+
+    function cashflowCellClickHandler(e) {
+        const cell = e.target.closest('td.cf-value');
+        if (!cell) return;
+        const rowKey = cell.dataset.rowKey;
+        const rowLabel = cell.dataset.rowLabel;
+        const periodIndex = parseInt(cell.dataset.periodIndex, 10);
+        const periodicity = cell.dataset.periodicity;
+        showCashflowCellDetails(periodicity, rowKey, rowLabel, periodIndex);
+    }
+
+    function showCashflowCellDetails(periodicity, rowKey, rowLabel, periodIndex) {
+        const cache = cashflowCalcCache[periodicity];
+        if (!cache) return;
+        const pStart = cache.periodDates[periodIndex];
+        const periodLabel = periodicity === 'Semanal'
+            ? `Sem ${getWeekNumber(pStart)[1]} ${pStart.getUTCFullYear()}`
+            : `${MONTH_NAMES_ES[pStart.getUTCMonth()]} ${pStart.getUTCFullYear()}`;
+        const allRows = gatherPeriodTransactions(pStart, periodicity);
+        let rows = [];
+        const fixedCats = currentBackupData.expense_categories ?
+            Object.keys(currentBackupData.expense_categories).filter(c => currentBackupData.expense_categories[c] === 'Fijo') : [];
+        const varCats = currentBackupData.expense_categories ?
+            Object.keys(currentBackupData.expense_categories).filter(c => currentBackupData.expense_categories[c] === 'Variable') : [];
+
+        if (rowKey === 'NET_INCOME') {
+            rows = allRows.filter(r => r.type === 'Ingreso');
+        } else if (rowKey === 'FIXED_EXP_TOTAL') {
+            rows = allRows.filter(r => r.type === 'Gasto' && fixedCats.includes(r.category));
+        } else if (rowKey === 'VAR_EXP_TOTAL') {
+            rows = allRows.filter(r => r.type === 'Gasto' && varCats.includes(r.category));
+        } else if (rowKey === 'NET_FLOW') {
+            rows = allRows;
+        } else if (rowKey.startsWith('CAT_')) {
+            const cat = rowKey.substring(4);
+            rows = allRows.filter(r => r.category === cat);
+        }
+
+        if (rowKey === 'START_BALANCE') {
+            const sbal = periodIndex === 0 ? cache.initialBalance : cache.end_bal_p[periodIndex - 1];
+            rows.push({ type: 'Saldo', name: 'Saldo Inicial', amount: sbal, category: '', date: '' });
+        } else if (rowKey === 'END_BALANCE') {
+            const sbal = periodIndex === 0 ? cache.initialBalance : cache.end_bal_p[periodIndex - 1];
+            rows.push({ type: 'Saldo', name: 'Saldo Inicial', amount: sbal, category: '', date: '' });
+            rows.push({ type: 'Ingreso', name: 'Ingreso Neto', amount: cache.income_p[periodIndex], category: '', date: '' });
+            rows.push({ type: 'Gasto', name: 'Gastos Fijos', amount: -cache.fixed_exp_p[periodIndex], category: '', date: '' });
+            rows.push({ type: 'Gasto', name: 'Gastos Variables', amount: -cache.var_exp_p[periodIndex], category: '', date: '' });
+            rows.push({ type: 'Resultado', name: 'Flujo Neto', amount: cache.net_flow_p[periodIndex], category: '', date: '' });
+            rows.push({ type: 'Saldo', name: 'Saldo Final', amount: cache.end_bal_p[periodIndex], category: '', date: '' });
+        }
+
+        if (rows.length === 0) {
+            rows.push({ type: 'Info', name: 'Sin detalle', amount: 0, category: '', date: '' });
+        }
+
+        openChartModal(`${rowLabel} - ${periodLabel}`, rows);
     }
 
     function extractTableData(tableEl) {
