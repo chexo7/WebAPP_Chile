@@ -11,6 +11,9 @@ const firebaseConfig = {
     appId: "1:363279849526:web:71bc23cceb2e24a3d4a097"
 };
 
+// API key para Google Gemini
+const GEMINI_API_KEY = "AIzaSyB_IazCUbRrYp96Em5s3z5MXXfBEbCC86o";
+
 // Mapea los UID de Firebase a las sub-rutas de datos dentro de /users
 // Modifica este objeto según tus propios usuarios
 const USER_PATHS = {
