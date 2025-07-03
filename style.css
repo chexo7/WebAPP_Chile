@@ -501,6 +501,7 @@ td.reimbursement-income {
 #cashflow-semanal-table td:not(:first-child) {
   text-align: right;
   font-family: 'Consolas', monospace;
+  cursor: pointer;
 }
 .bold { font-weight: 700 !important; }
 .text-red { color: var(--text-red) !important; }
@@ -1246,7 +1247,13 @@ td.reimbursement-income {
     top: 10px;
     right: 10px;
     font-size: 1.5em;
+    z-index: 5;
     cursor: pointer;
+}
+
+.cell-equation {
+    font-weight: 600;
+    margin-bottom: 10px;
 }
 
 #expense-drop-zone {
