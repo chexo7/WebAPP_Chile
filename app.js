@@ -522,13 +522,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (snapshot.exists()) {
                     const backups = snapshot.val();
                     const sortedKeys = Object.keys(backups).sort().reverse();
-                    sortedKeys.forEach(key => {
+
+                    // Filtrar sólo las versiones de los últimos dos meses
+                    const cutoff = new Date();
+                    cutoff.setMonth(cutoff.getMonth() - 2);
+
+                    const filteredKeys = sortedKeys.filter(key => {
+                        const ts = key.replace('backup_', '');
+                        if (ts.length === 15 && ts.includes('T')) {
+                            const dateStr = `${ts.substring(0,4)}-${ts.substring(4,6)}-${ts.substring(6,8)}T${ts.substring(9,11)}:${ts.substring(11,13)}:${ts.substring(13,15)}`;
+                            const d = new Date(dateStr);
+                            return d >= cutoff;
+                        }
+                        return false;
+                    });
+
+                    filteredKeys.forEach(key => {
                         const option = document.createElement('option');
                         option.value = key;
                         option.textContent = formatBackupKey(key);
                         backupSelector.appendChild(option);
                     });
-                    loadLatestVersionButton.disabled = sortedKeys.length === 0;
+
+                    loadLatestVersionButton.disabled = filteredKeys.length === 0;
                 } else {
                     // Si no hay backups, crea uno inicial y recarga la lista
                     loadingMessage.textContent = "Creando datos iniciales...";
