@@ -194,6 +194,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const chartModalClose = document.getElementById('chart-modal-close');
     const chartModalTitle = document.getElementById('chart-modal-title');
     const chartModalTableBody = document.querySelector('#chart-modal-table tbody');
+    const cellDetailsModal = document.getElementById('cell-details-modal');
+    const cellDetailsClose = document.getElementById('cell-details-close');
+    const cellDetailsTitle = document.getElementById('cell-details-title');
+    const cellDetailsEquation = document.getElementById('cell-details-equation');
+    const cellDetailsTableBody = document.querySelector('#cell-details-table tbody');
     let cashflowChartInstance = null;
     const pieMonthChartInstances = [null, null, null];
     const pieWeekChartInstances = [null, null, null];
@@ -2406,6 +2411,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 tdValue.textContent = formatCurrencyJS(value, symbol);
                 if (colorClass) tdValue.classList.add(colorClass);
                 if (def.isBold) tdValue.classList.add('bold');
+                const detail = computeCashflowCellDetail(def, i, periodicity, periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p, initialBalance, fixedCategories, variableCategories);
+                tdValue.addEventListener('click', () => {
+                    const periodLabel = periodicity === 'Semanal' ? `Semana ${getWeekNumber(periodDates[i])[1]} ${getWeekNumber(periodDates[i])[0]}` : `${MONTH_NAMES_ES[periodDates[i].getUTCMonth()]} ${periodDates[i].getUTCFullYear()}`;
+                    openCellDetailsModal(`${def.label} - ${periodLabel}`, detail.equation, detail.rows);
+                });
             }
         });
 
@@ -3572,6 +3582,30 @@ function getMondayOfWeek(year, week) {
         });
         chartModal.style.display = 'flex';
     }
+
+    function openCellDetailsModal(title, equation, rows) {
+        if (!cellDetailsModal || !cellDetailsTitle || !cellDetailsEquation || !cellDetailsTableBody) return;
+        cellDetailsTitle.textContent = title;
+        cellDetailsEquation.textContent = equation;
+        cellDetailsTableBody.innerHTML = '';
+        const symbol = currentBackupData && currentBackupData.display_currency_symbol ? currentBackupData.display_currency_symbol : '$';
+        (rows || []).forEach(r => {
+            const tr = document.createElement('tr');
+            tr.insertCell().textContent = r.type;
+            tr.insertCell().textContent = r.name;
+            tr.insertCell().textContent = formatCurrencyJS(r.amount, symbol);
+            tr.insertCell().textContent = r.category || '';
+            tr.insertCell().textContent = r.date || '';
+            cellDetailsTableBody.appendChild(tr);
+        });
+        cellDetailsModal.style.display = 'flex';
+    }
+    function closeCellDetailsModal() {
+        if (cellDetailsModal) cellDetailsModal.style.display = 'none';
+        if (cellDetailsTableBody) cellDetailsTableBody.innerHTML = '';
+        if (cellDetailsEquation) cellDetailsEquation.textContent = '';
+        if (cellDetailsTitle) cellDetailsTitle.textContent = '';
+    }
     function closeChartModal() {
         if (chartModal) chartModal.style.display = "none";
     }
@@ -3581,6 +3615,15 @@ function getMondayOfWeek(year, week) {
         chartModalClose.addEventListener("touchstart", function(e) { e.preventDefault(); closeChartModal(); });
     }
     if (chartModal) chartModal.addEventListener("click", function(e) { if (e.target === chartModal) closeChartModal(); });
+
+    if (cellDetailsClose) {
+        cellDetailsClose.addEventListener("click", function(e){ e.stopPropagation(); closeCellDetailsModal(); });
+        cellDetailsClose.addEventListener("touchstart", function(e) { e.preventDefault(); e.stopPropagation(); closeCellDetailsModal(); });
+    }
+    if (cellDetailsModal) {
+        cellDetailsModal.addEventListener("click", function(e) { if (e.target === cellDetailsModal) closeCellDetailsModal(); });
+        document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeCellDetailsModal(); });
+    }
 
     function gatherPeriodTransactions(pStart, periodicity, categoryFilter = null) {
         const pEnd = getPeriodEndDate(pStart, periodicity);
@@ -3606,6 +3649,49 @@ function getMondayOfWeek(year, week) {
             }
         });
         return rows;
+    }
+
+    function computeCashflowCellDetail(def, periodIdx, periodicity, periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p, initialBalance, fixedCategories, variableCategories) {
+        const pStart = periodDates[periodIdx];
+        const rows = [];
+        const symbol = currentBackupData.display_currency_symbol || '$';
+        let equation = '';
+        if (def.key === 'START_BALANCE') {
+            const val = (periodIdx === 0) ? initialBalance : end_bal_p[periodIdx - 1];
+            equation = `Saldo Inicial = ${formatCurrencyJS(val, symbol)}`;
+        } else if (def.key === 'NET_INCOME') {
+            gatherPeriodTransactions(pStart, periodicity).forEach(r => { if (r.type === 'Ingreso') rows.push(r); });
+            equation = `Total Ingresos = ${formatCurrencyJS(income_p[periodIdx], symbol)}`;
+        } else if (def.key === 'FIXED_EXP_TOTAL') {
+            gatherPeriodTransactions(pStart, periodicity).forEach(r => {
+                if (r.type !== 'Ingreso' && fixedCategories.includes(r.category)) {
+                    if (r.type === 'Reembolso') r.amount = -r.amount;
+                    rows.push(r);
+                }
+            });
+            equation = `Total Gastos Fijos = ${formatCurrencyJS(-fixed_exp_p[periodIdx], symbol)}`;
+        } else if (def.key === 'VAR_EXP_TOTAL') {
+            gatherPeriodTransactions(pStart, periodicity).forEach(r => {
+                if (r.type !== 'Ingreso' && variableCategories.includes(r.category)) {
+                    if (r.type === 'Reembolso') r.amount = -r.amount;
+                    rows.push(r);
+                }
+            });
+            equation = `Total Gastos Variables = ${formatCurrencyJS(-var_exp_p[periodIdx], symbol)}`;
+        } else if (def.key === 'NET_FLOW') {
+            equation = `Ingreso (${formatCurrencyJS(income_p[periodIdx], symbol)}) - Gastos (${formatCurrencyJS(fixed_exp_p[periodIdx] + var_exp_p[periodIdx], symbol)}) = ${formatCurrencyJS(net_flow_p[periodIdx], symbol)}`;
+        } else if (def.key === 'END_BALANCE') {
+            const startBal = (periodIdx === 0) ? initialBalance : end_bal_p[periodIdx - 1];
+            equation = `Saldo Inicial (${formatCurrencyJS(startBal, symbol)}) + Flujo Neto (${formatCurrencyJS(net_flow_p[periodIdx], symbol)}) = ${formatCurrencyJS(end_bal_p[periodIdx], symbol)}`;
+        } else if (def.category) {
+            gatherPeriodTransactions(pStart, periodicity, def.category).forEach(r => {
+                if (r.type === 'Reembolso') r.amount = -r.amount;
+                rows.push(r);
+            });
+            const total = -(expenses_by_cat_p[periodIdx][def.category] || 0);
+            equation = `Total ${def.label} = ${formatCurrencyJS(total, symbol)}`;
+        }
+        return { equation, rows };
     }
 
     function extractTableData(tableEl) {
