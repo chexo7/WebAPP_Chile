@@ -1999,12 +1999,17 @@ Cuando existan columnas de número de cuota trabaja con el monto total y el valo
             mapAmountSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.amount.toLowerCase()) || '';
             if (profile.columns.installments)
                 mapInstallmentsSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.installments.toLowerCase()) || '';
+        } else if (profileKey === 'auto') {
+            mapDateSelect.value = '';
+            mapDescSelect.value = '';
+            mapAmountSelect.value = '';
+            mapInstallmentsSelect.value = '';
+            requestAIMapping();
         } else {
             mapDateSelect.value = importHeaders.find(h => /fecha/i.test(h)) || '';
             mapDescSelect.value = importHeaders.find(h => /desc/i.test(h)) || '';
             mapAmountSelect.value = importHeaders.find(h => /monto/i.test(h)) || '';
             mapInstallmentsSelect.value = importHeaders.find(h => /cuota|install/i.test(h)) || '';
-            if (profileKey === 'auto') requestAIMapping();
         }
         renderImportTable();
     }
@@ -2156,7 +2161,8 @@ function renderImportTable() {
     if (bankProfileSelect) bankProfileSelect.addEventListener('change', () => { applyBankProfile(bankProfileSelect.value); requestAIDuplicates(); });
     if (analyzeExpensesButton) analyzeExpensesButton.addEventListener('click', () => {
         if (!parsedImportData.length) { alert('Primero carga un archivo'); return; }
-        analyzeExpensesButton.disabled = true;
+        aiDuplicateIndexes.clear();
+        if (importTableContainer) importTableContainer.innerHTML = '';
         renderMappingSelectors();
     });
     if (mergeExpensesButton) mergeExpensesButton.addEventListener('click', () => {
