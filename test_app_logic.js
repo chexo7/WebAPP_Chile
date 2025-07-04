@@ -230,6 +230,54 @@ function getExpenseOccurrenceDatesInPeriod(expense, pStart, pEnd, useInstant) {
     return dates;
 }
 
+function getIncomeOccurrenceDatesInPeriod(income, pStart, pEnd) {
+    if (!income || !income.start_date || !(pStart instanceof Date) || !(pEnd instanceof Date) || pStart > pEnd) return [];
+    const start = new Date(income.start_date);
+    const end = income.end_date ? new Date(income.end_date) : null;
+    const freq = income.frequency || 'Mensual';
+
+    const dates = [];
+
+    if (freq === 'Único') {
+        if (start >= pStart && start <= pEnd) dates.push(new Date(start));
+    } else if (freq === 'Mensual') {
+        if (start > pEnd || (end && end < pStart)) return [];
+        const payDay = start.getUTCDate();
+        const monthsToCheck = new Set();
+        let iter = new Date(Date.UTC(pStart.getUTCFullYear(), pStart.getUTCMonth(), 1));
+        while (iter <= pEnd) {
+            monthsToCheck.add(`${iter.getUTCFullYear()}-${iter.getUTCMonth()}`);
+            iter.setUTCMonth(iter.getUTCMonth() + 1);
+        }
+        monthsToCheck.forEach(key => {
+            const [y,m] = key.split('-').map(n=>parseInt(n));
+            const daysInMonth = getDaysInMonth(y,m);
+            const d = new Date(Date.UTC(y,m,Math.min(payDay,daysInMonth)));
+            if (d >= pStart && d <= pEnd && d >= start && (!end || d <= end)) dates.push(d);
+        });
+    } else if (freq === 'Semanal') {
+        if (start > pEnd || (end && end < pStart)) return [];
+        const payDow = start.getUTCDay();
+        let d = new Date(pStart.getTime());
+        while (d <= pEnd) {
+            if (d.getUTCDay() === payDow && d >= start && (!end || d <= end)) dates.push(new Date(d));
+            d.setUTCDate(d.getUTCDate() + 1);
+        }
+    } else if (freq === 'Bi-semanal') {
+        if (start > pEnd || (end && end < pStart)) return [];
+        let payDate = new Date(start.getTime());
+        while (payDate < pStart) {
+            payDate = addWeeks(payDate, 2);
+            if (end && payDate > end) return dates;
+        }
+        while (payDate <= pEnd) {
+            if (!end || payDate <= end) dates.push(new Date(payDate));
+            payDate = addWeeks(payDate, 2);
+        }
+    }
+    return dates;
+}
+
 
 function getPeriodStartDate(date, periodicity) {
     const year = date.getUTCFullYear();
@@ -1150,6 +1198,14 @@ runTest("getExpenseOccurrenceDatesInPeriod - Monthly", () => {
     const dates = getExpenseOccurrenceDatesInPeriod(exp, pStart, pEnd, false);
     assertEquals(1, dates.length, "One occurrence date in Jan 2024");
     assertEquals("2024-01-15", getISODateString(dates[0]), "Date is Jan 15" );
+});
+
+runTest("getIncomeOccurrenceDatesInPeriod - Weekly", () => {
+    const inc = { start_date: new Date(Date.UTC(2024,0,1)), frequency: "Semanal" };
+    const pStart = new Date(Date.UTC(2024,0,1));
+    const pEnd = new Date(Date.UTC(2024,0,31));
+    const dates = getIncomeOccurrenceDatesInPeriod(inc, pStart, pEnd);
+    assertEquals(5, dates.length, "Five weekly occurrences in Jan 2024");
 });
 // Ensure summarizeTests() is the last call.
 summarizeTests();
