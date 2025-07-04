@@ -2995,6 +2995,54 @@ document.addEventListener('DOMContentLoaded', () => {
         return dates;
     }
 
+    function getIncomeOccurrenceDatesInPeriod(income, pStart, pEnd, periodicity) {
+        if (!income || !income.start_date || !(pStart instanceof Date) || !(pEnd instanceof Date) || pStart > pEnd) return [];
+        const start = new Date(income.start_date);
+        const end = income.end_date ? new Date(income.end_date) : null;
+        const freq = income.frequency || 'Mensual';
+
+        const dates = [];
+
+        if (freq === 'Único') {
+            if (start >= pStart && start <= pEnd) dates.push(new Date(start));
+        } else if (freq === 'Mensual') {
+            if (start > pEnd || (end && end < pStart)) return [];
+            const payDay = start.getUTCDate();
+            const monthsToCheck = new Set();
+            let iter = new Date(Date.UTC(pStart.getUTCFullYear(), pStart.getUTCMonth(), 1));
+            while (iter <= pEnd) {
+                monthsToCheck.add(`${iter.getUTCFullYear()}-${iter.getUTCMonth()}`);
+                iter.setUTCMonth(iter.getUTCMonth() + 1);
+            }
+            monthsToCheck.forEach(key => {
+                const [y, m] = key.split('-').map(n => parseInt(n));
+                const daysInMonth = getDaysInMonth(y, m);
+                const d = new Date(Date.UTC(y, m, Math.min(payDay, daysInMonth)));
+                if (d >= pStart && d <= pEnd && d >= start && (!end || d <= end)) dates.push(d);
+            });
+        } else if (freq === 'Semanal') {
+            if (start > pEnd || (end && end < pStart)) return [];
+            const payDow = start.getUTCDay();
+            let d = new Date(pStart.getTime());
+            while (d <= pEnd) {
+                if (d.getUTCDay() === payDow && d >= start && (!end || d <= end)) dates.push(new Date(d));
+                d.setUTCDate(d.getUTCDate() + 1);
+            }
+        } else if (freq === 'Bi-semanal') {
+            if (start > pEnd || (end && end < pStart)) return [];
+            let payDate = new Date(start.getTime());
+            while (payDate < pStart) {
+                payDate = addWeeks(payDate, 2);
+                if (end && payDate > end) return dates;
+            }
+            while (payDate <= pEnd) {
+                if (!end || payDate <= end) dates.push(new Date(payDate));
+                payDate = addWeeks(payDate, 2);
+            }
+        }
+        return dates;
+    }
+
     function getIncomeOccurrencesInPeriod(income, pStart, pEnd, periodicity) {
         if (!income || !income.start_date || !(pStart instanceof Date) || !(pEnd instanceof Date) || pStart > pEnd) return 0;
         const start = new Date(income.start_date);
@@ -3735,6 +3783,46 @@ function getMondayOfWeek(year, week) {
         return rows;
     }
 
+    function gatherPeriodTransactionsDetailed(pStart, periodicity) {
+        const pEnd = getPeriodEndDate(pStart, periodicity);
+        const rows = [];
+        (currentBackupData.incomes || []).forEach(inc => {
+            const dates = getIncomeOccurrenceDatesInPeriod(inc, pStart, pEnd, periodicity);
+            dates.forEach(d => {
+                rows.push({
+                    type: inc.is_reimbursement ? 'Reembolso' : 'Ingreso',
+                    name: inc.name,
+                    amount: parseFloat(inc.net_monthly || 0),
+                    category: inc.is_reimbursement ? inc.reimbursement_category : '',
+                    date: getISODateString(d)
+                });
+            });
+        });
+        (currentBackupData.expenses || []).forEach(exp => {
+            const dates = getExpenseOccurrenceDatesInPeriod(exp, pStart, pEnd, currentBackupData.use_instant_expenses);
+            dates.forEach(d => {
+                let amt = parseFloat(exp.amount || 0);
+                const inst = parseInt(exp.installments || 1);
+                if (inst > 1 && !currentBackupData.use_instant_expenses) amt = amt / inst;
+                rows.push({
+                    type: 'Gasto',
+                    name: exp.name,
+                    amount: amt,
+                    category: exp.category,
+                    date: getISODateString(d)
+                });
+            });
+        });
+        rows.sort((a, b) => {
+            const da = new Date(a.date);
+            const db = new Date(b.date);
+            if (da < db) return -1;
+            if (da > db) return 1;
+            return a.name.localeCompare(b.name);
+        });
+        return rows;
+    }
+
     function extractTableData(tableEl) {
         const headers = [];
         const headerClasses = [];
@@ -3847,6 +3935,41 @@ function getMondayOfWeek(year, week) {
         return startY;
     }
 
+    function addTransactionsSectionToPdf(doc, sectionTitle, typeFilter, margin) {
+        if (!currentBackupData || !currentBackupData.analysis_start_date) return;
+        let startY = margin.top;
+        doc.setFontSize(9);
+        doc.text(sectionTitle, margin.left, startY - 10);
+
+        let monthStart = getPeriodStartDate(new Date(currentBackupData.analysis_start_date), 'Mensual');
+        const duration = parseInt(currentBackupData.analysis_duration || 0, 10);
+        const symbol = currentBackupData.display_currency_symbol || '$';
+
+        for (let i = 0; i < duration; i++) {
+            const monthLabel = `${MONTH_NAMES_FULL_ES[monthStart.getUTCMonth()]} ${monthStart.getUTCFullYear()}`;
+            const rows = gatherPeriodTransactionsDetailed(monthStart, 'Mensual').filter(r => {
+                return typeFilter === 'Gasto' ? r.type === 'Gasto' : r.type !== 'Gasto';
+            });
+            if (rows.length > 0) {
+                doc.text(monthLabel, margin.left, startY);
+                doc.autoTable({
+                    head: [['Nombre', 'Monto', 'Categoría', 'Fecha']],
+                    body: rows.map(r => [r.name, formatCurrencyJS(r.amount, symbol), r.category || '', r.date]),
+                    startY: startY + 5,
+                    theme: 'grid',
+                    styles: { fontSize: 7 },
+                    margin,
+                });
+                startY = doc.lastAutoTable.finalY + 10;
+                if (i < duration - 1 && startY > doc.internal.pageSize.getHeight() - margin.bottom - 20) {
+                    doc.addPage('letter', 'landscape');
+                    startY = margin.top;
+                }
+            }
+            monthStart = addMonths(monthStart, 1);
+        }
+    }
+
     function printCashflowSummary() {
         const { jsPDF } = window.jspdf || {};
         if (!jsPDF) {
@@ -3864,6 +3987,12 @@ function getMondayOfWeek(year, week) {
         doc.addPage('letter', 'landscape');
         const semanalData = extractTableData(document.getElementById('cashflow-semanal-table'));
         addTableSectionsToPdf(doc, 'Flujo de Caja - Semanal', semanalData, margin);
+
+        doc.addPage('letter', 'landscape');
+        addTransactionsSectionToPdf(doc, 'Ingresos por Mes', 'Ingreso', margin);
+        doc.addPage('letter', 'landscape');
+        addTransactionsSectionToPdf(doc, 'Gastos por Mes', 'Gasto', margin);
+
         doc.save('resumen_flujo_caja.pdf');
     }
 
