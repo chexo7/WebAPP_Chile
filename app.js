@@ -3864,6 +3864,54 @@ function getMondayOfWeek(year, week) {
         doc.addPage('letter', 'landscape');
         const semanalData = extractTableData(document.getElementById('cashflow-semanal-table'));
         addTableSectionsToPdf(doc, 'Flujo de Caja - Semanal', semanalData, margin);
+
+        // --- Ingresos y Gastos por Mes ---
+        function addSimpleTable(title, headers, rows) {
+            doc.addPage('letter', 'landscape');
+            doc.setFontSize(9);
+            doc.text(title, margin.left, margin.top - 10);
+            doc.autoTable({
+                head: [headers],
+                body: rows,
+                startY: margin.top,
+                theme: 'grid',
+                styles: { fontSize: 7, textColor: '#2d3436' },
+                headStyles: { fillColor: '#f1f6fb', textColor: '#3867d6', fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: '#f8f9fa' },
+                margin
+            });
+        }
+
+        if (currentBackupData && currentBackupData.analysis_start_date) {
+            const start = new Date(currentBackupData.analysis_start_date);
+            const duration = parseInt(currentBackupData.analysis_duration || 0, 10);
+            const symbol = currentBackupData.display_currency_symbol || '$';
+            const incomeRows = [];
+            const expenseRows = [];
+            let d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+            for (let i = 0; i < duration; i++) {
+                const monthLabel = `${MONTH_NAMES_FULL_ES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+                const trs = gatherPeriodTransactions(d, 'Mensual');
+                trs.forEach(t => {
+                    const amt = formatCurrencyJS(t.amount, symbol);
+                    if (t.type === 'Gasto') {
+                        const typ = currentBackupData.expense_categories[t.category] || 'Variable';
+                        expenseRows.push([monthLabel, t.name, amt, t.category || '', typ, t.date]);
+                    } else {
+                        const typ = t.type === 'Reembolso' ? 'Reembolso' : 'Ingreso';
+                        incomeRows.push([monthLabel, t.name, amt, typ, t.date]);
+                    }
+                });
+                d = addMonths(d, 1);
+            }
+            if (incomeRows.length > 0) {
+                addSimpleTable('Ingresos por Mes', ['Mes', 'Ingreso', 'Monto', 'Tipo', 'Fecha'], incomeRows);
+            }
+            if (expenseRows.length > 0) {
+                addSimpleTable('Gastos por Mes', ['Mes', 'Gasto', 'Monto', 'Categoría', 'Tipo', 'Fecha'], expenseRows);
+            }
+        }
+
         doc.save('resumen_flujo_caja.pdf');
     }
 
