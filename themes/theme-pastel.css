@@ -1,0 +1,29 @@
+/* Pastel Theme */
+:root {
+  --primary-color: #a29bfe;
+  --primary-hover: #8e82ff;
+  --accent-color: #55efc4;
+  --accent-hover: #2dfeaa;
+  --danger-color: #ff7675;
+  --danger-hover: #ff6b6b;
+  --text-color: #2d3436;
+  --light-text: #636e72;
+  --background: #f9f7f7;
+  --card-bg: #ffffff;
+  --border-color: #dcdde1;
+  --header-bg: #f8f8fe;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --transition: all 0.3s ease;
+  --radius: 8px;
+  --alt-row-bg: #fafafa;
+  --row-hover-bg: #f0f0f0;
+  --body-header-row-bg: #f1f1fd;
+  --text-green: #00b894;
+  --text-red: #d63031;
+  --text-orange: #fdcb6e;
+  --disabled-bg: #f0f0f0;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+}
