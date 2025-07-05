@@ -1,0 +1,31 @@
+@import url("../style.css");
+
+/* Variant 1: Minimal Mint */
+:root {
+  --primary-color: #2c7a7b;
+  --primary-hover: #1e5e5f;
+  --accent-color: #38b2ac;
+  --accent-hover: #2c9c96;
+  --danger-color: #e53e3e;
+  --danger-hover: #c53030;
+  --text-color: #2d3748;
+  --light-text: #718096;
+  --background: #edfdfd;
+  --card-bg: #ffffff;
+  --border-color: #c6f6d5;
+  --header-bg: #e6fffa;
+  --shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  --radius: 6px;
+  --alt-row-bg: #f0fff4;
+  --row-hover-bg: #e6fffa;
+  --body-header-row-bg: #f0fff4;
+  --text-green: #2c7a7b;
+  --text-red: #e53e3e;
+  --text-orange: #dd6b20;
+  --disabled-bg: #f0fdfa;
+}
+
+body {
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, var(--background) 0%, #c6f6d5 100%);
+}

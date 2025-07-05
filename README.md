@@ -41,6 +41,7 @@ El proyecto se organiza de la siguiente manera:
 
 *   `index.html`: Es el archivo HTML principal que estructura la página web. Contiene todos los elementos de la interfaz de usuario.
 *   `style.css`: Contiene todas las reglas de CSS para dar estilo a la aplicación, incluyendo el diseño responsive.
+*   En la carpeta `themes/` se incluyen variantes de estilo (`style_variant1.css` a `style_variant4.css`) que ofrecen cuatro propuestas de diseño alternativas. Para usarlas, reemplaza la referencia a `style.css` en `index.html` por la variante que prefieras.
 *   `app.js`: Es el corazón de la aplicación. Este archivo JavaScript maneja toda la lógica del frontend, incluyendo:
     *   Interacción con el DOM (manipulación de elementos HTML).
     *   Gestión de eventos (clics de botones, cambios en formularios).
