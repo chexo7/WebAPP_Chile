@@ -1,27 +1,28 @@
 /* Variables globales */
 :root {
-  --primary-color: #3867d6;
-  --primary-hover: #2d56bf;
-  --accent-color: #20bf6b;
-  --accent-hover: #1aa059;
-  --danger-color: #eb3b5a;
-  --danger-hover: #d63151;
-  --text-color: #2d3436;
-  --light-text: #636e72;
-  --background: #f7f9fc;
+  /* Pastel theme colors */
+  --primary-color: #5e60ce;
+  --primary-hover: #4b4f9d;
+  --accent-color: #ffb347;
+  --accent-hover: #ff9932;
+  --danger-color: #ff6b6b;
+  --danger-hover: #e55656;
+  --text-color: #333333;
+  --light-text: #555555;
+  --background: #f3f0f8;
   --card-bg: #ffffff;
-  --border-color: #dfe6e9;
-  --header-bg: #f1f6fb;
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --border-color: #ded5ea;
+  --header-bg: #e8e1f1;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   --transition: all 0.3s ease;
-  --radius: 8px;
-  --alt-row-bg: #f8f9fa;
-  --row-hover-bg: #e9ecef;
-  --body-header-row-bg: #eef3f8;
-  --text-green: #20bf6b;
-  --text-red: #eb3b5a;
-  --text-orange: #fa8231;
-  --disabled-bg: #f0f0f0;
+  --radius: 10px;
+  --alt-row-bg: #faf7fd;
+  --row-hover-bg: #ebe3f3;
+  --body-header-row-bg: #e6dbf1;
+  --text-green: #1abc9c;
+  --text-red: #e74c3c;
+  --text-orange: #f39c12;
+  --disabled-bg: #f4f4f6;
 }
 
 /* Reseteo y estilos base */
@@ -35,7 +36,7 @@ body {
   font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   margin: 0;
   padding: 10px;
-  background: linear-gradient(135deg, var(--background) 0%, #e0e7ff 100%);
+  background: linear-gradient(135deg, var(--background) 0%, #ffe9f6 100%);
   color: var(--text-color);
   line-height: 1.6;
 }
@@ -121,7 +122,7 @@ select {
   border-radius: var(--radius);
   font-size: 0.95rem;
   transition: var(--transition);
-  background-color: #fdfdff;
+  background-color: var(--card-bg);
 }
 
 input:disabled,
@@ -294,7 +295,7 @@ button.button-large {
     padding: 15px;
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
-    background-color: #fdfdff;
+    background-color: var(--card-bg);
 }
 .table-container-dynamic {
     flex: 2;
@@ -786,7 +787,7 @@ td.reimbursement-income {
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
     padding: 15px;
-    background-color: #fdfdff;
+    background-color: var(--card-bg);
 }
 .baby-step h3 {
     font-size: 1.1rem;
@@ -843,7 +844,7 @@ td.reimbursement-income {
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
     padding: 15px;
-    background-color: #fdfdff;
+    background-color: var(--card-bg);
 }
 .reminders-column h3 {
     margin-top: 0;
@@ -904,7 +905,7 @@ td.reimbursement-income {
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
     padding: 15px;
-    background-color: #fdfdff;
+    background-color: var(--card-bg);
 }
 
 #change-log-list {
@@ -1137,7 +1138,7 @@ td.reimbursement-income {
   max-width: 400px;
   margin: 0 auto;
   padding: 20px;
-  background-color: #fdfdff;
+  background-color: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
