@@ -1,27 +1,27 @@
 /* Variables globales */
 :root {
-  --primary-color: #3867d6;
-  --primary-hover: #2d56bf;
-  --accent-color: #20bf6b;
-  --accent-hover: #1aa059;
-  --danger-color: #eb3b5a;
-  --danger-hover: #d63151;
-  --text-color: #2d3436;
-  --light-text: #636e72;
-  --background: #f7f9fc;
+  --primary-color: #007acc;
+  --primary-hover: #005fa3;
+  --accent-color: #ff6f61;
+  --accent-hover: #e65b50;
+  --danger-color: #e63946;
+  --danger-hover: #c03535;
+  --text-color: #2e2e2e;
+  --light-text: #6c757d;
+  --background: #f5f7fa;
   --card-bg: #ffffff;
-  --border-color: #dfe6e9;
-  --header-bg: #f1f6fb;
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --border-color: #e0e0e0;
+  --header-bg: #f3f6f9;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   --transition: all 0.3s ease;
   --radius: 8px;
-  --alt-row-bg: #f8f9fa;
-  --row-hover-bg: #e9ecef;
+  --alt-row-bg: #f8f9fb;
+  --row-hover-bg: #e9eff5;
   --body-header-row-bg: #eef3f8;
-  --text-green: #20bf6b;
-  --text-red: #eb3b5a;
-  --text-orange: #fa8231;
-  --disabled-bg: #f0f0f0;
+  --text-green: #2ecc71;
+  --text-red: #e74c3c;
+  --text-orange: #f39c12;
+  --disabled-bg: #f1f1f1;
 }
 
 /* Reseteo y estilos base */
@@ -32,10 +32,10 @@
 }
 
 body {
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: 'Montserrat', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   margin: 0;
   padding: 10px;
-  background: linear-gradient(135deg, var(--background) 0%, #e0e7ff 100%);
+  background: linear-gradient(135deg, var(--background) 0%, #ffffff 100%);
   color: var(--text-color);
   line-height: 1.6;
 }
@@ -72,7 +72,7 @@ h1::after {
   transform: translateX(-50%);
   width: 70px;
   height: 3px;
-  background: var(--primary-color);
+  background: var(--accent-color);
   border-radius: 2px;
 }
 
@@ -178,11 +178,11 @@ label {
 
 /* Botones */
 button {
-  background-color: var(--primary-color);
-  color: white;
+  background: linear-gradient(180deg, var(--primary-color), var(--primary-hover));
+  color: #fff;
   padding: 10px 18px;
   border: none;
-  border-radius: var(--radius);
+  border-radius: calc(var(--radius) * 1.5);
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 500;
@@ -198,7 +198,7 @@ button:last-child {
 }
 
 button:hover {
-  background-color: var(--primary-hover);
+  background: linear-gradient(180deg, var(--primary-hover), var(--primary-color));
   transform: translateY(-1px);
   box-shadow: 0 3px 7px rgba(0, 0, 0, 0.1);
 }
