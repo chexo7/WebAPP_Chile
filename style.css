@@ -1,27 +1,27 @@
 /* Variables globales */
 :root {
-  --primary-color: #3867d6;
-  --primary-hover: #2d56bf;
-  --accent-color: #20bf6b;
-  --accent-hover: #1aa059;
-  --danger-color: #eb3b5a;
-  --danger-hover: #d63151;
-  --text-color: #2d3436;
-  --light-text: #636e72;
-  --background: #f7f9fc;
+  --primary-color: #4B6587;
+  --primary-hover: #3A4F6D;
+  --accent-color: #F28B30;
+  --accent-hover: #DB7A24;
+  --danger-color: #e74c3c;
+  --danger-hover: #c0392b;
+  --text-color: #2b2d42;
+  --light-text: #6c7a89;
+  --background: #f4f7fa;
   --card-bg: #ffffff;
-  --border-color: #dfe6e9;
-  --header-bg: #f1f6fb;
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --border-color: #dee2e6;
+  --header-bg: #e8eff7;
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
   --transition: all 0.3s ease;
-  --radius: 8px;
-  --alt-row-bg: #f8f9fa;
-  --row-hover-bg: #e9ecef;
-  --body-header-row-bg: #eef3f8;
-  --text-green: #20bf6b;
-  --text-red: #eb3b5a;
-  --text-orange: #fa8231;
-  --disabled-bg: #f0f0f0;
+  --radius: 10px;
+  --alt-row-bg: #f0f3f6;
+  --row-hover-bg: #e3e7eb;
+  --body-header-row-bg: #f2f5fa;
+  --text-green: #27ae60;
+  --text-red: #c0392b;
+  --text-orange: #e67e22;
+  --disabled-bg: #f1f1f1;
 }
 
 /* Reseteo y estilos base */
@@ -32,10 +32,10 @@
 }
 
 body {
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: 'Poppins', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   margin: 0;
   padding: 10px;
-  background: linear-gradient(135deg, var(--background) 0%, #e0e7ff 100%);
+  background: linear-gradient(135deg, var(--background) 0%, #dce1ec 100%);
   color: var(--text-color);
   line-height: 1.6;
 }
