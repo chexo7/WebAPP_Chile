@@ -1,0 +1,25 @@
+/* Classic Theme - same as default */
+:root {
+  --primary-color: #3867d6;
+  --primary-hover: #2d56bf;
+  --accent-color: #20bf6b;
+  --accent-hover: #1aa059;
+  --danger-color: #eb3b5a;
+  --danger-hover: #d63151;
+  --text-color: #2d3436;
+  --light-text: #636e72;
+  --background: #f7f9fc;
+  --card-bg: #ffffff;
+  --border-color: #dfe6e9;
+  --header-bg: #f1f6fb;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --transition: all 0.3s ease;
+  --radius: 8px;
+  --alt-row-bg: #f8f9fa;
+  --row-hover-bg: #e9ecef;
+  --body-header-row-bg: #eef3f8;
+  --text-green: #20bf6b;
+  --text-red: #eb3b5a;
+  --text-orange: #fa8231;
+  --disabled-bg: #f0f0f0;
+}
