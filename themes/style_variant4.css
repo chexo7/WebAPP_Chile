@@ -1,0 +1,31 @@
+@import url("../style.css");
+
+/* Variant 4: High Contrast Modern */
+:root {
+  --primary-color: #0d9488;
+  --primary-hover: #0f766e;
+  --accent-color: #facc15;
+  --accent-hover: #eab308;
+  --danger-color: #f43f5e;
+  --danger-hover: #e11d48;
+  --text-color: #111827;
+  --light-text: #374151;
+  --background: #fdfdfd;
+  --card-bg: #ffffff;
+  --border-color: #d1d5db;
+  --header-bg: #f3f4f6;
+  --shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  --radius: 0;
+  --alt-row-bg: #fafafa;
+  --row-hover-bg: #f3f4f6;
+  --body-header-row-bg: #fafafa;
+  --text-green: #0d9488;
+  --text-red: #f43f5e;
+  --text-orange: #fb923c;
+  --disabled-bg: #e5e7eb;
+}
+
+body {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  background: linear-gradient(135deg, var(--background) 0%, #f3f4f6 100%);
+}
