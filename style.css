@@ -1,23 +1,24 @@
 /* Variables globales */
 :root {
-  --primary-color: #007aff;
-  --primary-hover: #0060d5;
-  --accent-color: #34c759;
-  --accent-hover: #28a745;
+  /* Paleta basada en tonos azules */
+  --primary-color: #065BB5;
+  --primary-hover: #014689;
+  --accent-color: #06A0DC;
+  --accent-hover: #0A82BE;
   --danger-color: #ff3b30;
   --danger-hover: #e33228;
-  --text-color: #1c1c1e;
-  --light-text: #6e6e73;
-  --background: #f5f5f7;
+  --text-color: #041830;
+  --light-text: #317EC4;
+  --background: #ffffff;
   --card-bg: #ffffff;
-  --border-color: #d2d2d7;
-  --header-bg: #f0f0f5;
+  --border-color: #659CD2;
+  --header-bg: #82DAFE;
   --shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   --transition: all 0.3s ease;
   --radius: 12px;
-  --alt-row-bg: #f9f9fa;
-  --row-hover-bg: #e9e9ec;
-  --body-header-row-bg: #f1f1f4;
+  --alt-row-bg: #82DAFE;
+  --row-hover-bg: #2AC3FD;
+  --body-header-row-bg: #5D84F9;
   --text-green: #34c759;
   --text-red: #ff3b30;
   --text-orange: #ff9500;
