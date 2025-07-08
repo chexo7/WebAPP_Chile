@@ -3783,7 +3783,7 @@ function getMondayOfWeek(year, week) {
 
             const colorMap = {
                 'text-red': '#eb3b5a',
-                'text-blue': '#3867d6',
+                'text-blue': '#0694F6',
                 'text-green': '#20bf6b',
                 'text-orange': '#fa8231'
             };
@@ -3793,22 +3793,22 @@ function getMondayOfWeek(year, week) {
                 body: pageRows,
                 startY,
                 theme: 'grid',
-                styles: { fontSize: 6, textColor: '#2d3436' },
-                headStyles: { fillColor: '#f1f6fb', textColor: '#3867d6', fontStyle: 'bold' },
-                alternateRowStyles: { fillColor: '#f8f9fa' },
+                styles: { fontSize: 6, textColor: '#041830' },
+                headStyles: { fillColor: '#82DAFE', textColor: '#056DA4', fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: '#2AC3FD' },
                 margin,
                 didParseCell: function (data) {
                     if (data.section === 'body') {
                         const rowCls = rowClasses[data.row.index] || '';
                         const cellCls = pageCellClasses[data.row.index][data.column.index] || '';
-                        if (rowCls.includes('bg-header')) data.cell.styles.fillColor = '#eef3f8';
+                        if (rowCls.includes('bg-header')) data.cell.styles.fillColor = '#82DAFE';
                         if (cellCls.includes('bold')) data.cell.styles.fontStyle = 'bold';
                         for (const cls in colorMap) {
                             if (cellCls.includes(cls)) { data.cell.styles.textColor = colorMap[cls]; break; }
                         }
                     } else if (data.section === 'head') {
                         const cls = pageHeaderClasses[data.column.index] || '';
-                        if (cls.includes('current-period')) data.cell.styles.fillColor = '#eef3f8';
+                        if (cls.includes('current-period')) data.cell.styles.fillColor = '#82DAFE';
                     }
                 },
                 willDrawCell: function (data) {
@@ -3819,7 +3819,7 @@ function getMondayOfWeek(year, week) {
                         // Disable default fill so our background isn't overwritten
                         data.cell.styles.fillColor = null;
                         const { x, y, width, height } = data.cell;
-                        doc.setFillColor(238, 243, 248); // #eef3f8
+                        doc.setFillColor(130, 218, 254); // #82DAFE
                         doc.rect(x, y, width, height, 'F');
                         const spacing = 6;
                         doc.setLineWidth(0.4);
@@ -3875,9 +3875,9 @@ function getMondayOfWeek(year, week) {
                 body: rows,
                 startY: margin.top,
                 theme: 'grid',
-                styles: { fontSize: 7, textColor: '#2d3436' },
-                headStyles: { fillColor: '#f1f6fb', textColor: '#3867d6', fontStyle: 'bold' },
-                alternateRowStyles: { fillColor: '#f8f9fa' },
+                styles: { fontSize: 7, textColor: '#041830' },
+                headStyles: { fillColor: '#82DAFE', textColor: '#056DA4', fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: '#2AC3FD' },
                 margin
             });
         }
