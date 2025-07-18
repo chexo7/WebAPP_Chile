@@ -134,6 +134,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveBudgetButton = document.getElementById('save-budget-button');
     const budgetsTableView = document.querySelector('#budgets-table-view tbody');
     const budgetSummaryTableBody = document.querySelector('#budget-summary-table tbody');
+    const budgetPrevPeriodButton = document.getElementById('budget-prev-period-button');
+    const budgetNextPeriodButton = document.getElementById('budget-next-period-button');
+    const budgetYearSelect = document.getElementById('budget-year-select');
+    const budgetMonthSelect = document.getElementById('budget-month-select');
+    let currentBudgetViewDate = new Date();
 
     // --- ELEMENTOS PESTAÑA REGISTRO PAGOS ---
     const paymentsTabTitle = document.getElementById('payments-tab-title');
@@ -663,6 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderLogTab();
                     activePaymentsPeriodicity = currentBackupData.analysis_periodicity || 'Mensual';
                     setupPaymentPeriodSelectors();
+                    setupBudgetPeriodSelectors();
                     setPaymentPeriodicity(activePaymentsPeriodicity);
                     renderCashflowTable();
 
@@ -707,6 +713,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderLogTab();
                     activePaymentsPeriodicity = currentBackupData.analysis_periodicity || 'Mensual';
                     setupPaymentPeriodSelectors();
+                    setupBudgetPeriodSelectors();
                     setPaymentPeriodicity(activePaymentsPeriodicity);
                     renderCashflowTable();
 
@@ -1144,7 +1151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabId === 'grafico') {
             setPeriodicity(activeCashflowPeriodicity, 'chart');
         }
-        if (tabId === 'presupuestos') { renderBudgetsTable(); renderBudgetSummaryTable(); }
+        if (tabId === 'presupuestos') { setupBudgetPeriodSelectors(); renderBudgetsTable(); renderBudgetSummaryTableForSelectedPeriod(); }
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); setPaymentPeriodicity(activePaymentsPeriodicity); }
         if (tabId === 'ajustes') {
             populateSettingsForm();
@@ -1383,10 +1390,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCashflowTable();
         updateAnalysisModeLabels();
         setupPaymentPeriodSelectors();
+        setupBudgetPeriodSelectors();
         setPaymentPeriodicity(activePaymentsPeriodicity);
         renderBudgetsTable();
 
-        renderBudgetSummaryTable();
+        renderBudgetSummaryTableForSelectedPeriod();
     });
 
     if (printSummaryButton) {
@@ -2072,7 +2080,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isFirebaseKeySafe(category)) { alert(`Categoría "${category}" con nombre no permitido.`); return; }
         if (!currentBackupData.budgets) currentBackupData.budgets = {};
         currentBackupData.budgets[category] = amount;
-        renderBudgetsTable(); renderBudgetSummaryTable(); renderCashflowTable();
+        renderBudgetsTable(); renderBudgetSummaryTableForSelectedPeriod(); renderCashflowTable();
         alert(`Presupuesto para "${category}" guardado como ${formatCurrencyJS(amount, currentBackupData.display_currency_symbol || '$')}.`);
     });
     budgetCategorySelect.addEventListener('change', () => {
@@ -2093,86 +2101,119 @@ document.addEventListener('DOMContentLoaded', () => {
             row.addEventListener('click', () => { budgetCategorySelect.value = catName; budgetAmountInput.value = budgetAmount; });
         });
     }
-    function renderBudgetSummaryTable() {
-        if (!budgetSummaryTableBody || !currentBackupData) return;
-        budgetSummaryTableBody.innerHTML = '';
-        if (!currentBackupData.analysis_start_date || !currentBackupData.expenses || !currentBackupData.budgets || !currentBackupData.expense_categories) {
-            const row = budgetSummaryTableBody.insertRow();
-            const cell = row.insertCell(); cell.colSpan = 5; cell.textContent = "Datos insuficientes."; cell.style.textAlign = "center";
-            return;
+
+function getMonthlyExpensesMap(year, month) {
+    if (!currentBackupData) return {};
+    const tempData = {
+        ...currentBackupData,
+        analysis_start_date: new Date(Date.UTC(year, month, 1)),
+        analysis_duration: 1,
+        analysis_periodicity: 'Mensual',
+        incomes: (currentBackupData.incomes || []).map(inc => ({
+            ...inc,
+            start_date: inc.start_date ? new Date(inc.start_date) : null,
+            end_date: inc.end_date ? new Date(inc.end_date) : null
+        })),
+        expenses: (currentBackupData.expenses || []).map(exp => ({
+            ...exp,
+            start_date: exp.start_date ? new Date(exp.start_date) : null,
+            end_date: exp.end_date ? new Date(exp.end_date) : null
+        }))
+    };
+    const { expenses_by_cat_p } = calculateCashFlowData(tempData);
+    return (expenses_by_cat_p && expenses_by_cat_p[0]) ? expenses_by_cat_p[0] : {};
+}
+function renderBudgetSummaryTable() {
+    if (!budgetSummaryTableBody || !currentBackupData) return;
+    budgetSummaryTableBody.innerHTML = '';
+    if (!currentBackupData.analysis_start_date || !currentBackupData.expenses || !currentBackupData.budgets || !currentBackupData.expense_categories) {
+        const row = budgetSummaryTableBody.insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = 5;
+        cell.textContent = "Datos insuficientes.";
+        cell.style.textAlign = "center";
+        return;
+    }
+    const viewDate = currentBudgetViewDate instanceof Date ? currentBudgetViewDate : new Date();
+    const currentMonth = viewDate.getUTCMonth();
+    const currentYear = viewDate.getUTCFullYear();
+
+    const expensesThisMonth = getMonthlyExpensesMap(currentYear, currentMonth);
+
+    const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
+    sortedCategories.forEach(catName => {
+        const budget = currentBackupData.budgets[catName] || 0;
+        const spent = expensesThisMonth[catName] || 0;
+        const difference = budget - spent;
+        const percentageSpent = budget > 0 ? (spent / budget * 100) : 0;
+        const row = budgetSummaryTableBody.insertRow();
+        row.insertCell().textContent = catName;
+        row.insertCell().textContent = formatCurrencyJS(budget, currentBackupData.display_currency_symbol);
+        row.insertCell().textContent = formatCurrencyJS(spent, currentBackupData.display_currency_symbol);
+        const diffCell = row.insertCell();
+        diffCell.textContent = formatCurrencyJS(difference, currentBackupData.display_currency_symbol);
+        diffCell.classList.toggle('text-red', difference < 0);
+        diffCell.classList.toggle('text-green', difference > 0 && budget > 0);
+        const percCell = row.insertCell();
+        percCell.textContent = `${percentageSpent.toFixed(1)}%`;
+        if (budget > 0) {
+            if (percentageSpent > 100) percCell.classList.add('text-red');
+            else if (percentageSpent >= 80) percCell.classList.add('text-orange');
+            else percCell.classList.add('text-green');
         }
-        const analysisStartDate = new Date(currentBackupData.analysis_start_date);
-        const currentMonth = analysisStartDate.getUTCMonth();
-        const currentYear = analysisStartDate.getUTCFullYear();
-        const expensesThisMonth = {};
-        (currentBackupData.expenses || []).forEach(exp => {
-            if (!exp.start_date) return;
-            const expStartDate = new Date(exp.start_date);
-            let amountForSummary = 0;
-            if (exp.frequency === "Único") { if (expStartDate.getUTCFullYear() === currentYear && expStartDate.getUTCMonth() === currentMonth) amountForSummary = exp.amount; }
-            else if (exp.frequency === "Mensual") { if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) amountForSummary = exp.amount; }
-            else if (exp.frequency === "Semanal") { if (expStartDate <= new Date(Date.UTC(currentYear, currentMonth + 1, 0)) && (!exp.end_date || new Date(exp.end_date) >= new Date(Date.UTC(currentYear, currentMonth, 1)))) amountForSummary = exp.amount * (52 / 12); } 
-            else if (exp.frequency === "Bi-semanal") { 
-                let paydays_in_month = 0;
-                let current_pay_date = new Date(expStartDate.getTime());
-                const month_start_date = new Date(Date.UTC(currentYear, currentMonth, 1));
-                const month_end_date = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
-                while (current_pay_date <= month_end_date && (!exp.end_date || current_pay_date <= new Date(exp.end_date))) {
-                    if (current_pay_date >= month_start_date) {
-                        paydays_in_month++;
-                    }
-                    current_pay_date = addWeeks(current_pay_date, 2);
-                }
-                amountForSummary = exp.amount * paydays_in_month;
+    });
+}
+    function setupBudgetPeriodSelectors() {
+        const today = new Date();
+        const analysisStartDate = (currentBackupData && currentBackupData.analysis_start_date)
+            ? new Date(currentBackupData.analysis_start_date)
+            : new Date(today);
+        currentBudgetViewDate = today;
+        const analysisEndDate = addMonths(new Date(analysisStartDate), (currentBackupData ? currentBackupData.analysis_duration : 12));
+        if (budgetYearSelect) {
+            budgetYearSelect.innerHTML = '';
+            const startYear = Math.min(analysisStartDate.getUTCFullYear(), new Date().getUTCFullYear()) - 2;
+            const endYear = Math.max(analysisEndDate.getUTCFullYear(), new Date().getUTCFullYear()) + 5;
+            for (let y = startYear; y <= endYear; y++) {
+                const option = document.createElement('option');
+                option.value = y; option.textContent = y; budgetYearSelect.appendChild(option);
             }
-            if (amountForSummary > 0) expensesThisMonth[exp.category] = (expensesThisMonth[exp.category] || 0) + amountForSummary;
-        });
-
-        (currentBackupData.incomes || []).forEach(reimbInc => {
-            if (!reimbInc.is_reimbursement || !reimbInc.reimbursement_category || !reimbInc.start_date) return;
-            const reimbStartDate = new Date(reimbInc.start_date);
-            if (reimbStartDate.getUTCFullYear() === currentYear && reimbStartDate.getUTCMonth() === currentMonth) {
-                let amountToReimburse = reimbInc.net_monthly;
-                if (reimbInc.frequency === "Semanal") amountToReimburse = reimbInc.net_monthly * (52 / 12);
-                else if (reimbInc.frequency === "Bi-semanal") {
-                    let paydays_in_month = 0;
-                    let current_pay_date = new Date(reimbStartDate.getTime());
-                    const month_start_date = new Date(Date.UTC(currentYear, currentMonth, 1));
-                    const month_end_date = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
-                    while (current_pay_date <= month_end_date && (!reimbInc.end_date || current_pay_date <= new Date(reimbInc.end_date))) {
-                        if (current_pay_date >= month_start_date) {
-                            paydays_in_month++;
-                        }
-                        current_pay_date = addWeeks(current_pay_date, 2);
-                    }
-                    amountToReimburse = reimbInc.net_monthly * paydays_in_month;
-                }
-
-                // Allow negative values to reflect reimbursements exceeding expenses
-                if (reimbInc.reimbursement_category) {
-                    const currentExp = expensesThisMonth[reimbInc.reimbursement_category] || 0;
-                    expensesThisMonth[reimbInc.reimbursement_category] = currentExp - amountToReimburse;
-                }
-            }
-        });
-
-
-        const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
-        sortedCategories.forEach(catName => {
-            const budget = currentBackupData.budgets[catName] || 0;
-            const spent = expensesThisMonth[catName] || 0;
-            const difference = budget - spent;
-            const percentageSpent = budget > 0 ? (spent / budget * 100) : 0;
-            const row = budgetSummaryTableBody.insertRow();
-            row.insertCell().textContent = catName;
-            row.insertCell().textContent = formatCurrencyJS(budget, currentBackupData.display_currency_symbol);
-            row.insertCell().textContent = formatCurrencyJS(spent, currentBackupData.display_currency_symbol);
-            const diffCell = row.insertCell(); diffCell.textContent = formatCurrencyJS(difference, currentBackupData.display_currency_symbol);
-            diffCell.classList.toggle('text-red', difference < 0); diffCell.classList.toggle('text-green', difference > 0 && budget > 0);
-            const percCell = row.insertCell(); percCell.textContent = `${percentageSpent.toFixed(1)}%`;
-            if (budget > 0) { if (percentageSpent > 100) percCell.classList.add('text-red'); else if (percentageSpent >= 80) percCell.classList.add('text-orange'); else percCell.classList.add('text-green'); }
+            budgetYearSelect.value = currentBudgetViewDate.getUTCFullYear();
+        }
+        if (budgetMonthSelect) {
+            budgetMonthSelect.innerHTML = '';
+            MONTH_NAMES_FULL_ES.forEach((monthName, index) => {
+                const option = document.createElement('option');
+                option.value = index; option.textContent = monthName; budgetMonthSelect.appendChild(option);
+            });
+            budgetMonthSelect.value = currentBudgetViewDate.getUTCMonth();
+        }
+        [budgetYearSelect, budgetMonthSelect].forEach(sel => {
+            if (!sel) return;
+            sel.removeEventListener('change', renderBudgetSummaryTableForSelectedPeriod);
+            sel.addEventListener('change', renderBudgetSummaryTableForSelectedPeriod);
         });
     }
+
+    function navigateBudgetPeriod(direction) {
+        let year = parseInt(budgetYearSelect.value);
+        let month = parseInt(budgetMonthSelect.value);
+        const newDate = new Date(Date.UTC(year, month, 15));
+        newDate.setUTCMonth(newDate.getUTCMonth() + direction);
+        budgetYearSelect.value = newDate.getUTCFullYear();
+        budgetMonthSelect.value = newDate.getUTCMonth();
+        renderBudgetSummaryTableForSelectedPeriod();
+    }
+
+    function renderBudgetSummaryTableForSelectedPeriod() {
+        const year = parseInt(budgetYearSelect.value);
+        const monthIndex = parseInt(budgetMonthSelect.value);
+        currentBudgetViewDate = new Date(Date.UTC(year, monthIndex, 1));
+        renderBudgetSummaryTable();
+    }
+
+    if (budgetPrevPeriodButton) budgetPrevPeriodButton.addEventListener('click', () => navigateBudgetPeriod(-1));
+    if (budgetNextPeriodButton) budgetNextPeriodButton.addEventListener('click', () => navigateBudgetPeriod(1));
 
     // --- LÓGICA PESTAÑA REGISTRO PAGOS ---
     function setupPaymentPeriodSelectors() {
@@ -2427,7 +2468,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p);
         }
 
-        renderBudgetSummaryTable();
+        renderBudgetSummaryTableForSelectedPeriod();
     }
 
     function calculateCashFlowData(data) {
