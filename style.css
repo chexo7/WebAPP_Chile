@@ -674,6 +674,19 @@ td.reimbursement-income {
     margin-bottom: 0;
 }
 
+/* Estilos para Pestaña Presupuestos */
+.budget-period-selector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+.budget-period-selector select, .budget-period-selector button {
+    padding: 8px 10px;
+    margin-bottom: 0;
+}
+
 /* Selector de período para gráficos adicionales */
 .chart-period-selector {
     display: flex;

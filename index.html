@@ -291,7 +291,13 @@
                                     </tbody>
                             </table>
                         </div>
-                         <h3>Resumen Gasto vs Presupuesto (Mes Actual/Seleccionado)</h3>
+                        <h3 id="budget-summary-title">Resumen Gasto vs Presupuesto (Mes Actual/Seleccionado)</h3>
+                        <div class="budget-period-selector">
+                            <button id="budget-prev-month-button" title="Mes Anterior">&lt;</button>
+                            <select id="budget-year-select"></select>
+                            <select id="budget-month-select"></select>
+                            <button id="budget-next-month-button" title="Mes Siguiente">&gt;</button>
+                        </div>
                         <div class="table-responsive dynamic-table-scroll" id="budget-summary-table-container">
                             <table id="budget-summary-table">
                                 <thead>
