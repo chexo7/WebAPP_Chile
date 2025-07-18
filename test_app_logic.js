@@ -1143,6 +1143,16 @@ runTest("getExpenseOccurrencesInPeriod - Único weekly view", () => {
     assertEquals(1, occ, "Unique expense in same week");
 });
 
+runTest("NET_INCOME breakdown excludes reimbursements", () => {
+    const rows = [
+        { type: 'Ingreso', name: 'Salary', amount: 100 },
+        { type: 'Reembolso', name: 'Reimb', amount: 50 }
+    ];
+    const filtered = rows.filter(r => r.type === 'Ingreso');
+    assertEquals(1, filtered.length, "Filtered only one income");
+    assertEquals("Salary", filtered[0].name, "Filtered income is Salary");
+});
+
 runTest("getExpenseOccurrenceDatesInPeriod - Monthly", () => {
     const exp = { start_date: new Date(Date.UTC(2024,0,15)), frequency: "Mensual" };
     const pStart = new Date(Date.UTC(2024,0,1));

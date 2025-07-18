@@ -3462,7 +3462,7 @@ function getMondayOfWeek(year, week) {
         if (!startDate) return;
         let rows = gatherPeriodTransactions(startDate, periodicity, category);
         if (rowKey === 'NET_INCOME') {
-            rows = rows.filter(r => r.type !== 'Gasto');
+            rows = rows.filter(r => r.type === 'Ingreso');
         } else if (rowKey === 'FIXED_EXP_TOTAL' || rowKey === 'VAR_EXP_TOTAL') {
             const desiredType = rowKey === 'FIXED_EXP_TOTAL' ? 'Fijo' : 'Variable';
             rows = rows.filter(r => {
