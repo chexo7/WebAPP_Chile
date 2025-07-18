@@ -134,6 +134,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveBudgetButton = document.getElementById('save-budget-button');
     const budgetsTableView = document.querySelector('#budgets-table-view tbody');
     const budgetSummaryTableBody = document.querySelector('#budget-summary-table tbody');
+    const budgetYearSelect = document.getElementById('budget-year-select');
+    const budgetMonthSelect = document.getElementById('budget-month-select');
+    const prevBudgetMonthButton = document.getElementById('prev-budget-month-button');
+    const nextBudgetMonthButton = document.getElementById('next-budget-month-button');
+    let currentBudgetViewDate = new Date();
 
     // --- ELEMENTOS PESTAÑA REGISTRO PAGOS ---
     const paymentsTabTitle = document.getElementById('payments-tab-title');
@@ -658,6 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderIncomesTable();
                     renderExpensesTable();
                     renderBudgetsTable();
+                    setupBudgetMonthSelectors();
                     renderBabySteps();
                     renderReminders();
                     renderLogTab();
@@ -702,6 +708,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderIncomesTable();
                     renderExpensesTable();
                     renderBudgetsTable();
+                    setupBudgetMonthSelectors();
                     renderBabySteps();
                     renderReminders();
                     renderLogTab();
@@ -1144,7 +1151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabId === 'grafico') {
             setPeriodicity(activeCashflowPeriodicity, 'chart');
         }
-        if (tabId === 'presupuestos') { renderBudgetsTable(); renderBudgetSummaryTable(); }
+        if (tabId === 'presupuestos') { setupBudgetMonthSelectors(); renderBudgetsTable(); renderBudgetSummaryTable(); }
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); setPaymentPeriodicity(activePaymentsPeriodicity); }
         if (tabId === 'ajustes') {
             populateSettingsForm();
@@ -1385,6 +1392,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupPaymentPeriodSelectors();
         setPaymentPeriodicity(activePaymentsPeriodicity);
         renderBudgetsTable();
+        setupBudgetMonthSelectors();
 
         renderBudgetSummaryTable();
     });
@@ -2101,9 +2109,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const cell = row.insertCell(); cell.colSpan = 5; cell.textContent = "Datos insuficientes."; cell.style.textAlign = "center";
             return;
         }
-        const analysisStartDate = new Date(currentBackupData.analysis_start_date);
-        const currentMonth = analysisStartDate.getUTCMonth();
-        const currentYear = analysisStartDate.getUTCFullYear();
+        let selectedYear, selectedMonth;
+        if (budgetYearSelect && budgetMonthSelect) {
+            selectedYear = parseInt(budgetYearSelect.value);
+            selectedMonth = parseInt(budgetMonthSelect.value);
+        } else {
+            const analysisStartDate = new Date(currentBackupData.analysis_start_date);
+            selectedMonth = analysisStartDate.getUTCMonth();
+            selectedYear = analysisStartDate.getUTCFullYear();
+        }
+        currentBudgetViewDate = new Date(Date.UTC(selectedYear, selectedMonth, 1));
+        const currentMonth = selectedMonth;
+        const currentYear = selectedYear;
         const expensesThisMonth = {};
         (currentBackupData.expenses || []).forEach(exp => {
             if (!exp.start_date) return;
@@ -2172,6 +2189,45 @@ document.addEventListener('DOMContentLoaded', () => {
             const percCell = row.insertCell(); percCell.textContent = `${percentageSpent.toFixed(1)}%`;
             if (budget > 0) { if (percentageSpent > 100) percCell.classList.add('text-red'); else if (percentageSpent >= 80) percCell.classList.add('text-orange'); else percCell.classList.add('text-green'); }
         });
+    }
+
+    function setupBudgetMonthSelectors() {
+        if (!budgetYearSelect || !budgetMonthSelect) return;
+        const today = new Date();
+        const analysisStartDate = (currentBackupData && currentBackupData.analysis_start_date)
+            ? new Date(currentBackupData.analysis_start_date)
+            : new Date(today);
+        const analysisEndDate = addMonths(new Date(analysisStartDate), (currentBackupData ? currentBackupData.analysis_duration : 12));
+        currentBudgetViewDate = today;
+        budgetYearSelect.innerHTML = '';
+        const startYear = Math.min(analysisStartDate.getUTCFullYear(), today.getUTCFullYear()) - 2;
+        const endYear = Math.max(analysisEndDate.getUTCFullYear(), today.getUTCFullYear()) + 5;
+        for (let y = startYear; y <= endYear; y++) { const option = document.createElement('option'); option.value = y; option.textContent = y; budgetYearSelect.appendChild(option); }
+        budgetYearSelect.value = currentBudgetViewDate.getUTCFullYear();
+        budgetMonthSelect.innerHTML = '';
+        MONTH_NAMES_FULL_ES.forEach((monthName, index) => { const option = document.createElement('option'); option.value = index; option.textContent = monthName; budgetMonthSelect.appendChild(option); });
+        budgetMonthSelect.value = currentBudgetViewDate.getUTCMonth();
+        [budgetYearSelect, budgetMonthSelect].forEach(sel => { sel.removeEventListener('change', renderBudgetSummaryTable); sel.addEventListener('change', renderBudgetSummaryTable); });
+        if (prevBudgetMonthButton && nextBudgetMonthButton) {
+            prevBudgetMonthButton.removeEventListener('click', prevBudgetMonthHandler);
+            nextBudgetMonthButton.removeEventListener('click', nextBudgetMonthHandler);
+            prevBudgetMonthButton.addEventListener('click', prevBudgetMonthHandler);
+            nextBudgetMonthButton.addEventListener('click', nextBudgetMonthHandler);
+        }
+    }
+
+    function prevBudgetMonthHandler() { navigateBudgetMonth(-1); }
+    function nextBudgetMonthHandler() { navigateBudgetMonth(1); }
+
+    function navigateBudgetMonth(direction) {
+        if (!budgetYearSelect || !budgetMonthSelect) return;
+        let year = parseInt(budgetYearSelect.value);
+        let month = parseInt(budgetMonthSelect.value);
+        const newMonthDate = new Date(Date.UTC(year, month, 15));
+        newMonthDate.setUTCMonth(newMonthDate.getUTCMonth() + direction);
+        budgetYearSelect.value = newMonthDate.getUTCFullYear();
+        budgetMonthSelect.value = newMonthDate.getUTCMonth();
+        renderBudgetSummaryTable();
     }
 
     // --- LÓGICA PESTAÑA REGISTRO PAGOS ---
