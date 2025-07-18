@@ -674,6 +674,19 @@ td.reimbursement-income {
     margin-bottom: 0;
 }
 
+/* Estilos para Selector de Mes en Presupuestos */
+.budget-period-selector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+.budget-period-selector select, .budget-period-selector button {
+    padding: 8px 10px;
+    margin-bottom: 0;
+}
+
 /* Selector de período para gráficos adicionales */
 .chart-period-selector {
     display: flex;
@@ -1100,6 +1113,17 @@ td.reimbursement-income {
       margin-bottom: 8px;
   }
   .payments-period-selector button {
+      flex-basis: auto;
+  }
+  .budget-period-selector {
+      flex-wrap: wrap;
+      justify-content: space-around;
+  }
+  .budget-period-selector select, .budget-period-selector button {
+      flex-basis: 45%;
+      margin-bottom: 8px;
+  }
+  .budget-period-selector button {
       flex-basis: auto;
   }
   .reminders-columns {

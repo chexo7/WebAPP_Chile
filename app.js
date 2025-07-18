@@ -134,6 +134,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveBudgetButton = document.getElementById('save-budget-button');
     const budgetsTableView = document.querySelector('#budgets-table-view tbody');
     const budgetSummaryTableBody = document.querySelector('#budget-summary-table tbody');
+    const budgetYearSelect = document.getElementById('budget-year-select');
+    const budgetMonthSelect = document.getElementById('budget-month-select');
+    const budgetPrevMonthBtn = document.getElementById('budget-prev-month');
+    const budgetNextMonthBtn = document.getElementById('budget-next-month');
+    let currentBudgetViewDate = new Date();
 
     // --- ELEMENTOS PESTAÑA REGISTRO PAGOS ---
     const paymentsTabTitle = document.getElementById('payments-tab-title');
@@ -658,6 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderIncomesTable();
                     renderExpensesTable();
                     renderBudgetsTable();
+                    setupBudgetSummarySelectors();
                     renderBabySteps();
                     renderReminders();
                     renderLogTab();
@@ -702,6 +708,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderIncomesTable();
                     renderExpensesTable();
                     renderBudgetsTable();
+                    setupBudgetSummarySelectors();
                     renderBabySteps();
                     renderReminders();
                     renderLogTab();
@@ -1144,7 +1151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabId === 'grafico') {
             setPeriodicity(activeCashflowPeriodicity, 'chart');
         }
-        if (tabId === 'presupuestos') { renderBudgetsTable(); renderBudgetSummaryTable(); }
+        if (tabId === 'presupuestos') { renderBudgetsTable(); setupBudgetSummarySelectors(); renderBudgetSummaryTable(); }
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); setPaymentPeriodicity(activePaymentsPeriodicity); }
         if (tabId === 'ajustes') {
             populateSettingsForm();
@@ -1385,6 +1392,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupPaymentPeriodSelectors();
         setPaymentPeriodicity(activePaymentsPeriodicity);
         renderBudgetsTable();
+        setupBudgetSummarySelectors();
 
         renderBudgetSummaryTable();
     });
@@ -2101,9 +2109,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const cell = row.insertCell(); cell.colSpan = 5; cell.textContent = "Datos insuficientes."; cell.style.textAlign = "center";
             return;
         }
-        const analysisStartDate = new Date(currentBackupData.analysis_start_date);
-        const currentMonth = analysisStartDate.getUTCMonth();
-        const currentYear = analysisStartDate.getUTCFullYear();
+        const currentMonth = budgetMonthSelect ? parseInt(budgetMonthSelect.value) : new Date().getUTCMonth();
+        const currentYear = budgetYearSelect ? parseInt(budgetYearSelect.value) : new Date().getUTCFullYear();
         const expensesThisMonth = {};
         (currentBackupData.expenses || []).forEach(exp => {
             if (!exp.start_date) return;
@@ -2278,6 +2285,52 @@ document.addEventListener('DOMContentLoaded', () => {
             cell.textContent = "No hay gastos programados para este período.";
             cell.style.textAlign = "center";
         }
+    }
+
+    // --- LÓGICA PESTAÑA PRESUPUESTOS ---
+    function setupBudgetSummarySelectors() {
+        if (!budgetYearSelect || !budgetMonthSelect) return;
+        const today = new Date();
+        const analysisStartDate = (currentBackupData && currentBackupData.analysis_start_date)
+            ? new Date(currentBackupData.analysis_start_date)
+            : new Date(today);
+        const analysisEndDate = addMonths(new Date(analysisStartDate), (currentBackupData ? currentBackupData.analysis_duration : 12));
+        budgetYearSelect.innerHTML = '';
+        const startYear = Math.min(analysisStartDate.getUTCFullYear(), new Date().getUTCFullYear()) - 2;
+        const endYear = Math.max(analysisEndDate.getUTCFullYear(), new Date().getUTCFullYear()) + 5;
+        for (let y = startYear; y <= endYear; y++) {
+            const option = document.createElement('option');
+            option.value = y;
+            option.textContent = y;
+            budgetYearSelect.appendChild(option);
+        }
+        currentBudgetViewDate = today;
+        budgetYearSelect.value = currentBudgetViewDate.getUTCFullYear();
+        budgetMonthSelect.innerHTML = '';
+        MONTH_NAMES_FULL_ES.forEach((monthName, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = monthName;
+            budgetMonthSelect.appendChild(option);
+        });
+        budgetMonthSelect.value = currentBudgetViewDate.getUTCMonth();
+        [budgetYearSelect, budgetMonthSelect].forEach(sel => {
+            sel.removeEventListener('change', renderBudgetSummaryTable);
+            sel.addEventListener('change', renderBudgetSummaryTable);
+        });
+    }
+
+    budgetPrevMonthBtn.addEventListener('click', () => navigateBudgetMonth(-1));
+    budgetNextMonthBtn.addEventListener('click', () => navigateBudgetMonth(1));
+    function navigateBudgetMonth(direction) {
+        let year = parseInt(budgetYearSelect.value);
+        let month = parseInt(budgetMonthSelect.value);
+        const newDate = new Date(Date.UTC(year, month, 15));
+        newDate.setUTCMonth(newDate.getUTCMonth() + direction);
+        budgetYearSelect.value = newDate.getUTCFullYear();
+        budgetMonthSelect.value = newDate.getUTCMonth();
+        currentBudgetViewDate = newDate;
+        renderBudgetSummaryTable();
     }
 
     // --- LÓGICA PESTAÑA FLUJO DE CAJA ---
