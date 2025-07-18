@@ -412,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showMainContentScreen() {
         mainContentContainer.style.display = 'block';
-        activateTab('gastos'); // Activate a default tab
+        activateTab('log'); // Activate Log tab by default
         fetchAndUpdateUSDCLPRate(); // Fetch USD/CLP rate when main content is shown
         if (typeof updatePieMonthChart === 'function') updatePieMonthChart();
         if (typeof updatePieWeekChart === 'function') updatePieWeekChart();
