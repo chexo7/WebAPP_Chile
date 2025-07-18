@@ -515,8 +515,8 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingMessage.style.display = 'block';
         loadLatestVersionButton.disabled = true;
 
-        // MODIFICADO: Apunta a `users/${userSubPath}/backups`
-        userRef.child('backups').once('value')
+        // MODIFICADO: Apunta a `users/${userSubPath}/backups` y limita a las 10 últimas versiones
+        userRef.child('backups').orderByKey().limitToLast(10).once('value')
             .then(snapshot => {
                 backupSelector.innerHTML = '<option value="">-- Selecciona una versión --</option>';
                 if (snapshot.exists()) {
