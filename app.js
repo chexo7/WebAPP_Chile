@@ -1285,8 +1285,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentBackupData.credit_cards) currentBackupData.credit_cards = [];
         currentBackupData.credit_cards.forEach((card, idx) => {
             const li = document.createElement('li');
+            const prefRadio = document.createElement('input');
+            prefRadio.type = 'radio';
+            prefRadio.name = 'preferred-credit-card';
+            prefRadio.checked = !!card.preferred;
+            prefRadio.title = 'Marcar como preferida';
+            prefRadio.addEventListener('change', () => {
+                currentBackupData.credit_cards.forEach(c => { c.preferred = false; });
+                card.preferred = true;
+                renderCreditCards();
+            });
+            li.appendChild(prefRadio);
             const span = document.createElement('span');
-            span.textContent = `${card.name} (corte ${card.cutoff_day}, paga día ${card.payment_day || 1})`;
+            span.textContent = `${card.name} (corte ${card.cutoff_day}, paga día ${card.payment_day || 1})${card.preferred ? ' (Preferida)' : ''}`;
             li.appendChild(span);
 
             const expensesUsingCard = (currentBackupData.expenses || []).filter(exp => exp.payment_method === 'Credito' && exp.credit_card === card.name);
@@ -1332,12 +1343,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!expenseCreditCardSelect) return;
         expenseCreditCardSelect.innerHTML = '';
         const cards = currentBackupData && currentBackupData.credit_cards ? currentBackupData.credit_cards : [];
+        let preferredSet = false;
         cards.forEach(card => {
             const option = document.createElement('option');
             option.value = card.name;
             option.textContent = card.name;
+            if (card.preferred && !preferredSet) {
+                option.selected = true;
+                preferredSet = true;
+            }
             expenseCreditCardSelect.appendChild(option);
         });
+        const preferredCard = cards.find(c => c.preferred);
+        if (preferredCard) expenseCreditCardSelect.value = preferredCard.name;
     }
 
     function calculateCreditCardPaymentDate(movDate, cutoffDay, paymentDay) {
@@ -1417,7 +1435,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isNaN(payDay) || payDay < 1 || payDay > 31) { alert('Día de pago inválido'); return; }
             if (!currentBackupData.credit_cards) currentBackupData.credit_cards = [];
 
-            const cardData = { name: name, cutoff_day: cutoff, payment_day: payDay };
+            const existingPreferred = editingCreditCardIndex !== null ?
+                !!currentBackupData.credit_cards[editingCreditCardIndex].preferred : false;
+            const cardData = { name: name, cutoff_day: cutoff, payment_day: payDay, preferred: existingPreferred };
             if (editingCreditCardIndex !== null) {
                 const oldName = currentBackupData.credit_cards[editingCreditCardIndex].name;
                 currentBackupData.credit_cards[editingCreditCardIndex] = cardData;
@@ -1772,30 +1792,32 @@ document.addEventListener('DOMContentLoaded', () => {
         renderExpensesTable(); renderCashflowTable(); resetExpenseForm();
     });
     function resetExpenseForm() {
-    expenseForm.reset(); // This might trigger a change event on expenseFrequencySelect if its value changes
+        expenseForm.reset(); // This might trigger a change event on expenseFrequencySelect if its value changes
 
-    // Set frequency to 'Único' first
-    expenseFrequencySelect.value = 'Único'; 
+        // Set frequency to 'Único' first
+        expenseFrequencySelect.value = 'Único';
 
-    // Now, explicitly set the state for 'Único' frequency
-    expenseOngoingCheckbox.checked = false;
-    expenseOngoingCheckbox.disabled = true;
-    expenseEndDateInput.disabled = true; 
-    expenseEndDateInput.value = '';
-    expenseIsRealCheckbox.checked = false;
-    expensePaymentMethodSelect.value = 'Efectivo';
-    expenseCreditCardContainer.style.display = 'none';
-    expensePaymentDateContainer.style.display = 'none';
-    if (expenseInstallmentsContainer) expenseInstallmentsContainer.style.display = 'none';
-    if (expenseInstallmentsInput) expenseInstallmentsInput.value = '1';
+        // Now, explicitly set the state for 'Único' frequency
+        expenseOngoingCheckbox.checked = false;
+        expenseOngoingCheckbox.disabled = true;
+        expenseEndDateInput.disabled = true;
+        expenseEndDateInput.value = '';
+        expenseIsRealCheckbox.checked = true;
+        populateExpenseCreditCardDropdown();
+        expensePaymentMethodSelect.value = 'Credito';
+        expensePaymentMethodSelect.dispatchEvent(new Event('change'));
+        if (expenseInstallmentsInput) expenseInstallmentsInput.value = '1';
 
-    // ... (rest of the function, e.g., setting default category, button text, etc.)
+        const preferredCard = currentBackupData && currentBackupData.credit_cards ? currentBackupData.credit_cards.find(c => c.preferred) : null;
+        if (preferredCard) expenseCreditCardSelect.value = preferredCard.name;
+
+        // ... (rest of the function, e.g., setting default category, button text, etc.)
         if (expenseCategorySelect.options.length > 0 && expenseCategorySelect.value === "") {
             if (expenseCategorySelect.options[0].value !== "") expenseCategorySelect.selectedIndex = 0;
             else if (expenseCategorySelect.options.length > 1) expenseCategorySelect.selectedIndex = 1;
         }
-    addExpenseButton.textContent = 'Agregar Gasto'; 
-    cancelEditExpenseButton.style.display = 'none';
+        addExpenseButton.textContent = 'Agregar Gasto';
+        cancelEditExpenseButton.style.display = 'none';
         editingExpenseIndex = null;
         const defaultDate = getISODateString(new Date());
         expenseMovementDateInput.value = defaultDate;
@@ -1851,14 +1873,19 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseCategorySelect.value = expense.category; expenseFrequencySelect.value = expense.frequency;
         expenseMovementDateInput.value = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : '');
         expenseStartDateInput.value = expense.start_date ? getISODateString(new Date(expense.start_date)) : '';
-        expenseIsRealCheckbox.checked = expense.is_real || false;
-        expensePaymentMethodSelect.value = expense.payment_method || 'Efectivo';
+        expenseIsRealCheckbox.checked = expense.is_real !== undefined ? expense.is_real : true;
+        expensePaymentMethodSelect.value = expense.payment_method || 'Credito';
         const isCreditEdit = expensePaymentMethodSelect.value === 'Credito';
         expenseCreditCardContainer.style.display = isCreditEdit ? 'block' : 'none';
         expensePaymentDateContainer.style.display = isCreditEdit ? 'block' : 'none';
         if (expenseInstallmentsContainer) expenseInstallmentsContainer.style.display = isCreditEdit ? 'block' : 'none';
         if (expenseInstallmentsInput) expenseInstallmentsInput.value = expense.installments || 1;
-        if (expense.credit_card) expenseCreditCardSelect.value = expense.credit_card;
+        if (expense.credit_card) {
+            expenseCreditCardSelect.value = expense.credit_card;
+        } else {
+            const preferredCardEdit = currentBackupData && currentBackupData.credit_cards ? currentBackupData.credit_cards.find(c => c.preferred) : null;
+            if (preferredCardEdit) expenseCreditCardSelect.value = preferredCardEdit.name;
+        }
         const isUnico = expense.frequency === 'Único';
         expenseOngoingCheckbox.disabled = isUnico;
         if (isUnico) {
