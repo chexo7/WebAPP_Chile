@@ -1,0 +1,27 @@
+@import url("style.css");
+
+/* Dark theme overrides */
+:root {
+  --primary-color: #74b9ff;
+  --primary-hover: #4a99e2;
+  --accent-color: #fab1a0;
+  --accent-hover: #e17055;
+  --danger-color: #e74c3c;
+  --danger-hover: #c0392b;
+  --text-color: #dfe6e9;
+  --light-text: #b2bec3;
+  --background: #2d3436;
+  --card-bg: #3d3d3d;
+  --border-color: #555;
+  --header-bg: #444;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --alt-row-bg: #2f3640;
+  --row-hover-bg: #353b48;
+  --body-header-row-bg: #2d3436;
+  --disabled-bg: #555;
+}
+
+body {
+  background: var(--background);
+  color: var(--text-color);
+}
