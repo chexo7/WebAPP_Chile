@@ -3752,7 +3752,12 @@ function getMondayOfWeek(year, week) {
                     originalAmount: monthly,
                     occurrences: occ,
                     category,
-                    date: getISODateString(new Date(inc.start_date))
+                    date: getISODateString(new Date(inc.start_date)),
+                    frequency: inc.frequency,
+                    start_date: getISODateString(new Date(inc.start_date)),
+                    end_date: inc.end_date ? getISODateString(new Date(inc.end_date)) : '',
+                    is_reimbursement: !!inc.is_reimbursement,
+                    reimbursement_category: inc.reimbursement_category || ''
                 });
             }
         });
@@ -3775,7 +3780,13 @@ function getMondayOfWeek(year, week) {
                     installments: inst,
                     occurrences: occ,
                     category: exp.category,
-                    date: getISODateString(new Date(exp.start_date))
+                    date: getISODateString(new Date(exp.start_date)),
+                    frequency: exp.frequency,
+                    start_date: getISODateString(new Date(exp.start_date)),
+                    end_date: exp.end_date ? getISODateString(new Date(exp.end_date)) : '',
+                    movement_date: exp.movement_date ? getISODateString(new Date(exp.movement_date)) : '',
+                    payment_method: exp.payment_method,
+                    is_real: !!exp.is_real
                 });
             }
         });
@@ -3943,19 +3954,42 @@ function getMondayOfWeek(year, week) {
                     const amt = formatCurrencyJS(t.amount, symbol);
                     if (t.type === 'Gasto') {
                         const typ = currentBackupData.expense_categories[t.category] || 'Variable';
-                        expenseRows.push([monthLabel, t.name, amt, t.category || '', typ, t.date]);
+                        const moveDate = t.movement_date || t.start_date || '';
+                        const end = t.end_date ? t.end_date : (t.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
+                        expenseRows.push([
+                            monthLabel,
+                            t.name,
+                            amt,
+                            t.category || '',
+                            t.frequency,
+                            moveDate,
+                            t.start_date,
+                            end,
+                            t.payment_method === 'Credito' ? 'Tarjeta' : 'Efectivo',
+                            t.is_real ? 'Sí' : 'No',
+                            typ
+                        ]);
                     } else {
-                        const typ = t.type === 'Reembolso' ? 'Reembolso' : 'Ingreso';
-                        incomeRows.push([monthLabel, t.name, amt, typ, t.date]);
+                        const end = t.end_date ? t.end_date : (t.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
+                        const typeStr = t.type === 'Reembolso' ? `Reembolso (${t.reimbursement_category || 'N/A'})` : 'Ingreso Regular';
+                        incomeRows.push([
+                            monthLabel,
+                            t.name,
+                            amt,
+                            t.frequency,
+                            t.start_date,
+                            end,
+                            typeStr
+                        ]);
                     }
                 });
                 d = addMonths(d, 1);
             }
             if (incomeRows.length > 0) {
-                addSimpleTable('Ingresos por Mes', ['Mes', 'Ingreso', 'Monto', 'Tipo', 'Fecha'], incomeRows);
+                addSimpleTable('Ingresos por Mes', ['Mes', 'Ingreso', 'Monto', 'Frecuencia', 'Inicio', 'Fin', 'Tipo'], incomeRows);
             }
             if (expenseRows.length > 0) {
-                addSimpleTable('Gastos por Mes', ['Mes', 'Gasto', 'Monto', 'Categoría', 'Tipo', 'Fecha'], expenseRows);
+                addSimpleTable('Gastos por Mes', ['Mes', 'Gasto', 'Monto', 'Categoría', 'Frecuencia', 'Movimiento', 'Gasto/Pago', 'Fin', 'Método', 'Real', 'Tipo'], expenseRows);
             }
         }
 
