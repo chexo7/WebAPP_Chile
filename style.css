@@ -1312,6 +1312,22 @@ td.reimbursement-income {
 .duplicate-row {
     background-color: var(--alt-row-bg);
 }
+#ai-status {
+    margin-top: 10px;
+    font-size: 0.9rem;
+}
+.ai-chat {
+    margin-top: 10px;
+    border: 1px solid var(--border-color);
+    padding: 5px;
+    display: none;
+}
+.ai-chat-log {
+    max-height: 150px;
+    overflow-y: auto;
+    margin-bottom: 5px;
+}
+.ai-chat-log div { margin-bottom: 4px; }
 #import-expenses-modal .modal-content {
     width: 100%;
     height: 100%;
