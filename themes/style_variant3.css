@@ -1,0 +1,31 @@
+@import url("../style.css");
+
+/* Variant 3: Pastel Sunset */
+:root {
+  --primary-color: #ff7e67;
+  --primary-hover: #e76e58;
+  --accent-color: #ffd166;
+  --accent-hover: #f6c04f;
+  --danger-color: #ef476f;
+  --danger-hover: #d43d60;
+  --text-color: #4a4a4a;
+  --light-text: #7f7f7f;
+  --background: #fff8f0;
+  --card-bg: #ffffff;
+  --border-color: #ffd8b1;
+  --header-bg: #fff1e6;
+  --shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
+  --radius: 10px;
+  --alt-row-bg: #fff4e6;
+  --row-hover-bg: #ffe8d9;
+  --body-header-row-bg: #fff4e6;
+  --text-green: #06d6a0;
+  --text-red: #ef476f;
+  --text-orange: #ffa600;
+  --disabled-bg: #fff1e6;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background: linear-gradient(135deg, var(--background) 0%, #ffe8d9 100%);
+}
