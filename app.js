@@ -110,18 +110,66 @@ document.addEventListener('DOMContentLoaded', () => {
     const mapDateSelect = document.getElementById('map-date');
     const mapDescSelect = document.getElementById('map-description');
     const mapAmountSelect = document.getElementById('map-amount');
+    const mapInstallmentsSelect = document.getElementById('map-installments');
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
+    const analyzeExpensesButton = document.getElementById('analyze-expenses-button');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const bankProfileDiv = document.getElementById('bank-profile');
+    const aiStatusLabel = document.getElementById('ai-status');
+    const aiChatContainer = document.getElementById('ai-chat-container');
+    const aiChatMessages = document.getElementById('ai-chat-messages');
+    const aiChatInput = document.getElementById('ai-chat-input');
+    const aiChatSend = document.getElementById('ai-chat-send');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
+    let aiAvailable = false;
+    let aiDuplicateIndexes = new Set();
+    let importedExpenseFile = null;
     const bankProfiles = {
         falabella: {
             matchFileName: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.xlsx$/i,
             columns: { date: 'FECHA', desc: 'DESCRIPCION', amount: 'MONTO' }
         }
     };
+
+    const GEMINI_CONTEXT = `Eres un asistente para una aplicación web de finanzas personales.
+Debes analizar archivos Excel de gastos para mapear sus columnas a los campos de la webapp.
+Responde únicamente un JSON con las claves "date", "description", "amount" y opcionalmente "installments" indicando el nombre exacto de cada columna.
+Si no puedes determinar alguna columna usa cadena vacía.
+Considera que un movimiento puede repetirse con distinta descripción pero misma fecha y monto, trátalos como duplicados.
+Cuando existan columnas de número de cuota trabaja con el monto total y el valor de cuota, buscando si hay un movimiento previo con cuota inmediatamente anterior para asociarlo.`;
+
+    async function geminiRequest(text) {
+        const body = { contents: [ { parts: [ { text: GEMINI_CONTEXT + "\n" + text } ] } ] };
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error('Gemini request failed');
+        const data = await res.json();
+        return (((data.candidates || [])[0] || {}).content || {}).parts[0]?.text || '';
+    }
+
+    async function checkGeminiAvailability() {
+        try {
+            await geminiRequest('Di \"ok\"');
+            aiAvailable = true;
+            if (aiStatusLabel) aiStatusLabel.textContent = 'IA: disponible';
+        } catch(e) {
+            aiAvailable = false;
+            if (aiStatusLabel) aiStatusLabel.textContent = 'IA: no disponible';
+        }
+    }
+
+    async function analyzeDuplicatesWithAI(list) {
+        if (!aiAvailable) return [];
+        const prompt = `Lista actual: ${JSON.stringify(currentBackupData.expenses.map(e => ({name: e.name, date: e.movement_date ? getISODateString(new Date(e.movement_date)) : (e.start_date ? getISODateString(new Date(e.start_date)) : ''), amount: parseFloat(e.amount), installments: parseInt(e.installments || 1)})))}. Nuevos gastos: ${JSON.stringify(list)}. Considera duplicados aquellos movimientos donde fecha y monto coinciden aunque la descripción cambie. Si existen cuotas, vincula movimientos con la cuota inmediatamente anterior. Devuelve solo un array JSON de indices de nuevos gastos que ya existen.`;
+        const reply = await geminiRequest(prompt);
+        try { return JSON.parse(reply); } catch { return []; }
+    }
 
     // --- BLOQUEO DE EDICIÓN ---
     let editLockAcquired = false;
@@ -1912,16 +1960,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- IMPORTACIÓN MASIVA DE GASTOS ---
     function showImportExpensesModal() {
         if (importExpensesModal) importExpensesModal.style.display = 'flex';
+        aiDuplicateIndexes.clear();
+        if (aiStatusLabel) aiStatusLabel.textContent = 'IA: verificando...';
+        checkGeminiAvailability();
+        if (analyzeExpensesButton) analyzeExpensesButton.disabled = true;
     }
     function closeImportExpensesModal() {
         if (importExpensesModal) importExpensesModal.style.display = 'none';
         parsedImportData = [];
         importHeaders = [];
+        aiDuplicateIndexes.clear();
         if (importTableContainer) importTableContainer.innerHTML = '';
         if (columnMappingDiv) columnMappingDiv.style.display = 'none';
         if (bankProfileSelect) bankProfileSelect.value = 'auto';
         const bankProfileDiv = document.getElementById('bank-profile');
         if (bankProfileDiv) bankProfileDiv.style.display = 'none';
+        if (analyzeExpensesButton) analyzeExpensesButton.disabled = true;
     }
     function parseExcelDate(val) {
         if (val === undefined || val === null) return null;
@@ -1947,10 +2001,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return null;
     }
-    function checkExpenseDuplicate(name, dateStr, amount) {
+    function checkExpenseDuplicate(name, dateStr, amount, installments = 1) {
         return (currentBackupData.expenses || []).some(exp => {
             const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
-            return expDate === dateStr && exp.name === name && parseFloat(exp.amount) === parseFloat(amount);
+            const sameDate = expDate === dateStr;
+            const sameAmount = parseFloat(exp.amount) === parseFloat(amount);
+            const sameInst = parseInt(exp.installments || 1) === parseInt(installments);
+            if (sameDate && sameAmount && sameInst) return true;
+            if (sameDate && sameAmount) return true;
+            if (installments > 1 && sameAmount && parseInt(exp.installments || 1) === installments - 1) return true;
+            return false;
         });
     }
     function createCategorySelect() {
@@ -1973,16 +2033,26 @@ document.addEventListener('DOMContentLoaded', () => {
             mapDateSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.date.toLowerCase()) || '';
             mapDescSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.desc.toLowerCase()) || '';
             mapAmountSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.amount.toLowerCase()) || '';
+            if (profile.columns.installments)
+                mapInstallmentsSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.installments.toLowerCase()) || '';
+            renderImportTable();
+        } else if (profileKey === 'auto') {
+            mapDateSelect.value = '';
+            mapDescSelect.value = '';
+            mapAmountSelect.value = '';
+            mapInstallmentsSelect.value = '';
+            requestAIMapping();
         } else {
             mapDateSelect.value = importHeaders.find(h => /fecha/i.test(h)) || '';
             mapDescSelect.value = importHeaders.find(h => /desc/i.test(h)) || '';
             mapAmountSelect.value = importHeaders.find(h => /monto/i.test(h)) || '';
+            mapInstallmentsSelect.value = importHeaders.find(h => /cuota|install/i.test(h)) || '';
+            renderImportTable();
         }
-        renderImportTable();
     }
     function renderMappingSelectors() {
         if (!columnMappingDiv) return;
-        const selects = [mapDateSelect, mapDescSelect, mapAmountSelect];
+        const selects = [mapDateSelect, mapDescSelect, mapAmountSelect, mapInstallmentsSelect];
         selects.forEach(sel => { sel.innerHTML = '<option value="">--</option>'; });
         importHeaders.forEach(h => {
             selects.forEach(sel => {
@@ -1993,18 +2063,20 @@ document.addEventListener('DOMContentLoaded', () => {
         columnMappingDiv.style.display = 'flex';
         const bankProfileDiv = document.getElementById('bank-profile');
         if (bankProfileDiv) bankProfileDiv.style.display = 'flex';
+        requestAIDuplicates();
     }
-    function renderImportTable() {
+function renderImportTable() {
         if (!importTableContainer) return;
         importTableContainer.innerHTML = '';
         const dateCol = mapDateSelect.value;
         const descCol = mapDescSelect.value;
         const amountCol = mapAmountSelect.value;
+        const instCol = mapInstallmentsSelect.value;
         if (!dateCol || !descCol || !amountCol) return;
         const table = document.createElement('table');
         table.classList.add('import-preview-table');
         const thead = document.createElement('thead');
-        thead.innerHTML = '<tr><th>Importar</th><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Categoría</th><th>Duplicado?</th></tr>';
+        thead.innerHTML = '<tr><th>Importar</th><th>Fecha</th><th>Descripción</th><th>Monto</th>' + (instCol ? '<th>Cuotas</th>' : '') + '<th>Categoría</th><th>Duplicado?</th></tr>';
         table.appendChild(thead);
         const tbody = document.createElement('tbody');
         parsedImportData.forEach((row, idx) => {
@@ -2012,7 +2084,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateStr = dateObj ? getISODateString(dateObj) : '';
             const desc = row[descCol] !== undefined ? String(row[descCol]) : '';
             const amt = row[amountCol];
-            const isDup = checkExpenseDuplicate(desc, dateStr, parseFloat(amt));
+            const inst = instCol && row[instCol] !== undefined ? parseInt(row[instCol],10) || 1 : 1;
+            const localDup = checkExpenseDuplicate(desc, dateStr, parseFloat(amt), inst);
+            const aiDup = aiDuplicateIndexes.has(idx);
+            const isDup = localDup || aiDup;
             const tr = document.createElement('tr');
             if (isDup) tr.classList.add('duplicate-row');
             const chkCell = tr.insertCell();
@@ -2020,6 +2095,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.insertCell().textContent = dateStr || String(row[dateCol] || '');
             tr.insertCell().textContent = desc;
             tr.insertCell().textContent = amt;
+            if (instCol) tr.insertCell().textContent = inst;
             const catCell = tr.insertCell();
             const sel = createCategorySelect(); sel.dataset.index = idx; catCell.appendChild(sel);
             tr.insertCell().textContent = isDup ? 'Sí' : 'No';
@@ -2027,6 +2103,53 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         table.appendChild(tbody);
         importTableContainer.appendChild(table);
+    }
+
+    async function requestAIMapping() {
+        if (!aiAvailable || !parsedImportData.length) return;
+        const sample = parsedImportData.slice(0, 3).map(row => {
+            const obj = {};
+            importHeaders.forEach(h => { obj[h] = row[h]; });
+            return obj;
+        });
+        const prompt = `Encabezados: ${JSON.stringify(importHeaders)}. Ejemplos: ${JSON.stringify(sample)}. Devuelve solo un JSON con las claves \"date\", \"description\", \"amount\" y opcionalmente \"installments\" indicando la columna correspondiente`;
+        try {
+            const reply = await geminiRequest(prompt);
+            const mapping = JSON.parse(reply);
+            if (mapping.date && importHeaders.includes(mapping.date)) mapDateSelect.value = mapping.date;
+            if (mapping.description && importHeaders.includes(mapping.description)) mapDescSelect.value = mapping.description;
+            if (mapping.amount && importHeaders.includes(mapping.amount)) mapAmountSelect.value = mapping.amount;
+            if (mapping.installments && importHeaders.includes(mapping.installments)) mapInstallmentsSelect.value = mapping.installments;
+        } catch(e) {
+            console.error('AI mapping error', e);
+        }
+        renderImportTable();
+        requestAIDuplicates();
+    }
+
+    async function requestAIDuplicates() {
+        if (!aiAvailable) { renderImportTable(); return; }
+        const dateCol = mapDateSelect.value;
+        const descCol = mapDescSelect.value;
+        const amountCol = mapAmountSelect.value;
+        const instCol = mapInstallmentsSelect.value;
+        if (!dateCol || !descCol || !amountCol) { renderImportTable(); return; }
+        const list = parsedImportData.map((row, idx) => {
+            const dateObj = parseExcelDate(row[dateCol]);
+            const dateStr = dateObj ? getISODateString(dateObj) : '';
+            const desc = row[descCol] !== undefined ? String(row[descCol]) : '';
+            const amt = parseFloat(row[amountCol] || 0);
+            const inst = instCol && row[instCol] !== undefined ? parseInt(row[instCol],10) || 1 : 1;
+            return { index: idx, name: desc, date: dateStr, amount: amt, installments: inst };
+        });
+        try {
+            const dups = await analyzeDuplicatesWithAI(list);
+            aiDuplicateIndexes = new Set(dups);
+        } catch(e) {
+            console.error(e);
+            aiDuplicateIndexes = new Set();
+        }
+        renderImportTable();
     }
     function handleExpenseFile(file) {
         const reader = new FileReader();
@@ -2049,7 +2172,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             if (bankProfileSelect) bankProfileSelect.value = detected;
-            renderMappingSelectors();
+            importedExpenseFile = file;
+            aiDuplicateIndexes.clear();
+            if (importTableContainer) importTableContainer.innerHTML = '';
+            if (columnMappingDiv) columnMappingDiv.style.display = 'none';
+            if (analyzeExpensesButton) analyzeExpensesButton.disabled = false;
+            if (bankProfileDiv) bankProfileDiv.style.display = 'flex';
         };
         reader.readAsArrayBuffer(file);
     }
@@ -2064,14 +2192,21 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseDropZone.addEventListener('drop', e => { e.preventDefault(); expenseDropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleExpenseFile(e.dataTransfer.files[0]); });
     }
     if (expenseFileInput) expenseFileInput.addEventListener('change', e => { if (e.target.files[0]) handleExpenseFile(e.target.files[0]); });
-    if (mapDateSelect) mapDateSelect.addEventListener('change', renderImportTable);
-    if (mapDescSelect) mapDescSelect.addEventListener('change', renderImportTable);
-    if (mapAmountSelect) mapAmountSelect.addEventListener('change', renderImportTable);
-    if (bankProfileSelect) bankProfileSelect.addEventListener('change', () => applyBankProfile(bankProfileSelect.value));
+    if (mapDateSelect) mapDateSelect.addEventListener('change', requestAIDuplicates);
+    if (mapDescSelect) mapDescSelect.addEventListener('change', requestAIDuplicates);
+    if (mapAmountSelect) mapAmountSelect.addEventListener('change', requestAIDuplicates);
+    if (bankProfileSelect) bankProfileSelect.addEventListener('change', () => { applyBankProfile(bankProfileSelect.value); requestAIDuplicates(); });
+    if (analyzeExpensesButton) analyzeExpensesButton.addEventListener('click', () => {
+        if (!parsedImportData.length) { alert('Primero carga un archivo'); return; }
+        aiDuplicateIndexes.clear();
+        if (importTableContainer) importTableContainer.innerHTML = '';
+        renderMappingSelectors();
+    });
     if (mergeExpensesButton) mergeExpensesButton.addEventListener('click', () => {
         const dateCol = mapDateSelect.value;
         const descCol = mapDescSelect.value;
         const amountCol = mapAmountSelect.value;
+        const instCol = mapInstallmentsSelect.value;
         if (!dateCol || !descCol || !amountCol) { alert('Mapea las columnas requeridas'); return; }
         const checkboxes = importTableContainer ? importTableContainer.querySelectorAll('input[type="checkbox"][data-index]') : [];
         checkboxes.forEach(chk => {
@@ -2081,9 +2216,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dateObj = parseExcelDate(row[dateCol]);
                 const desc = row[descCol] !== undefined ? String(row[descCol]) : '';
                 const amt = parseFloat(row[amountCol] || 0);
+                const inst = instCol && row[instCol] !== undefined ? parseInt(row[instCol],10) || 1 : 1;
                 const catSel = importTableContainer.querySelector(`select[data-index="${idx}"]`);
                 const cat = catSel ? catSel.value : '';
-                const entry = { name: desc, amount: amt, category: cat, type: currentBackupData.expense_categories[cat] || 'Variable', frequency: 'Único', start_date: dateObj, end_date: null, is_real: true, movement_date: dateObj, payment_method: 'Efectivo', credit_card: null, installments: 1 };
+                const entry = { name: desc, amount: amt, category: cat, type: currentBackupData.expense_categories[cat] || 'Variable', frequency: 'Único', start_date: dateObj, end_date: null, is_real: true, movement_date: dateObj, payment_method: 'Efectivo', credit_card: null, installments: inst };
                 if (!currentBackupData.expenses) currentBackupData.expenses = [];
                 currentBackupData.expenses.push(entry);
             }
@@ -2092,6 +2228,28 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCashflowTable();
         closeImportExpensesModal();
     });
+
+    async function sendAIChat() {
+        const text = aiChatInput.value.trim();
+        if (!text) return;
+        const msgDiv = document.createElement('div');
+        msgDiv.textContent = 'Tú: ' + text;
+        aiChatMessages.appendChild(msgDiv);
+        aiChatInput.value = '';
+        try {
+            const reply = await geminiRequest(text);
+            const rDiv = document.createElement('div');
+            rDiv.textContent = 'IA: ' + reply;
+            aiChatMessages.appendChild(rDiv);
+            aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
+        } catch(e) {
+            const errDiv = document.createElement('div');
+            errDiv.textContent = 'IA sin respuesta';
+            aiChatMessages.appendChild(errDiv);
+        }
+    }
+    if (aiChatSend) aiChatSend.addEventListener('click', sendAIChat);
+    if (aiChatInput) aiChatInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendAIChat(); } });
 
     // --- LÓGICA PESTAÑA PRESUPUESTOS ---
     function resetBudgetForm() {
