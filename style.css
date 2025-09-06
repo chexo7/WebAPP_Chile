@@ -1293,6 +1293,9 @@ td.reimbursement-income {
     gap: 10px;
     margin: 10px 0;
 }
+#analyze-expenses-button {
+    margin-bottom: 10px;
+}
 #column-mapping label {
     display: flex;
     flex-direction: column;
@@ -1346,4 +1349,28 @@ td.reimbursement-income {
     padding: 0;
 }
 .breakdown-popup li { margin: 2px 0; }
+
+#ai-chat-container {
+    border-top: 1px solid var(--border-color);
+    margin-top: 10px;
+    padding-top: 10px;
+}
+
+.chat-messages {
+    height: 120px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    padding: 5px;
+    margin-bottom: 5px;
+    background-color: var(--input-bg);
+}
+
+.chat-input-group {
+    display: flex;
+    gap: 5px;
+}
+
+.chat-input-group input {
+    flex: 1;
+}
 
