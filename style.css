@@ -1347,3 +1347,30 @@ td.reimbursement-income {
 }
 .breakdown-popup li { margin: 2px 0; }
 
+/* Gemini AI integration */
+.ai-status {
+    margin-top: 10px;
+    font-size: 0.9rem;
+}
+.ai-chat {
+    border: 1px solid var(--border-color);
+    margin-top: 10px;
+    padding: 5px;
+    max-height: 200px;
+    display: flex;
+    flex-direction: column;
+}
+.ai-chat .messages {
+    flex: 1;
+    overflow-y: auto;
+    font-size: 0.9rem;
+}
+.ai-chat .chat-input {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+}
+.ai-chat input {
+    flex: 1;
+}
+

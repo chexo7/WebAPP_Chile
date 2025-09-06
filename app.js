@@ -113,9 +113,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const geminiStatus = document.getElementById('gemini-status');
+    const geminiChat = document.getElementById('gemini-chat');
+    const geminiMessagesDiv = document.getElementById('gemini-messages');
+    const geminiChatInput = document.getElementById('gemini-chat-input');
+    const geminiSendButton = document.getElementById('gemini-send-button');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
+    let aiDuplicateFlags = [];
+    let geminiAvailable = false;
+    let geminiChatHistory = [];
     const bankProfiles = {
         falabella: {
             matchFileName: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.xlsx$/i,
@@ -1912,6 +1920,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- IMPORTACIÓN MASIVA DE GASTOS ---
     function showImportExpensesModal() {
         if (importExpensesModal) importExpensesModal.style.display = 'flex';
+        if (geminiStatus) geminiStatus.textContent = 'IA: verificando disponibilidad...';
+        checkGeminiAvailability();
     }
     function closeImportExpensesModal() {
         if (importExpensesModal) importExpensesModal.style.display = 'none';
@@ -1922,6 +1932,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (bankProfileSelect) bankProfileSelect.value = 'auto';
         const bankProfileDiv = document.getElementById('bank-profile');
         if (bankProfileDiv) bankProfileDiv.style.display = 'none';
+        geminiChatHistory = [];
+        renderGeminiMessages();
     }
     function parseExcelDate(val) {
         if (val === undefined || val === null) return null;
@@ -1952,6 +1964,93 @@ document.addEventListener('DOMContentLoaded', () => {
             const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
             return expDate === dateStr && exp.name === name && parseFloat(exp.amount) === parseFloat(amount);
         });
+    }
+
+    async function geminiRequest(contents) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents })
+        });
+        if (!resp.ok) throw new Error('Gemini API error');
+        return resp.json();
+    }
+
+    async function checkGeminiAvailability() {
+        try {
+            await geminiRequest([{ parts: [{ text: 'ping' }] }]);
+            geminiAvailable = true;
+        } catch (e) {
+            geminiAvailable = false;
+        }
+        if (geminiStatus) geminiStatus.textContent = geminiAvailable ? 'IA disponible' : 'IA no disponible';
+        if (geminiChat) geminiChat.style.display = geminiAvailable ? 'block' : 'none';
+    }
+
+    async function classifyDuplicatesWithAI(rows) {
+        if (!geminiAvailable) { return rows.map(r => false); }
+        const existing = (currentBackupData.expenses || []).map(exp => ({
+            name: exp.name,
+            amount: parseFloat(exp.amount),
+            date: exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '')
+        }));
+        const imported = rows.map(r => ({ name: r.desc, amount: parseFloat(r.amount), date: r.date }));
+        const systemMsg = {
+            parts: [{ text: 'La aplicación gestiona gastos con los campos name, amount, category, frequency, start_date, end_date, movement_date, payment_method y installments. Determina si un gasto importado ya existe comparando nombre, fecha y monto. Responde con un array JSON de valores true/false para cada gasto importado.' }]
+        };
+        const userMsg = {
+            parts: [{ text: `Existentes: ${JSON.stringify(existing)}\nImportados: ${JSON.stringify(imported)}` }]
+        };
+        try {
+            const data = await geminiRequest([systemMsg, userMsg]);
+            const text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0].text;
+            const arr = JSON.parse(text);
+            return Array.isArray(arr) ? arr.map(v => !!v) : rows.map(() => false);
+        } catch (e) {
+            return rows.map(() => false);
+        }
+    }
+
+    async function updateAIDuplicates() {
+        const dateCol = mapDateSelect.value;
+        const descCol = mapDescSelect.value;
+        const amountCol = mapAmountSelect.value;
+        if (!dateCol || !descCol || !amountCol) { aiDuplicateFlags = []; return; }
+        const rows = parsedImportData.map(r => ({
+            desc: r[descCol] !== undefined ? String(r[descCol]) : '',
+            amount: r[amountCol],
+            date: (function(){const d=parseExcelDate(r[dateCol]);return d?getISODateString(d):'';})()
+        }));
+        aiDuplicateFlags = await classifyDuplicatesWithAI(rows);
+    }
+
+    async function sendGeminiMessage() {
+        const txt = geminiChatInput.value.trim();
+        if (!txt) return;
+        geminiChatInput.value = '';
+        geminiChatHistory.push({ role: 'user', parts: [{ text: txt }] });
+        renderGeminiMessages();
+        try {
+            const data = await geminiRequest([ { parts: [{ text: 'La aplicación gestiona gastos con los campos name, amount, category, frequency, start_date, end_date, movement_date, payment_method y installments.' }] }, ...geminiChatHistory ]);
+            const reply = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0].text;
+            geminiChatHistory.push({ role: 'model', parts: [{ text: reply }] });
+            renderGeminiMessages();
+        } catch (e) {
+            geminiChatHistory.push({ role: 'model', parts: [{ text: 'Error al contactar la IA.' }] });
+            renderGeminiMessages();
+        }
+    }
+
+    function renderGeminiMessages() {
+        if (!geminiMessagesDiv) return;
+        geminiMessagesDiv.innerHTML = '';
+        geminiChatHistory.forEach(m => {
+            const p = document.createElement('p');
+            p.textContent = (m.role === 'user' ? 'Tú: ' : 'IA: ') + m.parts[0].text;
+            geminiMessagesDiv.appendChild(p);
+        });
+        geminiMessagesDiv.scrollTop = geminiMessagesDiv.scrollHeight;
     }
     function createCategorySelect() {
         const sel = document.createElement('select');
@@ -2012,7 +2111,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateStr = dateObj ? getISODateString(dateObj) : '';
             const desc = row[descCol] !== undefined ? String(row[descCol]) : '';
             const amt = row[amountCol];
-            const isDup = checkExpenseDuplicate(desc, dateStr, parseFloat(amt));
+            const isDup = aiDuplicateFlags[idx] === true ? true : (!geminiAvailable && checkExpenseDuplicate(desc, dateStr, parseFloat(amt)));
             const tr = document.createElement('tr');
             if (isDup) tr.classList.add('duplicate-row');
             const chkCell = tr.insertCell();
@@ -2050,6 +2149,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (bankProfileSelect) bankProfileSelect.value = detected;
             renderMappingSelectors();
+            updateAIDuplicates().then(renderImportTable);
         };
         reader.readAsArrayBuffer(file);
     }
@@ -2064,9 +2164,9 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseDropZone.addEventListener('drop', e => { e.preventDefault(); expenseDropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleExpenseFile(e.dataTransfer.files[0]); });
     }
     if (expenseFileInput) expenseFileInput.addEventListener('change', e => { if (e.target.files[0]) handleExpenseFile(e.target.files[0]); });
-    if (mapDateSelect) mapDateSelect.addEventListener('change', renderImportTable);
-    if (mapDescSelect) mapDescSelect.addEventListener('change', renderImportTable);
-    if (mapAmountSelect) mapAmountSelect.addEventListener('change', renderImportTable);
+    if (mapDateSelect) mapDateSelect.addEventListener('change', () => { updateAIDuplicates().then(renderImportTable); });
+    if (mapDescSelect) mapDescSelect.addEventListener('change', () => { updateAIDuplicates().then(renderImportTable); });
+    if (mapAmountSelect) mapAmountSelect.addEventListener('change', () => { updateAIDuplicates().then(renderImportTable); });
     if (bankProfileSelect) bankProfileSelect.addEventListener('change', () => applyBankProfile(bankProfileSelect.value));
     if (mergeExpensesButton) mergeExpensesButton.addEventListener('click', () => {
         const dateCol = mapDateSelect.value;
@@ -2092,6 +2192,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCashflowTable();
         closeImportExpensesModal();
     });
+    if (geminiSendButton) geminiSendButton.addEventListener('click', sendGeminiMessage);
+    if (geminiChatInput) geminiChatInput.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); sendGeminiMessage(); } });
 
     // --- LÓGICA PESTAÑA PRESUPUESTOS ---
     function resetBudgetForm() {
