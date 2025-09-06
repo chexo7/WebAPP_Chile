@@ -1347,3 +1347,32 @@ td.reimbursement-income {
 }
 .breakdown-popup li { margin: 2px 0; }
 
+/* --- Chat IA --- */
+#ai-chat-container {
+  margin-top: 10px;
+  border: 1px solid var(--border-color);
+  padding: 8px;
+  border-radius: var(--radius);
+  max-height: 200px;
+  overflow-y: auto;
+}
+#ai-chat-log {
+  max-height: 120px;
+  overflow-y: auto;
+  margin-bottom: 5px;
+}
+.chat-input-row {
+  display: flex;
+  gap: 4px;
+}
+.chat-input-row input {
+  flex: 1;
+}
+.ai-message {
+  color: var(--primary-color);
+}
+.user-message {
+  color: var(--text-green);
+  text-align: right;
+}
+

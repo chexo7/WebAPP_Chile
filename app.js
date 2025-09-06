@@ -113,9 +113,67 @@ document.addEventListener('DOMContentLoaded', () => {
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const aiStatusLabel = document.getElementById('ai-status');
+    const aiChatContainer = document.getElementById('ai-chat-container');
+    const aiChatLog = document.getElementById('ai-chat-log');
+    const aiChatInput = document.getElementById('ai-chat-input');
+    const aiChatSend = document.getElementById('ai-chat-send');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
+    let aiAvailable = false;
+    let aiConversation = [];
+    let duplicatesFromAI = new Set();
+
+    const appInstructions = 'La aplicación registra gastos con los campos name, amount, category, frequency, start_date, end_date, movement_date, payment_method, credit_card e installments.';
+
+    async function callGemini(messages) {
+        const payload = { contents: messages.map(t => ({ parts: [{ text: t }] })) };
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+            return data.candidates[0].content.parts.map(p => p.text).join('');
+        }
+        throw new Error('Respuesta inválida');
+    }
+
+    async function checkAIAvailability() {
+        try {
+            await callGemini(['ping']);
+            aiAvailable = true;
+            if (aiChatContainer) aiChatContainer.style.display = 'block';
+        } catch (e) {
+            aiAvailable = false;
+            if (aiChatContainer) aiChatContainer.style.display = 'none';
+        }
+        updateAiStatus();
+    }
+
+    function updateAiStatus() {
+        if (aiStatusLabel) aiStatusLabel.textContent = aiAvailable ? 'IA disponible' : 'IA no disponible';
+    }
+
+    function updateChatLog(role, text) {
+        if (!aiChatLog) return;
+        const div = document.createElement('div');
+        div.className = role === 'user' ? 'user-message' : 'ai-message';
+        div.textContent = text;
+        aiChatLog.appendChild(div);
+        aiChatLog.scrollTop = aiChatLog.scrollHeight;
+    }
+
+    function sendAiMessage(msg) {
+        if (!aiAvailable) return;
+        aiConversation.push({ role: 'user', text: msg });
+        updateChatLog('user', msg);
+        callGemini([appInstructions].concat(aiConversation.map(m => m.text))).then(resp => {
+            aiConversation.push({ role: 'ai', text: resp });
+            updateChatLog('ai', resp);
+        }).catch(err => updateChatLog('ai', 'Error: ' + err.message));
+    }
+
+    updateAiStatus();
     const bankProfiles = {
         falabella: {
             matchFileName: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.xlsx$/i,
@@ -1912,6 +1970,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- IMPORTACIÓN MASIVA DE GASTOS ---
     function showImportExpensesModal() {
         if (importExpensesModal) importExpensesModal.style.display = 'flex';
+        checkAIAvailability();
     }
     function closeImportExpensesModal() {
         if (importExpensesModal) importExpensesModal.style.display = 'none';
@@ -1994,7 +2053,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const bankProfileDiv = document.getElementById('bank-profile');
         if (bankProfileDiv) bankProfileDiv.style.display = 'flex';
     }
-    function renderImportTable() {
+    function renderImportTable(skipAI) {
         if (!importTableContainer) return;
         importTableContainer.innerHTML = '';
         const dateCol = mapDateSelect.value;
@@ -2012,7 +2071,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateStr = dateObj ? getISODateString(dateObj) : '';
             const desc = row[descCol] !== undefined ? String(row[descCol]) : '';
             const amt = row[amountCol];
-            const isDup = checkExpenseDuplicate(desc, dateStr, parseFloat(amt));
+            const isDup = duplicatesFromAI.has(idx) ? true : checkExpenseDuplicate(desc, dateStr, parseFloat(amt));
             const tr = document.createElement('tr');
             if (isDup) tr.classList.add('duplicate-row');
             const chkCell = tr.insertCell();
@@ -2027,6 +2086,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         table.appendChild(tbody);
         importTableContainer.appendChild(table);
+        if (aiAvailable && !skipAI) analyzeDuplicatesWithAI();
+    }
+
+    async function analyzeDuplicatesWithAI() {
+        const dateCol = mapDateSelect.value;
+        const descCol = mapDescSelect.value;
+        const amountCol = mapAmountSelect.value;
+        if (!dateCol || !descCol || !amountCol || !aiAvailable) return;
+        const existing = (currentBackupData.expenses || []).map(exp => {
+            const ds = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
+            return [exp.name, ds, parseFloat(exp.amount)];
+        });
+        const imported = parsedImportData.map(row => {
+            const dateObj = parseExcelDate(row[dateCol]);
+            const ds = dateObj ? getISODateString(dateObj) : String(row[dateCol] || '');
+            return [String(row[descCol] || ''), ds, parseFloat(row[amountCol] || 0)];
+        });
+        const prompt = `Gastos actuales: ${JSON.stringify(existing)}\nGastos importados: ${JSON.stringify(imported)}\nResponde solo con un JSON {"duplicateIndexes":[...]} indicando los indices de los gastos importados que ya existen`;
+        try {
+            const resp = await callGemini([appInstructions, prompt]);
+            const json = JSON.parse(resp.trim());
+            if (Array.isArray(json.duplicateIndexes)) {
+                duplicatesFromAI = new Set(json.duplicateIndexes.map(n => parseInt(n,10)));
+                renderImportTable(true);
+            }
+        } catch (e) {
+            console.error('AI analysis failed', e);
+        }
     }
     function handleExpenseFile(file) {
         const reader = new FileReader();
@@ -2091,6 +2178,14 @@ document.addEventListener('DOMContentLoaded', () => {
         renderExpensesTable();
         renderCashflowTable();
         closeImportExpensesModal();
+    });
+
+    if (aiChatSend) aiChatSend.addEventListener('click', () => {
+        const msg = aiChatInput.value.trim();
+        if (msg) { aiChatInput.value = ''; sendAiMessage(msg); }
+    });
+    if (aiChatInput) aiChatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); aiChatSend.click(); }
     });
 
     // --- LÓGICA PESTAÑA PRESUPUESTOS ---
