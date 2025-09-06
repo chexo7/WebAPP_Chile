@@ -100,3 +100,14 @@ La aplicación utiliza Firebase Realtime Database para almacenar todos los datos
 
 *   **Tasa de Cambio USD/CLP:** La aplicación obtiene la tasa de cambio entre USD y CLP de forma automática desde la API de CoinGecko. Esta tasa se muestra en la pestaña de "Ajustes" y es solo para fines informativos, no se almacena persistente con los datos del usuario en Firebase.
 *   **Validación de Nombres/Claves:** Para asegurar la compatibilidad con Firebase Realtime Database, los nombres de ingresos, gastos y categorías no deben contener caracteres prohibidos por Firebase para las claves (ej: `.`, `$`, `#`, `[`, `]`, `/`). La aplicación incluye validaciones para prevenir el guardado de datos con estos caracteres en nombres que podrían ser usados como claves.
+
+## Temas de Diseño
+
+Se incluyen cuatro hojas de estilo alternativas en la carpeta `themes/` que modifican la paleta de colores y tipografías de la aplicación. Para probarlas, reemplaza la referencia a `style.css` en `index.html` por el archivo deseado:
+
+- `theme-classic.css`: versión clásica (idéntica al diseño original).
+- `theme-dark.css`: esquema oscuro con tonos azules.
+- `theme-pastel.css`: colores suaves tipo pastel.
+- `theme-retro.css`: apariencia retro con fuente monoespaciada.
+
+
