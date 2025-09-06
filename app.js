@@ -110,18 +110,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const mapDateSelect = document.getElementById('map-date');
     const mapDescSelect = document.getElementById('map-description');
     const mapAmountSelect = document.getElementById('map-amount');
+    const mapInstallmentsSelect = document.getElementById('map-installments');
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const analyzeExpensesButton = document.getElementById('analyze-expenses-button');
+    const aiStatusLabel = document.getElementById('ai-status');
+    const aiChatContainer = document.getElementById('ai-chat-container');
+    const aiChatMessages = document.getElementById('ai-chat-messages');
+    const aiChatInput = document.getElementById('ai-chat-input');
+    const aiChatSend = document.getElementById('ai-chat-send');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
+    let aiAvailable = false;
+    let aiDuplicateIndexes = new Set();
     const bankProfiles = {
         falabella: {
             matchFileName: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.xlsx$/i,
             columns: { date: 'FECHA', desc: 'DESCRIPCION', amount: 'MONTO' }
         }
     };
+
+    const GEMINI_CONTEXT = `Eres un asistente para la aplicación financiera WebApp que administra gastos e ingresos.
+Al recibir encabezados de un archivo Excel y algunas filas de ejemplo debes responder solo un JSON con las claves "date", "description", "amount" e "installments".
+Indica el nombre exacto de la columna que corresponde a cada campo. Usa cadena vacía si alguna columna no existe.
+Cuando analices gastos existentes considera duplicados aquellos que coincidan en fecha y monto aunque la descripción sea distinta.
+Si hay columnas de cuotas o número de cuota, recuerda que la aplicación maneja el monto total y divide las cuotas internamente. Usa ese número para identificar movimientos en cuotas buscando si hay uno previo con el mismo monto y descripción pero con número de cuota inmediatamente anterior.`;
+
+    async function geminiRequest(text) {
+        const body = { contents: [ { parts: [ { text: GEMINI_CONTEXT + "\n" + text } ] } ] };
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error('Gemini request failed');
+        const data = await res.json();
+        return (((data.candidates || [])[0] || {}).content || {}).parts[0]?.text || '';
+    }
+
+    async function checkGeminiAvailability() {
+        try {
+            await geminiRequest('Di \"ok\"');
+            aiAvailable = true;
+            if (aiStatusLabel) aiStatusLabel.textContent = 'IA: disponible';
+        } catch(e) {
+            aiAvailable = false;
+            if (aiStatusLabel) aiStatusLabel.textContent = 'IA: no disponible';
+        }
+    }
+
+    async function analyzeDuplicatesWithAI(list) {
+        if (!aiAvailable) return [];
+        const prompt = `Lista actual: ${JSON.stringify(currentBackupData.expenses.map(e => ({name: e.name, date: e.movement_date ? getISODateString(new Date(e.movement_date)) : (e.start_date ? getISODateString(new Date(e.start_date)) : ''), amount: parseFloat(e.amount), installments: parseInt(e.installments || 1)})))}. Nuevos gastos: ${JSON.stringify(list)}. Devuelve solo un array JSON de indices de nuevos gastos que ya existen considerando duplicado si coinciden fecha y monto aunque la descripción sea distinta y tratando de emparejar cuotas consecutivas.`;
+        const reply = await geminiRequest(prompt);
+        try { return JSON.parse(reply); } catch { return []; }
+    }
 
     // --- BLOQUEO DE EDICIÓN ---
     let editLockAcquired = false;
@@ -1912,16 +1957,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- IMPORTACIÓN MASIVA DE GASTOS ---
     function showImportExpensesModal() {
         if (importExpensesModal) importExpensesModal.style.display = 'flex';
+        aiDuplicateIndexes.clear();
+        if (aiStatusLabel) aiStatusLabel.textContent = 'IA: verificando...';
+        checkGeminiAvailability();
+        if (analyzeExpensesButton) analyzeExpensesButton.style.display = 'none';
     }
     function closeImportExpensesModal() {
         if (importExpensesModal) importExpensesModal.style.display = 'none';
         parsedImportData = [];
         importHeaders = [];
+        aiDuplicateIndexes.clear();
         if (importTableContainer) importTableContainer.innerHTML = '';
         if (columnMappingDiv) columnMappingDiv.style.display = 'none';
         if (bankProfileSelect) bankProfileSelect.value = 'auto';
         const bankProfileDiv = document.getElementById('bank-profile');
         if (bankProfileDiv) bankProfileDiv.style.display = 'none';
+        if (analyzeExpensesButton) analyzeExpensesButton.style.display = 'none';
     }
     function parseExcelDate(val) {
         if (val === undefined || val === null) return null;
@@ -1947,10 +1998,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return null;
     }
-    function checkExpenseDuplicate(name, dateStr, amount) {
+    function checkExpenseDuplicate(name, dateStr, amount, inst) {
         return (currentBackupData.expenses || []).some(exp => {
             const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
-            return expDate === dateStr && exp.name === name && parseFloat(exp.amount) === parseFloat(amount);
+            if (expDate !== dateStr) return false;
+            if (parseFloat(exp.amount) !== parseFloat(amount)) return false;
+            const expInst = parseInt(exp.installments || 1);
+            const instNum = parseInt(inst || 1);
+            if (instNum > 1 && expInst === instNum - 1 && exp.name === name) return true;
+            if (exp.name === name) return true;
+            return true; // misma fecha y monto aunque nombre distinto
         });
     }
     function createCategorySelect() {
@@ -1973,16 +2030,21 @@ document.addEventListener('DOMContentLoaded', () => {
             mapDateSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.date.toLowerCase()) || '';
             mapDescSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.desc.toLowerCase()) || '';
             mapAmountSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.amount.toLowerCase()) || '';
+            if (profile.columns.installments) {
+                mapInstallmentsSelect.value = importHeaders.find(h => h.toLowerCase() === profile.columns.installments.toLowerCase()) || '';
+            }
         } else {
             mapDateSelect.value = importHeaders.find(h => /fecha/i.test(h)) || '';
             mapDescSelect.value = importHeaders.find(h => /desc/i.test(h)) || '';
             mapAmountSelect.value = importHeaders.find(h => /monto/i.test(h)) || '';
+            mapInstallmentsSelect.value = importHeaders.find(h => /cuota|cuotas|installment/i.test(h)) || '';
+            if (profileKey === 'auto') requestAIMapping();
         }
         renderImportTable();
     }
     function renderMappingSelectors() {
         if (!columnMappingDiv) return;
-        const selects = [mapDateSelect, mapDescSelect, mapAmountSelect];
+        const selects = [mapDateSelect, mapDescSelect, mapAmountSelect, mapInstallmentsSelect];
         selects.forEach(sel => { sel.innerHTML = '<option value="">--</option>'; });
         importHeaders.forEach(h => {
             selects.forEach(sel => {
@@ -1993,8 +2055,9 @@ document.addEventListener('DOMContentLoaded', () => {
         columnMappingDiv.style.display = 'flex';
         const bankProfileDiv = document.getElementById('bank-profile');
         if (bankProfileDiv) bankProfileDiv.style.display = 'flex';
+        requestAIDuplicates();
     }
-    function renderImportTable() {
+function renderImportTable() {
         if (!importTableContainer) return;
         importTableContainer.innerHTML = '';
         const dateCol = mapDateSelect.value;
@@ -2004,7 +2067,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const table = document.createElement('table');
         table.classList.add('import-preview-table');
         const thead = document.createElement('thead');
-        thead.innerHTML = '<tr><th>Importar</th><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Categoría</th><th>Duplicado?</th></tr>';
+        thead.innerHTML = '<tr><th>Importar</th><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Cuotas</th><th>Categoría</th><th>Duplicado?</th></tr>';
         table.appendChild(thead);
         const tbody = document.createElement('tbody');
         parsedImportData.forEach((row, idx) => {
@@ -2012,7 +2075,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateStr = dateObj ? getISODateString(dateObj) : '';
             const desc = row[descCol] !== undefined ? String(row[descCol]) : '';
             const amt = row[amountCol];
-            const isDup = checkExpenseDuplicate(desc, dateStr, parseFloat(amt));
+            const instCol = mapInstallmentsSelect.value;
+            const instVal = instCol ? parseInt(row[instCol] || 1) : 1;
+            const localDup = checkExpenseDuplicate(desc, dateStr, parseFloat(amt), instVal);
+            const aiDup = aiDuplicateIndexes.has(idx);
+            const isDup = localDup || aiDup;
             const tr = document.createElement('tr');
             if (isDup) tr.classList.add('duplicate-row');
             const chkCell = tr.insertCell();
@@ -2020,6 +2087,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.insertCell().textContent = dateStr || String(row[dateCol] || '');
             tr.insertCell().textContent = desc;
             tr.insertCell().textContent = amt;
+            tr.insertCell().textContent = instVal;
             const catCell = tr.insertCell();
             const sel = createCategorySelect(); sel.dataset.index = idx; catCell.appendChild(sel);
             tr.insertCell().textContent = isDup ? 'Sí' : 'No';
@@ -2027,6 +2095,53 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         table.appendChild(tbody);
         importTableContainer.appendChild(table);
+    }
+
+    async function requestAIMapping() {
+        if (!aiAvailable || !parsedImportData.length) return;
+        const sample = parsedImportData.slice(0, 3).map(row => {
+            const obj = {};
+            importHeaders.forEach(h => { obj[h] = row[h]; });
+            return obj;
+        });
+        const prompt = `Encabezados: ${JSON.stringify(importHeaders)}. Ejemplos: ${JSON.stringify(sample)}. Devuelve solo un JSON con las claves \"date\", \"description\", \"amount\" e \"installments\" indicando la columna correspondiente si existe`;
+        try {
+            const reply = await geminiRequest(prompt);
+            const mapping = JSON.parse(reply);
+            if (mapping.date && importHeaders.includes(mapping.date)) mapDateSelect.value = mapping.date;
+            if (mapping.description && importHeaders.includes(mapping.description)) mapDescSelect.value = mapping.description;
+            if (mapping.amount && importHeaders.includes(mapping.amount)) mapAmountSelect.value = mapping.amount;
+            if (mapping.installments && importHeaders.includes(mapping.installments)) mapInstallmentsSelect.value = mapping.installments;
+        } catch(e) {
+            console.error('AI mapping error', e);
+        }
+        renderImportTable();
+        requestAIDuplicates();
+    }
+
+    async function requestAIDuplicates() {
+        if (!aiAvailable) { renderImportTable(); return; }
+        const dateCol = mapDateSelect.value;
+        const descCol = mapDescSelect.value;
+        const amountCol = mapAmountSelect.value;
+        const instCol = mapInstallmentsSelect.value;
+        if (!dateCol || !descCol || !amountCol) { renderImportTable(); return; }
+        const list = parsedImportData.map((row, idx) => {
+            const dateObj = parseExcelDate(row[dateCol]);
+            const dateStr = dateObj ? getISODateString(dateObj) : '';
+            const desc = row[descCol] !== undefined ? String(row[descCol]) : '';
+            const amt = parseFloat(row[amountCol] || 0);
+            const instVal = instCol ? parseInt(row[instCol] || 1) : 1;
+            return { index: idx, name: desc, date: dateStr, amount: amt, installments: instVal };
+        });
+        try {
+            const dups = await analyzeDuplicatesWithAI(list);
+            aiDuplicateIndexes = new Set(dups);
+        } catch(e) {
+            console.error(e);
+            aiDuplicateIndexes = new Set();
+        }
+        renderImportTable();
     }
     function handleExpenseFile(file) {
         const reader = new FileReader();
@@ -2049,9 +2164,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             if (bankProfileSelect) bankProfileSelect.value = detected;
-            renderMappingSelectors();
+            if (analyzeExpensesButton) analyzeExpensesButton.style.display = 'block';
+            if (columnMappingDiv) columnMappingDiv.style.display = 'none';
+            if (document.getElementById('bank-profile')) document.getElementById('bank-profile').style.display = 'none';
+            if (importTableContainer) importTableContainer.innerHTML = '';
         };
         reader.readAsArrayBuffer(file);
+    }
+
+    function analyzeImportedData() {
+        if (analyzeExpensesButton) analyzeExpensesButton.style.display = 'none';
+        renderMappingSelectors();
     }
 
     openImportExpensesButtons.forEach(btn => btn.addEventListener("click", showImportExpensesModal));
@@ -2064,14 +2187,17 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseDropZone.addEventListener('drop', e => { e.preventDefault(); expenseDropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleExpenseFile(e.dataTransfer.files[0]); });
     }
     if (expenseFileInput) expenseFileInput.addEventListener('change', e => { if (e.target.files[0]) handleExpenseFile(e.target.files[0]); });
-    if (mapDateSelect) mapDateSelect.addEventListener('change', renderImportTable);
-    if (mapDescSelect) mapDescSelect.addEventListener('change', renderImportTable);
-    if (mapAmountSelect) mapAmountSelect.addEventListener('change', renderImportTable);
-    if (bankProfileSelect) bankProfileSelect.addEventListener('change', () => applyBankProfile(bankProfileSelect.value));
+    if (analyzeExpensesButton) analyzeExpensesButton.addEventListener('click', analyzeImportedData);
+    if (mapDateSelect) mapDateSelect.addEventListener('change', requestAIDuplicates);
+    if (mapDescSelect) mapDescSelect.addEventListener('change', requestAIDuplicates);
+    if (mapAmountSelect) mapAmountSelect.addEventListener('change', requestAIDuplicates);
+    if (mapInstallmentsSelect) mapInstallmentsSelect.addEventListener('change', requestAIDuplicates);
+    if (bankProfileSelect) bankProfileSelect.addEventListener('change', () => { applyBankProfile(bankProfileSelect.value); requestAIDuplicates(); });
     if (mergeExpensesButton) mergeExpensesButton.addEventListener('click', () => {
         const dateCol = mapDateSelect.value;
         const descCol = mapDescSelect.value;
         const amountCol = mapAmountSelect.value;
+        const instCol = mapInstallmentsSelect.value;
         if (!dateCol || !descCol || !amountCol) { alert('Mapea las columnas requeridas'); return; }
         const checkboxes = importTableContainer ? importTableContainer.querySelectorAll('input[type="checkbox"][data-index]') : [];
         checkboxes.forEach(chk => {
@@ -2081,9 +2207,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dateObj = parseExcelDate(row[dateCol]);
                 const desc = row[descCol] !== undefined ? String(row[descCol]) : '';
                 const amt = parseFloat(row[amountCol] || 0);
+                const inst = instCol ? parseInt(row[instCol] || 1) : 1;
                 const catSel = importTableContainer.querySelector(`select[data-index="${idx}"]`);
                 const cat = catSel ? catSel.value : '';
-                const entry = { name: desc, amount: amt, category: cat, type: currentBackupData.expense_categories[cat] || 'Variable', frequency: 'Único', start_date: dateObj, end_date: null, is_real: true, movement_date: dateObj, payment_method: 'Efectivo', credit_card: null, installments: 1 };
+                const entry = { name: desc, amount: amt, category: cat, type: currentBackupData.expense_categories[cat] || 'Variable', frequency: 'Único', start_date: dateObj, end_date: null, is_real: true, movement_date: dateObj, payment_method: 'Efectivo', credit_card: null, installments: inst };
                 if (!currentBackupData.expenses) currentBackupData.expenses = [];
                 currentBackupData.expenses.push(entry);
             }
@@ -2092,6 +2219,28 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCashflowTable();
         closeImportExpensesModal();
     });
+
+    async function sendAIChat() {
+        const text = aiChatInput.value.trim();
+        if (!text) return;
+        const msgDiv = document.createElement('div');
+        msgDiv.textContent = 'Tú: ' + text;
+        aiChatMessages.appendChild(msgDiv);
+        aiChatInput.value = '';
+        try {
+            const reply = await geminiRequest(text);
+            const rDiv = document.createElement('div');
+            rDiv.textContent = 'IA: ' + reply;
+            aiChatMessages.appendChild(rDiv);
+            aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
+        } catch(e) {
+            const errDiv = document.createElement('div');
+            errDiv.textContent = 'IA sin respuesta';
+            aiChatMessages.appendChild(errDiv);
+        }
+    }
+    if (aiChatSend) aiChatSend.addEventListener('click', sendAIChat);
+    if (aiChatInput) aiChatInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendAIChat(); } });
 
     // --- LÓGICA PESTAÑA PRESUPUESTOS ---
     function resetBudgetForm() {
