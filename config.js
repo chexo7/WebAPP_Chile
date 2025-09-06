@@ -30,6 +30,9 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const database = firebase.database();
 
+// Clave para acceder a la API de Gemini
+const GEMINI_API_KEY = "AIzaSyB_IazCUbRrYp96Em5s3z5MXXfBEbCC86o";
+
 // --- Funciones de utilidad ---
 
 /**
