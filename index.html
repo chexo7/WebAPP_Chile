@@ -500,8 +500,10 @@
                 <div class="modal-content">
                     <span id="import-expenses-modal-close" class="modal-close">&times;</span>
                     <h3>Importar Gastos desde Excel</h3>
+                    <p id="ai-status">IA: verificando...</p>
                     <div id="expense-drop-zone">Arrastra el archivo .xlsx aquí o haz clic para seleccionar</div>
                     <input type="file" id="expense-file-input" accept=".xlsx,.xls" style="display:none;">
+                    <button type="button" id="process-import-button" class="accent" style="display:none;">Procesar Archivo</button>
                     <div id="bank-profile" style="display:none;">
                         <label>Perfil<select id="import-bank-profile">
                             <option value="auto">Automático</option>
@@ -515,6 +517,13 @@
                     </div>
                     <div id="import-table-container"></div>
                     <button type="button" id="merge-expenses-button" class="accent">Unir</button>
+                    <div id="ai-chat-container">
+                        <div id="ai-chat-messages" class="chat-messages"></div>
+                        <div class="chat-input-group">
+                            <input type="text" id="ai-chat-input" placeholder="Pregunta a la IA">
+                            <button type="button" id="ai-chat-send">Enviar</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
