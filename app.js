@@ -1529,6 +1529,65 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
+    function getSearchContext(inputElement) {
+        const term = (inputElement && typeof inputElement.value === 'string') ? inputElement.value.toLowerCase() : '';
+        return {
+            term,
+            numericTerm: term.replace(/[^0-9]/g, '')
+        };
+    }
+
+    function matchesSearch(searchContext, stringValues = [], numericValues = []) {
+        const { term, numericTerm } = searchContext;
+        if (!term) return true;
+        const normalizedStrings = Array.isArray(stringValues) ? stringValues : [stringValues];
+        const normalizedNumeric = Array.isArray(numericValues) ? numericValues : [numericValues];
+        const stringMatch = normalizedStrings.some(value => {
+            if (value === null || value === undefined) return false;
+            return value.toString().toLowerCase().includes(term);
+        });
+        if (stringMatch) return true;
+        if (!numericTerm) return false;
+        return normalizedNumeric.some(value => {
+            if (value === null || value === undefined) return false;
+            return value.toString().includes(numericTerm);
+        });
+    }
+
+    function filterItemsWithIndex(items, searchInput, extractor) {
+        const searchContext = getSearchContext(searchInput);
+        if (!Array.isArray(items)) return [];
+        return items.reduce((acc, item, index) => {
+            const extracted = extractor ? extractor(item) : {};
+            const stringValues = extracted && (extracted.strings || extracted.stringValues) || [];
+            const numericValues = extracted && (extracted.numeric || extracted.numericValues) || [];
+            if (matchesSearch(searchContext, stringValues, numericValues)) {
+                acc.push({ item, index });
+            }
+            return acc;
+        }, []);
+    }
+
+    function appendActionButtons(row, onEdit, onDelete) {
+        const actionsCell = row.insertCell();
+        if (typeof onEdit === 'function') {
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Editar';
+            editButton.classList.add('small-button');
+            editButton.onclick = onEdit;
+            actionsCell.appendChild(editButton);
+        }
+        if (typeof onDelete === 'function') {
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Eliminar';
+            deleteButton.classList.add('small-button', 'danger');
+            deleteButton.onclick = onDelete;
+            actionsCell.appendChild(deleteButton);
+        }
+        return actionsCell;
+    }
+
+
     incomeForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const name = incomeNameInput.value.trim();
@@ -1590,42 +1649,39 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderIncomesTable() {
         if (!incomesTableView || !currentBackupData || !currentBackupData.incomes) return;
         incomesTableView.innerHTML = '';
-        const searchTerm = searchIncomeInput.value.toLowerCase();
-        const numericTerm = searchTerm.replace(/[^0-9]/g, '');
-        const filteredIncomes = currentBackupData.incomes.filter(income => {
-            const amountStr = formatCurrencyJS(income.net_monthly, currentBackupData.display_currency_symbol || '$');
-            const amountLower = amountStr.toLowerCase();
-            const amountNumeric = amountStr.replace(/[^0-9]/g, '');
-            return (
-                income.name.toLowerCase().includes(searchTerm) ||
-                amountLower.includes(searchTerm) ||
-                (numericTerm && amountNumeric.includes(numericTerm)) ||
-                income.frequency.toLowerCase().includes(searchTerm) ||
-                (income.is_reimbursement && "reembolso".includes(searchTerm))
-            );
+        const currencySymbol = currentBackupData.display_currency_symbol || '$';
+        const filteredIncomes = filterItemsWithIndex(currentBackupData.incomes, searchIncomeInput, (income) => {
+            const amountStr = formatCurrencyJS(income.net_monthly, currencySymbol);
+            return {
+                strings: [
+                    income.name,
+                    amountStr,
+                    income.frequency,
+                    income.is_reimbursement ? 'reembolso' : null,
+                    income.is_reimbursement ? income.reimbursement_category : null
+                ],
+                numeric: [amountStr.replace(/[^0-9]/g, '')]
+            };
         });
-        filteredIncomes.forEach((income) => {
-            const originalIndex = currentBackupData.incomes.findIndex(inc => inc === income);
+
+        filteredIncomes.forEach(({ item: income, index }) => {
             const row = incomesTableView.insertRow();
             row.insertCell().textContent = income.name;
-            row.insertCell().textContent = formatCurrencyJS(income.net_monthly, currentBackupData.display_currency_symbol || '$');
+            row.insertCell().textContent = formatCurrencyJS(income.net_monthly, currencySymbol);
             row.insertCell().textContent = income.frequency;
             row.insertCell().textContent = income.start_date ? getISODateString(new Date(income.start_date)) : 'N/A';
             row.insertCell().textContent = income.end_date ? getISODateString(new Date(income.end_date)) : (income.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
 
             const typeCell = row.insertCell();
             if (income.is_reimbursement) {
-                typeCell.innerHTML = `Reembolso <span class="reimbursement-icon" title="Reembolso de ${income.reimbursement_category || 'N/A'}">↺</span>`;
+                const reimbursementCategory = income.reimbursement_category || 'N/A';
+                typeCell.innerHTML = `Reembolso <span class="reimbursement-icon" title="Reembolso de ${reimbursementCategory}">↺</span>`;
                 typeCell.classList.add('reimbursement-income');
             } else {
                 typeCell.textContent = 'Ingreso Regular';
             }
 
-            const actionsCell = row.insertCell();
-            const editButton = document.createElement('button'); editButton.textContent = 'Editar'; editButton.classList.add('small-button');
-            editButton.onclick = () => loadIncomeForEdit(originalIndex); actionsCell.appendChild(editButton);
-            const deleteButton = document.createElement('button'); deleteButton.textContent = 'Eliminar'; deleteButton.classList.add('small-button', 'danger');
-            deleteButton.onclick = () => deleteIncome(originalIndex); actionsCell.appendChild(deleteButton);
+            appendActionButtons(row, () => loadIncomeForEdit(index), () => deleteIncome(index));
         });
     }
     searchIncomeInput.addEventListener('input', renderIncomesTable);
@@ -1828,22 +1884,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderExpensesTable() {
         if (!expensesTableView || !currentBackupData || !currentBackupData.expenses) return;
         expensesTableView.innerHTML = '';
-        const searchTerm = searchExpenseInput.value.toLowerCase();
-        const numericTerm = searchTerm.replace(/[^0-9]/g, '');
-        const filteredExpenses = currentBackupData.expenses.filter(expense => {
-            const amountStr = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$');
-            const amountLower = amountStr.toLowerCase();
-            const amountNumeric = amountStr.replace(/[^0-9]/g, '');
-            return (
-                expense.name.toLowerCase().includes(searchTerm) ||
-                amountLower.includes(searchTerm) ||
-                (numericTerm && amountNumeric.includes(numericTerm)) ||
-                expense.category.toLowerCase().includes(searchTerm) ||
-                expense.frequency.toLowerCase().includes(searchTerm)
-            );
+        const currencySymbol = currentBackupData.display_currency_symbol || '$';
+        const filteredExpenses = filterItemsWithIndex(currentBackupData.expenses, searchExpenseInput, (expense) => {
+            const amountStr = formatCurrencyJS(expense.amount, currencySymbol);
+            return {
+                strings: [
+                    expense.name,
+                    amountStr,
+                    expense.category,
+                    expense.frequency,
+                    expense.payment_method === 'Credito' ? 'tarjeta' : 'efectivo'
+                ],
+                numeric: [amountStr.replace(/[^0-9]/g, '')]
+            };
         });
-        filteredExpenses.forEach((expense) => {
-            const originalIndex = currentBackupData.expenses.findIndex(exp => exp === expense);
+        filteredExpenses.forEach(({ item: expense, index }) => {
             const row = expensesTableView.insertRow();
             const nameCell = row.insertCell();
             const nameDiv = document.createElement('div');
@@ -1851,7 +1906,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nameDiv.classList.add('name-scroll');
             nameCell.classList.add('expense-name-cell');
             nameCell.appendChild(nameDiv);
-            row.insertCell().textContent = formatCurrencyJS(expense.amount, currentBackupData.display_currency_symbol || '$');
+            row.insertCell().textContent = formatCurrencyJS(expense.amount, currencySymbol);
             row.insertCell().textContent = expense.category;
             row.insertCell().textContent = expense.frequency;
             row.insertCell().textContent = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A');
@@ -1859,11 +1914,7 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = expense.end_date ? getISODateString(new Date(expense.end_date)) : (expense.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
             row.insertCell().textContent = expense.payment_method === 'Credito' ? 'Tarjeta' : 'Efectivo';
             row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
-            const actionsCell = row.insertCell();
-            const editButton = document.createElement('button'); editButton.textContent = 'Editar'; editButton.classList.add('small-button');
-            editButton.onclick = () => loadExpenseForEdit(originalIndex); actionsCell.appendChild(editButton);
-            const deleteButton = document.createElement('button'); deleteButton.textContent = 'Eliminar'; deleteButton.classList.add('small-button', 'danger');
-            deleteButton.onclick = () => deleteExpense(originalIndex); actionsCell.appendChild(deleteButton);
+            appendActionButtons(row, () => loadExpenseForEdit(index), () => deleteExpense(index));
         });
     }
     searchExpenseInput.addEventListener('input', renderExpensesTable);
