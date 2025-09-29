@@ -18,6 +18,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return globalCategoryColors[cat];
     }
+
+    function toUTCDate(value, fallback = null) {
+        if (value instanceof Date) {
+            return value;
+        }
+        if (value === null || value === undefined || value === '') {
+            return fallback;
+        }
+        if (typeof value === 'string') {
+            const normalized = value.includes('T') ? value : `${value}T00:00:00Z`;
+            const date = new Date(normalized);
+            return isNaN(date.getTime()) ? fallback : date;
+        }
+        const date = new Date(value);
+        return isNaN(date.getTime()) ? fallback : date;
+    }
+
+    function setElementDisplay(element, displayValue) {
+        if (element) {
+            element.style.display = displayValue;
+        }
+    }
+
+    function showElement(element, displayValue = 'block') {
+        setElementDisplay(element, displayValue);
+    }
+
+    function hideElement(element) {
+        setElementDisplay(element, 'none');
+    }
     // --- ELEMENTOS GLOBALES ---
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
@@ -356,12 +386,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- LÓGICA DE UI ---
     function showLoginScreen() {
-        authContainer.style.display = 'block';
-        loginForm.style.display = 'block';
-        logoutArea.style.display = 'none';
-        dataSelectionContainer.style.display = 'none';
-        mainContentContainer.style.display = 'none';
-        loginError.style.display = 'none';
+        showElement(authContainer);
+        showElement(loginForm);
+        hideElement(logoutArea);
+        hideElement(dataSelectionContainer);
+        hideElement(mainContentContainer);
+        hideElement(loginError);
         loginError.textContent = '';
         clearAllDataViews();
         currentBackupData = null;
@@ -400,24 +430,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function showDataSelectionScreen(user) {
-        authContainer.style.display = 'block';
-        loginForm.style.display = 'none';
-        logoutArea.style.display = 'block';
+        showElement(authContainer);
+        hideElement(loginForm);
+        showElement(logoutArea);
         authStatus.textContent = `Conectado como: ${user.email}`;
-        dataSelectionContainer.style.display = 'none';
-        mainContentContainer.style.display = 'none';
+        hideElement(dataSelectionContainer);
+        hideElement(mainContentContainer);
 
         const locked = await acquireEditLock(user);
         if (!locked) {
             authStatus.textContent = 'Otro usuario está editando los datos en este momento.';
             return;
         }
-        dataSelectionContainer.style.display = 'block';
+        showElement(dataSelectionContainer);
         fetchBackups();
     }
 
     function showMainContentScreen() {
-        mainContentContainer.style.display = 'block';
+        showElement(mainContentContainer);
         activateTab('log'); // Activate Log tab by default
         fetchAndUpdateUSDCLPRate(); // Fetch USD/CLP rate when main content is shown
         if (typeof updatePieMonthChart === 'function') updatePieMonthChart();
@@ -467,12 +497,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const email = emailInput.value;
         const password = passwordInput.value;
         authStatus.textContent = "Ingresando...";
-        loginError.style.display = 'none';
+        hideElement(loginError);
         loginError.textContent = '';
         auth.signInWithEmailAndPassword(email, password)
             .catch(error => {
                 loginError.textContent = 'Usuario o contraseña incorrectos.';
-                loginError.style.display = 'block';
+                showElement(loginError);
                 authStatus.textContent = '';
             });
     });
@@ -513,12 +543,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const userRef = getUserDataRef();
         if (!userRef) {
             loadingMessage.textContent = "Error: No se pudo obtener la referencia de datos del usuario.";
-            loadingMessage.style.display = 'block';
+            showElement(loadingMessage);
             return;
         }
 
         loadingMessage.textContent = "Cargando lista de versiones...";
-        loadingMessage.style.display = 'block';
+        showElement(loadingMessage);
         loadLatestVersionButton.disabled = true;
 
         // MODIFICADO: Apunta a `users/${userSubPath}/backups` y limita a las 10 últimas versiones
@@ -543,7 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     return;
                 }
-                loadingMessage.style.display = 'none';
+                hideElement(loadingMessage);
             })
             .catch(error => {
                 console.error("Error fetching backups:", error);
@@ -584,8 +614,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         loadingMessage.textContent = `Cargando datos de la versión: ${formatBackupKey(key)}...`;
-        loadingMessage.style.display = 'block';
-        mainContentContainer.style.display = 'none';
+        showElement(loadingMessage);
+        hideElement(mainContentContainer);
         clearAllDataViews();
         originalLoadedData = null;
 
@@ -628,7 +658,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentBackupData.change_log = changeLogEntries;
 
 
-                    currentBackupData.analysis_start_date = currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date + 'T00:00:00Z') : new Date();
+                    currentBackupData.analysis_start_date = toUTCDate(currentBackupData.analysis_start_date, new Date());
                     currentBackupData.analysis_duration = parseInt(currentBackupData.analysis_duration, 10) || 12;
                     currentBackupData.analysis_periodicity = currentBackupData.analysis_periodicity || "Mensual";
                     currentBackupData.analysis_initial_balance = parseFloat(currentBackupData.analysis_initial_balance) || 0;
@@ -636,13 +666,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentBackupData.use_instant_expenses = !!currentBackupData.use_instant_expenses;
 
                     (currentBackupData.incomes || []).forEach(inc => {
-                        if (inc.start_date) inc.start_date = new Date(inc.start_date + 'T00:00:00Z');
-                        if (inc.end_date) inc.end_date = new Date(inc.end_date + 'T00:00:00Z');
+                        if (inc.start_date) inc.start_date = toUTCDate(inc.start_date);
+                        if (inc.end_date) inc.end_date = toUTCDate(inc.end_date);
                     });
                     (currentBackupData.expenses || []).forEach(exp => {
-                        if (exp.start_date) exp.start_date = new Date(exp.start_date + 'T00:00:00Z');
-                        if (exp.end_date) exp.end_date = new Date(exp.end_date + 'T00:00:00Z');
-                        if (exp.movement_date) exp.movement_date = new Date(exp.movement_date + 'T00:00:00Z');
+                        if (exp.start_date) exp.start_date = toUTCDate(exp.start_date);
+                        if (exp.end_date) exp.end_date = toUTCDate(exp.end_date);
+                        if (exp.movement_date) exp.movement_date = toUTCDate(exp.movement_date);
                         else exp.movement_date = exp.start_date;
                         if (!exp.payment_method) exp.payment_method = 'Efectivo';
                     });
@@ -720,7 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     showMainContentScreen();
                 }
-                loadingMessage.style.display = 'none';
+                hideElement(loadingMessage);
             })
             .catch(error => {
                 console.error("Error loading backup data:", error);
@@ -1099,25 +1129,25 @@ document.addEventListener('DOMContentLoaded', () => {
         dataToSave.change_log = changeLogEntries;
 
         loadingMessage.textContent = "Guardando cambios como nueva versión...";
-        loadingMessage.style.display = 'block';
+        showElement(loadingMessage);
 
         // MODIFICADO: Apunta a `users/${userSubPath}/backups/${newBackupKey}`
         userRef.child(`backups/${newBackupKey}`).set(dataToSave)
             .then(() => {
-                loadingMessage.style.display = 'none';
+                hideElement(loadingMessage);
                 alert(`Cambios guardados exitosamente como nueva versión: ${formatBackupKey(newBackupKey)}`);
 
                 currentBackupKey = newBackupKey;
                 currentBackupData = JSON.parse(JSON.stringify(dataToSave));
 
-                currentBackupData.analysis_start_date = new Date(currentBackupData.analysis_start_date + 'T00:00:00Z');
+                currentBackupData.analysis_start_date = toUTCDate(currentBackupData.analysis_start_date);
                 (currentBackupData.incomes || []).forEach(inc => {
-                    if (inc.start_date) inc.start_date = new Date(inc.start_date + 'T00:00:00Z');
-                    if (inc.end_date) inc.end_date = new Date(inc.end_date + 'T00:00:00Z');
+                    if (inc.start_date) inc.start_date = toUTCDate(inc.start_date);
+                    if (inc.end_date) inc.end_date = toUTCDate(inc.end_date);
                 });
                 (currentBackupData.expenses || []).forEach(exp => {
-                    if (exp.start_date) exp.start_date = new Date(exp.start_date + 'T00:00:00Z');
-                    if (exp.end_date) exp.end_date = new Date(exp.end_date + 'T00:00:00Z');
+                    if (exp.start_date) exp.start_date = toUTCDate(exp.start_date);
+                    if (exp.end_date) exp.end_date = toUTCDate(exp.end_date);
                 });
                 originalLoadedData = JSON.parse(JSON.stringify(currentBackupData));
 
@@ -1127,7 +1157,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderLogTab();
             })
             .catch(error => {
-                loadingMessage.style.display = 'none';
+                hideElement(loadingMessage);
                 console.error("Error saving new version:", error);
                 alert(`Error al guardar la nueva versión: ${error.message}`);
                 changeLogEntries.shift();
@@ -1179,8 +1209,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const activeBtn = cashflowSubtabs.querySelector(`.subtab-button[data-period="${periodicity}"]`);
             if (activeBtn) activeBtn.classList.add('active');
             if (cashflowMensualContainer && cashflowSemanalContainer) {
-                cashflowMensualContainer.style.display = periodicity === 'Mensual' ? 'block' : 'none';
-                cashflowSemanalContainer.style.display = periodicity === 'Semanal' ? 'block' : 'none';
+                setElementDisplay(cashflowMensualContainer, periodicity === 'Mensual' ? 'block' : 'none');
+                setElementDisplay(cashflowSemanalContainer, periodicity === 'Semanal' ? 'block' : 'none');
             }
             renderCashflowTable();
         }
@@ -1190,8 +1220,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (activeBtn) activeBtn.classList.add('active');
             if (graficoTitle) graficoTitle.textContent = `Gráfico de Flujo de Caja - ${periodicity}`;
             if (pieMonthContainer && pieWeekContainer) {
-                pieMonthContainer.style.display = periodicity === 'Mensual' ? 'block' : 'none';
-                pieWeekContainer.style.display = periodicity === 'Semanal' ? 'block' : 'none';
+                setElementDisplay(pieMonthContainer, periodicity === 'Mensual' ? 'block' : 'none');
+                setElementDisplay(pieWeekContainer, periodicity === 'Semanal' ? 'block' : 'none');
             }
             if (periodicity === 'Mensual' && typeof updatePieMonthChart === 'function') updatePieMonthChart();
             if (periodicity === 'Semanal' && typeof updatePieWeekChart === 'function') updatePieWeekChart();
@@ -1374,9 +1404,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateExpensePaymentDate() {
         const movValue = expenseMovementDateInput.value;
         const isCredit = expensePaymentMethodSelect.value === 'Credito';
-        if (expensePaymentDateContainer) expensePaymentDateContainer.style.display = isCredit ? 'block' : 'none';
+        setElementDisplay(expensePaymentDateContainer, isCredit ? 'block' : 'none');
         if (!movValue) { expenseStartDateInput.value = ''; return; }
-        const movDate = new Date(movValue + 'T00:00:00Z');
+        const movDate = toUTCDate(movValue);
         if (!isCredit) {
             expenseStartDateInput.value = movValue;
         } else {
@@ -1398,7 +1428,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applySettingsButton.addEventListener('click', () => {
         if (!currentBackupData) { alert("No hay datos cargados para aplicar ajustes."); return; }
         currentBackupData.analysis_duration = parseInt(analysisDurationInput.value, 10);
-        currentBackupData.analysis_start_date = new Date(analysisStartDateInput.value + 'T00:00:00Z');
+        currentBackupData.analysis_start_date = toUTCDate(analysisStartDateInput.value);
         currentBackupData.analysis_initial_balance = parseFloat(analysisInitialBalanceInput.value);
         currentBackupData.display_currency_symbol = displayCurrencySymbolInput.value.trim() || "$";
         currentBackupData.use_instant_expenses = instantExpenseToggle ? instantExpenseToggle.checked : false;
@@ -1469,7 +1499,7 @@ document.addEventListener('DOMContentLoaded', () => {
         creditCardCutoffInput.value = card.cutoff_day;
         creditCardPaymentDayInput.value = card.payment_day;
         addCreditCardButton.textContent = 'Guardar Cambios';
-        cancelEditCreditCardButton.style.display = 'inline-block';
+        showElement(cancelEditCreditCardButton, 'inline-block');
         editingCreditCardIndex = index;
         updateCreditCardExample();
         document.getElementById('ajustes').scrollIntoView({ behavior: 'smooth' });
@@ -1481,7 +1511,7 @@ document.addEventListener('DOMContentLoaded', () => {
         creditCardCutoffInput.value = '';
         creditCardPaymentDayInput.value = '';
         addCreditCardButton.textContent = 'Agregar Tarjeta';
-        cancelEditCreditCardButton.style.display = 'none';
+        hideElement(cancelEditCreditCardButton);
         editingCreditCardIndex = null;
         updateCreditCardExample();
     }
@@ -1499,7 +1529,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     incomeIsReimbursementCheckbox.addEventListener('change', () => {
-        incomeReimbursementCategoryContainer.style.display = incomeIsReimbursementCheckbox.checked ? 'block' : 'none';
+        setElementDisplay(incomeReimbursementCategoryContainer, incomeIsReimbursementCheckbox.checked ? 'block' : 'none');
         if (incomeIsReimbursementCheckbox.checked) {
             populateIncomeReimbursementCategoriesDropdown();
         } else {
@@ -1603,9 +1633,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isReimbursement && !reimbursementCategory) { alert("Si es un reembolso, debe seleccionar una categoría de gasto a reembolsar."); return; }
 
 
-        const startDate = startDateValue ? new Date(startDateValue + 'T00:00:00Z') : null;
+        const startDate = toUTCDate(startDateValue);
         const isOngoing = incomeOngoingCheckbox.checked;
-        const endDate = (frequency === 'Único' || isOngoing || !endDateValue) ? null : new Date(endDateValue + 'T00:00:00Z');
+        const endDate = (frequency === 'Único' || isOngoing || !endDateValue) ? null : toUTCDate(endDateValue);
 
         if (isNaN(amount) || !startDate) { alert("Por favor, completa los campos obligatorios (Nombre, Monto, Fecha Inicio)."); return; }
         if (endDate && startDate && endDate < startDate) { alert("La fecha de fin no puede ser anterior a la fecha de inicio."); return; }
@@ -1636,11 +1666,11 @@ document.addEventListener('DOMContentLoaded', () => {
         incomeFrequencySelect.value = 'Mensual';
 
         incomeIsReimbursementCheckbox.checked = false;
-        incomeReimbursementCategoryContainer.style.display = 'none';
+        hideElement(incomeReimbursementCategoryContainer);
         incomeReimbursementCategorySelect.value = '';
 
         addIncomeButton.textContent = 'Agregar Ingreso';
-        cancelEditIncomeButton.style.display = 'none';
+        hideElement(cancelEditIncomeButton);
         editingIncomeIndex = null;
         incomeStartDateInput.value = getISODateString(currentBackupData && currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
     }
@@ -1707,13 +1737,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (incomeIsReimbursementCheckbox.checked) {
             populateIncomeReimbursementCategoriesDropdown();
             incomeReimbursementCategorySelect.value = income.reimbursement_category || '';
-            incomeReimbursementCategoryContainer.style.display = 'block';
+            showElement(incomeReimbursementCategoryContainer);
         } else {
             incomeReimbursementCategorySelect.value = '';
-            incomeReimbursementCategoryContainer.style.display = 'none';
+            hideElement(incomeReimbursementCategoryContainer);
         }
 
-        addIncomeButton.textContent = 'Guardar Cambios'; cancelEditIncomeButton.style.display = 'inline-block';
+        addIncomeButton.textContent = 'Guardar Cambios'; showElement(cancelEditIncomeButton, 'inline-block');
         editingIncomeIndex = index; document.getElementById('ingresos').scrollIntoView({ behavior: 'smooth' });
     }
 
@@ -1739,9 +1769,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     expensePaymentMethodSelect.addEventListener('change', () => {
         const isCredit = expensePaymentMethodSelect.value === 'Credito';
-        expenseCreditCardContainer.style.display = isCredit ? 'block' : 'none';
-        expensePaymentDateContainer.style.display = isCredit ? 'block' : 'none';
-        if (expenseInstallmentsContainer) expenseInstallmentsContainer.style.display = isCredit ? 'block' : 'none';
+        setElementDisplay(expenseCreditCardContainer, isCredit ? 'block' : 'none');
+        setElementDisplay(expensePaymentDateContainer, isCredit ? 'block' : 'none');
+        if (expenseInstallmentsContainer) setElementDisplay(expenseInstallmentsContainer, isCredit ? 'block' : 'none');
         updateExpensePaymentDate();
     });
     expenseMovementDateInput.addEventListener('change', updateExpensePaymentDate);
@@ -1824,9 +1854,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!category) { alert("Selecciona una categoría."); return; }
         if (!isFirebaseKeySafe(category)) { alert(`Categoría "${category}" con nombre no permitido.`); return; }
 
-        const startDate = startDateValue ? new Date(startDateValue + 'T00:00:00Z') : null;
+        const startDate = toUTCDate(startDateValue);
         const isOngoing = expenseOngoingCheckbox.checked;
-        const endDate = (frequency === 'Único' || isOngoing || !endDateValue) ? null : new Date(endDateValue + 'T00:00:00Z');
+        const endDate = (frequency === 'Único' || isOngoing || !endDateValue) ? null : toUTCDate(endDateValue);
         const installments = parseInt(expenseInstallmentsInput ? expenseInstallmentsInput.value : '1', 10) || 1;
         const isReal = expenseIsRealCheckbox.checked;
 
@@ -1834,7 +1864,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (endDate && startDate && endDate < startDate) { alert("Fecha de fin no puede ser anterior a fecha de inicio."); return; }
 
         const expenseType = currentBackupData.expense_categories[category] || "Variable";
-        const movementDate = expenseMovementDateInput.value ? new Date(expenseMovementDateInput.value + 'T00:00:00Z') : startDate;
+        const movementDate = expenseMovementDateInput.value ? toUTCDate(expenseMovementDateInput.value) : startDate;
         const paymentMethod = expensePaymentMethodSelect.value;
         const creditCard = paymentMethod === 'Credito' ? expenseCreditCardSelect.value : null;
         const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal, movement_date: movementDate, payment_method: paymentMethod, credit_card: creditCard, installments };
@@ -1873,7 +1903,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (expenseCategorySelect.options.length > 1) expenseCategorySelect.selectedIndex = 1;
         }
         addExpenseButton.textContent = 'Agregar Gasto';
-        cancelEditExpenseButton.style.display = 'none';
+        hideElement(cancelEditExpenseButton);
         editingExpenseIndex = null;
         const defaultDate = getISODateString(new Date());
         expenseMovementDateInput.value = defaultDate;
@@ -1927,9 +1957,9 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseIsRealCheckbox.checked = expense.is_real !== undefined ? expense.is_real : true;
         expensePaymentMethodSelect.value = expense.payment_method || 'Credito';
         const isCreditEdit = expensePaymentMethodSelect.value === 'Credito';
-        expenseCreditCardContainer.style.display = isCreditEdit ? 'block' : 'none';
-        expensePaymentDateContainer.style.display = isCreditEdit ? 'block' : 'none';
-        if (expenseInstallmentsContainer) expenseInstallmentsContainer.style.display = isCreditEdit ? 'block' : 'none';
+        setElementDisplay(expenseCreditCardContainer, isCreditEdit ? 'block' : 'none');
+        setElementDisplay(expensePaymentDateContainer, isCreditEdit ? 'block' : 'none');
+        if (expenseInstallmentsContainer) setElementDisplay(expenseInstallmentsContainer, isCreditEdit ? 'block' : 'none');
         if (expenseInstallmentsInput) expenseInstallmentsInput.value = expense.installments || 1;
         if (expense.credit_card) {
             expenseCreditCardSelect.value = expense.credit_card;
@@ -1946,7 +1976,7 @@ document.addEventListener('DOMContentLoaded', () => {
             expenseEndDateInput.value = expense.end_date ? getISODateString(new Date(expense.end_date)) : '';
             expenseEndDateInput.disabled = expenseOngoingCheckbox.checked;
         }
-        addExpenseButton.textContent = 'Guardar Cambios'; cancelEditExpenseButton.style.display = 'inline-block';
+        addExpenseButton.textContent = 'Guardar Cambios'; showElement(cancelEditExpenseButton, 'inline-block');
         editingExpenseIndex = index; document.getElementById('gastos').scrollIntoView({ behavior: 'smooth' });
         updateExpensePaymentDate();
         updateRemoveCategoryButtonState();
@@ -1962,17 +1992,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- IMPORTACIÓN MASIVA DE GASTOS ---
     function showImportExpensesModal() {
-        if (importExpensesModal) importExpensesModal.style.display = 'flex';
+        if (importExpensesModal) showElement(importExpensesModal, 'flex');
     }
     function closeImportExpensesModal() {
-        if (importExpensesModal) importExpensesModal.style.display = 'none';
+        if (importExpensesModal) hideElement(importExpensesModal);
         parsedImportData = [];
         importHeaders = [];
         if (importTableContainer) importTableContainer.innerHTML = '';
-        if (columnMappingDiv) columnMappingDiv.style.display = 'none';
+        hideElement(columnMappingDiv);
         if (bankProfileSelect) bankProfileSelect.value = 'auto';
         const bankProfileDiv = document.getElementById('bank-profile');
-        if (bankProfileDiv) bankProfileDiv.style.display = 'none';
+        hideElement(bankProfileDiv);
     }
     function parseExcelDate(val) {
         if (val === undefined || val === null) return null;
@@ -2041,9 +2071,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         applyBankProfile(bankProfileSelect ? bankProfileSelect.value : 'auto');
-        columnMappingDiv.style.display = 'flex';
+        showElement(columnMappingDiv, 'flex');
         const bankProfileDiv = document.getElementById('bank-profile');
-        if (bankProfileDiv) bankProfileDiv.style.display = 'flex';
+        if (bankProfileDiv) showElement(bankProfileDiv, 'flex');
     }
     function renderImportTable() {
         if (!importTableContainer) return;
@@ -2296,8 +2326,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function updatePaymentPeriodSelectorVisibility() {
         const isWeekly = activePaymentsPeriodicity === "Semanal";
         paymentsTabTitle.textContent = isWeekly ? "Registro de Pagos Semanales" : "Registro de Pagos Mensuales";
-        paymentMonthSelect.style.display = isWeekly ? 'none' : 'inline-block';
-        paymentWeekSelect.style.display = isWeekly ? 'inline-block' : 'none';
+        setElementDisplay(paymentMonthSelect, isWeekly ? 'none' : 'inline-block');
+        setElementDisplay(paymentWeekSelect, isWeekly ? 'inline-block' : 'none');
     }
     prevPeriodButton.addEventListener('click', () => navigatePaymentPeriod(-1));
     nextPeriodButton.addEventListener('click', () => navigatePaymentPeriod(1));
@@ -2390,7 +2420,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tableBodyEl.innerHTML = '';
 
         let baseStartDate = currentBackupData.analysis_start_date;
-        if (typeof baseStartDate === 'string') baseStartDate = new Date(baseStartDate + 'T00:00:00Z');
+        if (typeof baseStartDate === 'string') baseStartDate = toUTCDate(baseStartDate);
         if (!(baseStartDate instanceof Date) || isNaN(baseStartDate)) {
             tableBodyEl.innerHTML = '<tr><td colspan="2">Error: Fecha de inicio inválida.</td></tr>';
             return;
@@ -3593,7 +3623,7 @@ function getMondayOfWeek(year, week) {
             }).join('');
             breakdownPopup.innerHTML = `<ul>${items}</ul><strong>Total: ${formatCurrencyJS(total, symbol)}</strong>`;
         }
-        breakdownPopup.style.display = 'block';
+        showElement(breakdownPopup);
         const rect = cell.getBoundingClientRect();
         const popupRect = breakdownPopup.getBoundingClientRect();
         breakdownPopup.style.left = (rect.left + window.scrollX + rect.width / 2 - popupRect.width / 2) + 'px';
@@ -3601,7 +3631,7 @@ function getMondayOfWeek(year, week) {
     }
 
     function hideBreakdownPopup() {
-        if (breakdownPopup) breakdownPopup.style.display = 'none';
+        hideElement(breakdownPopup);
     }
 
     document.addEventListener('click', (e) => {
@@ -3623,11 +3653,11 @@ function getMondayOfWeek(year, week) {
     expenseEndDateInput.disabled = true;
     updateAnalysisDurationLabel();
     // updateUsdClpInfoLabel(); // No longer needed here, called by activateTab or showMainContentScreen
-    incomeReimbursementCategoryContainer.style.display = 'none';
+    hideElement(incomeReimbursementCategoryContainer);
 
     if (isTouchDevice) {
         const rangeContainer = document.getElementById('mobile-chart-range');
-        if (rangeContainer) rangeContainer.style.display = 'flex';
+        if (rangeContainer) showElement(rangeContainer, 'flex');
         if (applyMobileChartRangeButton) {
             applyMobileChartRangeButton.addEventListener('click', applyMobileChartRange);
         }
@@ -3736,8 +3766,8 @@ function getMondayOfWeek(year, week) {
             renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
             return;
         }
-        const startDate = new Date(startStr + 'T00:00:00Z');
-        const endDate = new Date(endStr + 'T00:00:00Z');
+        const startDate = toUTCDate(startStr);
+        const endDate = toUTCDate(endStr);
         if (isNaN(startDate) || isNaN(endDate) || startDate > endDate) {
             renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
             return;
@@ -3774,10 +3804,10 @@ function getMondayOfWeek(year, week) {
             tr.insertCell().textContent = r.date || '';
             chartModalTableBody.appendChild(tr);
         });
-        chartModal.style.display = 'flex';
+        showElement(chartModal, 'flex');
     }
     function closeChartModal() {
-        if (chartModal) chartModal.style.display = "none";
+        if (chartModal) hideElement(chartModal);
     }
 
     if (chartModalClose) {
