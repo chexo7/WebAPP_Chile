@@ -1811,6 +1811,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function appendActionButtons(row, onEdit, onDelete) {
         const actionsCell = row.insertCell();
+        actionsCell.classList.add('table-actions-cell');
         if (typeof onEdit === 'function') {
             const editButton = document.createElement('button');
             editButton.textContent = 'Editar';
@@ -1910,11 +1911,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         filteredIncomes.forEach(({ item: income, index }) => {
             const row = incomesTableView.insertRow();
-            row.insertCell().textContent = income.name;
-            row.insertCell().textContent = formatAmountWithCurrency(income.net_monthly, income.currency);
+            const nameCell = row.insertCell();
+            nameCell.textContent = income.name;
+
+            const amountCell = row.insertCell();
+            amountCell.textContent = formatAmountWithCurrency(income.net_monthly, income.currency);
+            amountCell.classList.add('numeric-cell');
+
             row.insertCell().textContent = income.frequency;
-            row.insertCell().textContent = income.start_date ? getISODateString(new Date(income.start_date)) : 'N/A';
-            row.insertCell().textContent = income.end_date ? getISODateString(new Date(income.end_date)) : (income.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
+
+            const startCell = row.insertCell();
+            startCell.textContent = income.start_date ? getISODateString(new Date(income.start_date)) : 'N/A';
+            startCell.classList.add('date-cell');
+
+            const endCell = row.insertCell();
+            endCell.textContent = income.end_date ? getISODateString(new Date(income.end_date)) : (income.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
+            endCell.classList.add('date-cell');
 
             const typeCell = row.insertCell();
             if (income.is_reimbursement) {
@@ -2153,14 +2165,34 @@ document.addEventListener('DOMContentLoaded', () => {
             nameDiv.classList.add('name-scroll');
             nameCell.classList.add('expense-name-cell');
             nameCell.appendChild(nameDiv);
-            row.insertCell().textContent = formatAmountWithCurrency(expense.amount, expense.currency);
+
+            const amountCell = row.insertCell();
+            amountCell.textContent = formatAmountWithCurrency(expense.amount, expense.currency);
+            amountCell.classList.add('numeric-cell');
+
             row.insertCell().textContent = expense.category;
             row.insertCell().textContent = expense.frequency;
-            row.insertCell().textContent = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A');
-            row.insertCell().textContent = expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A';
-            row.insertCell().textContent = expense.end_date ? getISODateString(new Date(expense.end_date)) : (expense.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
-            row.insertCell().textContent = expense.payment_method === 'Credito' ? 'Tarjeta' : 'Efectivo';
-            row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
+
+            const movementCell = row.insertCell();
+            movementCell.textContent = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A');
+            movementCell.classList.add('date-cell');
+
+            const startCell = row.insertCell();
+            startCell.textContent = expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A';
+            startCell.classList.add('date-cell');
+
+            const endCell = row.insertCell();
+            endCell.textContent = expense.end_date ? getISODateString(new Date(expense.end_date)) : (expense.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
+            endCell.classList.add('date-cell');
+
+            const methodCell = row.insertCell();
+            methodCell.textContent = expense.payment_method === 'Credito' ? 'Tarjeta' : 'Efectivo';
+            methodCell.classList.add('status-cell');
+
+            const realCell = row.insertCell();
+            realCell.textContent = expense.is_real ? 'Sí' : 'No';
+            realCell.classList.add('status-cell');
+
             appendActionButtons(row, () => loadExpenseForEdit(index), () => deleteExpense(index));
         });
     }
@@ -2423,8 +2455,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const budgetAmount = (currentBackupData.budgets && currentBackupData.budgets[catName] !== undefined) ? currentBackupData.budgets[catName] : 0;
             const row = budgetsTableView.insertRow();
             row.insertCell().textContent = catName;
-            row.insertCell().textContent = catType;
-            row.insertCell().textContent = formatCurrencyJS(budgetAmount, currentBackupData.display_currency_symbol || '$');
+
+            const typeCell = row.insertCell();
+            typeCell.textContent = catType;
+            typeCell.classList.add('status-cell');
+
+            const amountCell = row.insertCell();
+            amountCell.textContent = formatCurrencyJS(budgetAmount, currentBackupData.display_currency_symbol || '$');
+            amountCell.classList.add('numeric-cell');
+
             row.addEventListener('click', () => { budgetCategorySelect.value = catName; budgetAmountInput.value = budgetAmount; });
         });
     }
@@ -2458,13 +2497,30 @@ document.addEventListener('DOMContentLoaded', () => {
             const percentageSpent = budget > 0 ? (spent / budget * 100) : 0;
             const row = budgetSummaryTableBody.insertRow();
             row.insertCell().textContent = catName;
-            row.insertCell().textContent = formatCurrencyJS(budget, currentBackupData.display_currency_symbol);
-            row.insertCell().textContent = formatCurrencyJS(spent, currentBackupData.display_currency_symbol);
-            const diffCell = row.insertCell(); diffCell.textContent = formatCurrencyJS(difference, currentBackupData.display_currency_symbol);
-            diffCell.classList.toggle('text-red', difference < 0); diffCell.classList.toggle('text-green', difference > 0 && budget > 0);
-        const percCell = row.insertCell(); percCell.textContent = `${percentageSpent.toFixed(1)}%`;
-        if (budget > 0) { if (percentageSpent > 100) percCell.classList.add('text-red'); else if (percentageSpent >= 80) percCell.classList.add('text-orange'); else percCell.classList.add('text-green'); }
-    });
+
+            const budgetCell = row.insertCell();
+            budgetCell.textContent = formatCurrencyJS(budget, currentBackupData.display_currency_symbol);
+            budgetCell.classList.add('numeric-cell');
+
+            const spentCell = row.insertCell();
+            spentCell.textContent = formatCurrencyJS(spent, currentBackupData.display_currency_symbol);
+            spentCell.classList.add('numeric-cell');
+
+            const diffCell = row.insertCell();
+            diffCell.textContent = formatCurrencyJS(difference, currentBackupData.display_currency_symbol);
+            diffCell.classList.add('numeric-cell');
+            diffCell.classList.toggle('text-red', difference < 0);
+            diffCell.classList.toggle('text-green', difference > 0 && budget > 0);
+
+            const percCell = row.insertCell();
+            percCell.textContent = `${percentageSpent.toFixed(1)}%`;
+            percCell.classList.add('percentage-cell');
+            if (budget > 0) {
+                if (percentageSpent > 100) percCell.classList.add('text-red');
+                else if (percentageSpent >= 80) percCell.classList.add('text-orange');
+                else percCell.classList.add('text-green');
+            }
+        });
     }
 
     function setupBudgetPeriodSelectors() {
@@ -2600,12 +2656,27 @@ document.addEventListener('DOMContentLoaded', () => {
         rowsData.forEach(r => {
             const row = paymentsTableView.insertRow();
             row.insertCell().textContent = r.name;
-            row.insertCell().textContent = formatAmountWithCurrency(r.amount, r.currency);
+
+            const amountCell = row.insertCell();
+            amountCell.textContent = formatAmountWithCurrency(r.amount, r.currency);
+            amountCell.classList.add('numeric-cell');
+
             row.insertCell().textContent = r.category;
-            row.insertCell().textContent = r.type;
-            row.insertCell().textContent = r.isReal;
-            row.insertCell().textContent = r.date;
+
+            const typeCell = row.insertCell();
+            typeCell.textContent = r.type;
+            typeCell.classList.add('status-cell');
+
+            const realCell = row.insertCell();
+            realCell.textContent = r.isReal;
+            realCell.classList.add('status-cell');
+
+            const dateCell = row.insertCell();
+            dateCell.textContent = r.date;
+            dateCell.classList.add('date-cell');
+
             const paidCell = row.insertCell();
+            paidCell.classList.add('table-checkbox-cell');
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.checked = currentBackupData.payments && currentBackupData.payments[r.paymentKey] === true;
