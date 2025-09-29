@@ -110,6 +110,12 @@
                             <label for="income-amount">Monto Neto:</label>
                             <input type="number" id="income-amount" step="any" required>
 
+                            <label for="income-currency">Moneda:</label>
+                            <select id="income-currency">
+                                <option value="USD" selected>USD</option>
+                                <option value="CLP">CLP</option>
+                            </select>
+
                             <label for="income-frequency">Frecuencia:</label>
                             <select id="income-frequency">
                                 <option value="Mensual">Mensual</option>
@@ -152,6 +158,7 @@
                                     <tr>
                                         <th>Nombre</th>
                                         <th>Monto</th>
+                                        <th>Moneda</th>
                                         <th>Frecuencia</th>
                                         <th>Inicio</th>
                                         <th>Fin</th>
@@ -178,6 +185,12 @@
 
                             <label for="expense-amount">Monto:</label>
                             <input type="number" id="expense-amount" step="any" required>
+
+                            <label for="expense-currency">Moneda:</label>
+                            <select id="expense-currency">
+                                <option value="CLP" selected>CLP</option>
+                                <option value="USD">USD</option>
+                            </select>
 
                             <label for="expense-category">Categoría:</label>
                             <div class="category-input-group">
@@ -244,6 +257,7 @@
                                         <th>Nombre</th>
                                         <th>Monto</th>
                                         <th>Categoría</th>
+                                        <th>Moneda</th>
                                         <th>Frecuencia</th>
                                         <th>Movimiento</th>
                                         <th>Gasto/Pago</th>
