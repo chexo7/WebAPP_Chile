@@ -297,57 +297,68 @@ button.button-large {
     background-color: #fdfdff;
 }
 .table-container-dynamic {
-    flex: 2;
-    min-width: 400px;
+    flex: 1 1 100%;
+    min-width: 0;
+    width: 100%;
     display: flex;
     flex-direction: column;
 }
 .dynamic-table-scroll {
     flex-grow: 1;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
     max-height: 500px;
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
 }
 
 /* Tablas dinámicas (Ingresos/Gastos/Presupuestos) */
-#incomes-table-view, #expenses-table-view, #budgets-table-view, #payments-table-view, #budget-summary-table {
+#incomes-table-view,
+#expenses-table-view,
+#budgets-table-view,
+#payments-table-view,
+#budget-summary-table {
     width: 100%;
-    min-width: max-content;
     border-collapse: separate;
     border-spacing: 0;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
+    table-layout: auto;
 }
 
 /* Ajustes específicos para la tabla de gastos */
-#expenses-table-view {
-    table-layout: fixed;
-    min-width: unset;
-}
-
+#incomes-table-view th,
+#incomes-table-view td,
 #expenses-table-view th,
-#expenses-table-view td {
-    width: calc(100% / 12);
-}
-
-/* Nombre y Acciones ocupan el doble de espacio */
-#expenses-table-view th:nth-child(1),
-#expenses-table-view th:nth-child(10),
-#expenses-table-view td:nth-child(1),
-#expenses-table-view td:nth-child(10) {
-    width: calc(100% / 12 * 2);
-}
-
-#incomes-table-view th, #incomes-table-view td,
-#expenses-table-view th, #expenses-table-view td,
-#budgets-table-view th, #budgets-table-view td,
-#payments-table-view th, #payments-table-view td,
-#budget-summary-table th, #budget-summary-table td {
-    padding: 8px 10px;
+#expenses-table-view td,
+#budgets-table-view th,
+#budgets-table-view td,
+#payments-table-view th,
+#payments-table-view td,
+#budget-summary-table th,
+#budget-summary-table td {
+    padding: 10px 12px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word;
     background-color: var(--card-bg);
+}
+
+#incomes-table-view th:last-child,
+#expenses-table-view th:last-child,
+#payments-table-view th:last-child {
+    text-align: center;
+}
+
+#incomes-table-view td:last-child,
+#expenses-table-view td:last-child,
+#payments-table-view td:last-child {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    white-space: normal;
 }
 
 /* Cabeceras de tabla */
@@ -373,10 +384,58 @@ button.button-large {
     background-color: var(--row-hover-bg);
 }
 
-#incomes-table-view td button, #expenses-table-view td button {
-    padding: 4px 8px;
+#incomes-table-view td button,
+#expenses-table-view td button,
+#payments-table-view td button {
+    padding: 6px 10px;
     font-size: 0.8rem;
-    margin-right: 5px;
+    margin: 0;
+}
+
+#incomes-table-view td button + button,
+#expenses-table-view td button + button,
+#payments-table-view td button + button {
+    margin-left: 4px;
+}
+
+@media (max-width: 1024px) {
+    .dynamic-table-scroll {
+        max-height: 420px;
+    }
+
+    #incomes-table-view th,
+    #incomes-table-view td,
+    #expenses-table-view th,
+    #expenses-table-view td,
+    #budgets-table-view th,
+    #budgets-table-view td,
+    #payments-table-view th,
+    #payments-table-view td,
+    #budget-summary-table th,
+    #budget-summary-table td {
+        padding: 8px 10px;
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .dynamic-table-scroll {
+        max-height: 360px;
+    }
+
+    #incomes-table-view td:last-child,
+    #expenses-table-view td:last-child,
+    #payments-table-view td:last-child {
+        justify-content: flex-start;
+        gap: 4px;
+    }
+
+    #incomes-table-view td button,
+    #expenses-table-view td button,
+    #payments-table-view td button {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 110px;
+    }
 }
 
 /* Ajuste de ancho y scroll para columna Nombre en Gastos */
