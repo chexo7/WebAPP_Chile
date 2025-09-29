@@ -95,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const incomeForm = document.getElementById('income-form');
     const incomeNameInput = document.getElementById('income-name');
     const incomeAmountInput = document.getElementById('income-amount');
+    const incomeCurrencySelect = document.getElementById('income-currency');
     const incomeFrequencySelect = document.getElementById('income-frequency');
     const incomeStartDateInput = document.getElementById('income-start-date');
     const incomeEndDateInput = document.getElementById('income-end-date');
@@ -112,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const expenseForm = document.getElementById('expense-form');
     const expenseNameInput = document.getElementById('expense-name');
     const expenseAmountInput = document.getElementById('expense-amount');
+    const expenseCurrencySelect = document.getElementById('expense-currency');
     const expenseCategorySelect = document.getElementById('expense-category');
     const addCategoryButton = document.getElementById('add-category-button');
     const removeCategoryButton = document.getElementById('remove-category-button');
@@ -152,6 +154,10 @@ document.addEventListener('DOMContentLoaded', () => {
             columns: { date: 'FECHA', desc: 'DESCRIPCION', amount: 'MONTO' }
         }
     };
+
+    const usdClpRateCache = {};
+    const usdClpRatePending = {};
+    let latestUsdClpRate = null;
 
     // --- BLOQUEO DE EDICIÓN ---
     let editLockAcquired = false;
@@ -630,6 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentBackupData.incomes.forEach(inc => {
                         if (typeof inc.is_reimbursement === 'undefined') inc.is_reimbursement = false;
                         if (typeof inc.reimbursement_category === 'undefined') inc.reimbursement_category = null;
+                        inc.currency = inc.currency || 'USD';
                     });
 
                     if (!currentBackupData.expenses) currentBackupData.expenses = [];
@@ -675,6 +682,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (exp.movement_date) exp.movement_date = toUTCDate(exp.movement_date);
                         else exp.movement_date = exp.start_date;
                         if (!exp.payment_method) exp.payment_method = 'Efectivo';
+                        exp.currency = exp.currency || 'USD';
                     });
                     if (Array.isArray(currentBackupData.credit_cards)) {
                         currentBackupData.credit_cards.forEach(card => {
@@ -1257,23 +1265,226 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- LÓGICA PESTAÑA AJUSTES ---
+    function getDateKey(date) {
+        if (!(date instanceof Date) || isNaN(date.getTime())) return null;
+        return getISODateString(date);
+    }
+
+    function isSameUtcDay(dateA, dateB) {
+        const keyA = getDateKey(dateA);
+        const keyB = getDateKey(dateB);
+        return keyA !== null && keyA === keyB;
+    }
+
+    function formatDateForCoinGecko(date) {
+        const normalized = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+        const day = ('0' + normalized.getUTCDate()).slice(-2);
+        const month = ('0' + (normalized.getUTCMonth() + 1)).slice(-2);
+        const year = normalized.getUTCFullYear();
+        return `${day}-${month}-${year}`;
+    }
+
+    function storeUsdClpRate(date, rate) {
+        if (typeof rate !== 'number' || !isFinite(rate) || rate <= 0) return;
+        const key = getDateKey(date);
+        if (!key) return;
+        usdClpRateCache[key] = rate;
+        latestUsdClpRate = rate;
+    }
+
+    async function fetchCurrentUsdClpRate() {
+        const API_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=clp';
+        const response = await fetch(API_URL);
+        if (!response.ok) {
+            throw new Error(`Error de red: ${response.status}`);
+        }
+        const data = await response.json();
+        const clpRate = data && data.usd && data.usd.clp;
+        if (typeof clpRate !== 'number' || !isFinite(clpRate)) {
+            throw new Error('Tasa CLP no encontrada en la respuesta de la API.');
+        }
+        return clpRate;
+    }
+
+    async function fetchHistoricalUsdClpRate(date) {
+        const formatted = formatDateForCoinGecko(date);
+        const API_URL = `https://api.coingecko.com/api/v3/coins/usd/history?date=${formatted}`;
+        const response = await fetch(API_URL);
+        if (!response.ok) {
+            throw new Error(`Error de red: ${response.status}`);
+        }
+        const data = await response.json();
+        const clpRate = data && data.market_data && data.market_data.current_price && data.market_data.current_price.clp;
+        if (typeof clpRate !== 'number' || !isFinite(clpRate)) {
+            throw new Error('Tasa CLP histórica no disponible en la respuesta.');
+        }
+        return clpRate;
+    }
+
+    async function fetchUsdClpRateForDate(date) {
+        const key = getDateKey(date);
+        if (!key) return latestUsdClpRate;
+        if (usdClpRateCache[key]) return usdClpRateCache[key];
+        if (usdClpRatePending[key]) return usdClpRatePending[key];
+
+        const fetchPromise = (async () => {
+            let rate = null;
+            const today = new Date();
+            try {
+                if (isSameUtcDay(date, today)) {
+                    rate = await fetchCurrentUsdClpRate();
+                } else {
+                    const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+                    const targetUtc = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+                    if (targetUtc > todayUtc) {
+                        rate = await fetchCurrentUsdClpRate();
+                    } else {
+                        const diffDays = Math.floor((todayUtc - targetUtc) / 86400000);
+                        if (diffDays > 365) {
+                            console.warn(`Fecha ${key} fuera de rango histórico público, utilizando tasa actual.`);
+                            rate = await fetchCurrentUsdClpRate();
+                        } else {
+                            rate = await fetchHistoricalUsdClpRate(date);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn(`Error obteniendo tasa USD/CLP para ${key}:`, error);
+                rate = latestUsdClpRate;
+            }
+
+            if (typeof rate === 'number' && rate > 0) {
+                storeUsdClpRate(date, rate);
+            } else if (latestUsdClpRate && latestUsdClpRate > 0) {
+                usdClpRateCache[key] = latestUsdClpRate;
+                rate = latestUsdClpRate;
+            }
+
+            return rate;
+        })();
+
+        usdClpRatePending[key] = fetchPromise;
+        try {
+            return await fetchPromise;
+        } finally {
+            delete usdClpRatePending[key];
+        }
+    }
+
+    async function ensureUsdClpRatesForDates(dates) {
+        if (!Array.isArray(dates) || dates.length === 0) return;
+        const uniqueDates = new Map();
+        dates.forEach(date => {
+            if (!(date instanceof Date) || isNaN(date.getTime())) return;
+            const key = getDateKey(date);
+            if (!key || uniqueDates.has(key)) return;
+            uniqueDates.set(key, new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())));
+        });
+
+        const fetchers = [];
+        uniqueDates.forEach((date, key) => {
+            if (!usdClpRateCache[key]) {
+                fetchers.push(fetchUsdClpRateForDate(date));
+            }
+        });
+
+        if (fetchers.length > 0) {
+            await Promise.all(fetchers.map(p => p.catch(error => {
+                console.warn('No se pudo obtener una de las tasas USD/CLP requeridas:', error);
+                return null;
+            })));
+        }
+    }
+
+    function getCachedUsdClpRate(date) {
+        if (date instanceof Date && !isNaN(date.getTime())) {
+            const key = getDateKey(date);
+            if (key && usdClpRateCache[key] && usdClpRateCache[key] > 0) {
+                return usdClpRateCache[key];
+            }
+        }
+        return (latestUsdClpRate && latestUsdClpRate > 0) ? latestUsdClpRate : null;
+    }
+
+    function convertAmountToUsd(amount, currency, date) {
+        const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount || 0);
+        if (!currency || currency === 'USD') return isNaN(numericAmount) ? 0 : numericAmount;
+        if (currency === 'CLP') {
+            const rate = getCachedUsdClpRate(date);
+            if (rate && rate > 0) {
+                return (isNaN(numericAmount) ? 0 : numericAmount) / rate;
+            }
+            console.warn('Tasa USD/CLP no disponible, usando monto original sin convertir.');
+            return isNaN(numericAmount) ? 0 : numericAmount;
+        }
+        return isNaN(numericAmount) ? 0 : numericAmount;
+    }
+
+    function collectUsdRateDatesForExpenses(expenses, periodStart, periodEnd, useInstantExpenses) {
+        const rateDates = [];
+        if (!(periodStart instanceof Date) || !(periodEnd instanceof Date)) return rateDates;
+        (expenses || []).forEach(exp => {
+            if (!exp || exp.currency !== 'CLP') return;
+            const { normalizedExpense } = buildExpenseOccurrenceContext(exp, useInstantExpenses);
+            if (!normalizedExpense || !normalizedExpense.start_date) return;
+            const occurrenceDates = getExpenseOccurrenceDatesInPeriod(normalizedExpense, periodStart, periodEnd, useInstantExpenses);
+            occurrenceDates.forEach(date => {
+                if (date instanceof Date && !isNaN(date.getTime())) {
+                    rateDates.push(new Date(date.getTime()));
+                }
+            });
+        });
+        return rateDates;
+    }
+
+    function collectUsdRateDatesForIncomes(incomes, periodStart, periodEnd, periodicity) {
+        const rateDates = [];
+        if (!(periodStart instanceof Date) || !(periodEnd instanceof Date)) return rateDates;
+        (incomes || []).forEach(inc => {
+            if (!inc || inc.currency !== 'CLP') return;
+            const occurrenceDates = getIncomeOccurrenceDatesInPeriod(inc, periodStart, periodEnd, periodicity);
+            occurrenceDates.forEach(date => {
+                if (date instanceof Date && !isNaN(date.getTime())) {
+                    rateDates.push(new Date(date.getTime()));
+                }
+            });
+        });
+        return rateDates;
+    }
+
+    async function ensureUsdClpRatesForPeriodRange(periodStart, periodEnd, {
+        expenses = [],
+        incomes = [],
+        useInstantExpenses = false,
+        periodicity = 'Mensual',
+        includeExpenses = true,
+        includeIncomes = true
+    } = {}) {
+        if (!(periodStart instanceof Date) || isNaN(periodStart.getTime()) ||
+            !(periodEnd instanceof Date) || isNaN(periodEnd.getTime())) return;
+        const rateDateCandidates = [];
+        if (includeExpenses) {
+            rateDateCandidates.push(...collectUsdRateDatesForExpenses(expenses, periodStart, periodEnd, useInstantExpenses));
+        }
+        if (includeIncomes) {
+            rateDateCandidates.push(...collectUsdRateDatesForIncomes(incomes, periodStart, periodEnd, periodicity));
+        }
+        if (rateDateCandidates.length === 0) return;
+        await ensureUsdClpRatesForDates(rateDateCandidates);
+    }
+
     async function fetchAndUpdateUSDCLPRate() {
         if (!usdClpInfoLabel) return;
         usdClpInfoLabel.innerHTML = `1 USD = $CLP (Obteniendo...) <span class="loading-dots"></span>`;
-        const API_URL = "https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=clp";
+        const today = new Date();
         try {
-            const response = await fetch(API_URL);
-            if (!response.ok) {
-                throw new Error(`Error de red: ${response.status}`);
-            }
-            const data = await response.json();
-            const clpRate = data.usd && data.usd.clp;
-            if (clpRate === undefined || clpRate === null) {
-                throw new Error("Tasa CLP no encontrada en la respuesta de la API.");
+            const clpRate = await fetchUsdClpRateForDate(today);
+            if (typeof clpRate !== 'number' || !isFinite(clpRate) || clpRate <= 0) {
+                throw new Error('Tasa CLP no disponible.');
             }
             usdClpInfoLabel.textContent = `1 USD = ${clpRate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Fuente: CoinGecko)`;
         } catch (error) {
-            console.warn("No se pudo actualizar el USD/CLP:", error);
+            console.warn('No se pudo actualizar el USD/CLP:', error);
             usdClpInfoLabel.innerHTML = `<b>1 USD = N/D</b> <small>(Error al obtener tasa)</small>`;
         }
     }
@@ -1623,6 +1834,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const name = incomeNameInput.value.trim();
         const amount = parseFloat(incomeAmountInput.value);
         const frequency = incomeFrequencySelect.value;
+        const currency = incomeCurrencySelect.value || 'USD';
         const startDateValue = incomeStartDateInput.value;
         const endDateValue = incomeEndDateInput.value;
         const isReimbursement = incomeIsReimbursementCheckbox.checked;
@@ -1647,7 +1859,8 @@ document.addEventListener('DOMContentLoaded', () => {
             start_date: startDate,
             end_date: endDate,
             is_reimbursement: isReimbursement,
-            reimbursement_category: reimbursementCategory
+            reimbursement_category: reimbursementCategory,
+            currency
         };
 
         if (editingIncomeIndex !== null) {
@@ -1664,6 +1877,7 @@ document.addEventListener('DOMContentLoaded', () => {
         incomeOngoingCheckbox.checked = true;
         incomeEndDateInput.disabled = true; incomeEndDateInput.value = '';
         incomeFrequencySelect.value = 'Mensual';
+        if (incomeCurrencySelect) incomeCurrencySelect.value = 'USD';
 
         incomeIsReimbursementCheckbox.checked = false;
         hideElement(incomeReimbursementCategoryContainer);
@@ -1679,16 +1893,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderIncomesTable() {
         if (!incomesTableView || !currentBackupData || !currentBackupData.incomes) return;
         incomesTableView.innerHTML = '';
-        const currencySymbol = currentBackupData.display_currency_symbol || '$';
         const filteredIncomes = filterItemsWithIndex(currentBackupData.incomes, searchIncomeInput, (income) => {
-            const amountStr = formatCurrencyJS(income.net_monthly, currencySymbol);
+            const amountStr = formatAmountWithCurrency(income.net_monthly, income.currency);
             return {
                 strings: [
                     income.name,
                     amountStr,
                     income.frequency,
                     income.is_reimbursement ? 'reembolso' : null,
-                    income.is_reimbursement ? income.reimbursement_category : null
+                    income.is_reimbursement ? income.reimbursement_category : null,
+                    income.currency
                 ],
                 numeric: [amountStr.replace(/[^0-9]/g, '')]
             };
@@ -1697,7 +1911,7 @@ document.addEventListener('DOMContentLoaded', () => {
         filteredIncomes.forEach(({ item: income, index }) => {
             const row = incomesTableView.insertRow();
             row.insertCell().textContent = income.name;
-            row.insertCell().textContent = formatCurrencyJS(income.net_monthly, currencySymbol);
+            row.insertCell().textContent = formatAmountWithCurrency(income.net_monthly, income.currency);
             row.insertCell().textContent = income.frequency;
             row.insertCell().textContent = income.start_date ? getISODateString(new Date(income.start_date)) : 'N/A';
             row.insertCell().textContent = income.end_date ? getISODateString(new Date(income.end_date)) : (income.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
@@ -1721,6 +1935,7 @@ document.addEventListener('DOMContentLoaded', () => {
         incomeNameInput.value = income.name;
         incomeAmountInput.value = income.net_monthly;
         incomeFrequencySelect.value = income.frequency;
+        if (incomeCurrencySelect) incomeCurrencySelect.value = income.currency || 'USD';
         incomeStartDateInput.value = income.start_date ? getISODateString(new Date(income.start_date)) : '';
 
         const isUnico = income.frequency === 'Único';
@@ -1846,6 +2061,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const amount = parseFloat(expenseAmountInput.value);
         const category = expenseCategorySelect.value;
         const frequency = expenseFrequencySelect.value;
+        const currency = expenseCurrencySelect.value || 'USD';
         const startDateValue = expenseStartDateInput.value;
         const endDateValue = expenseEndDateInput.value;
 
@@ -1867,7 +2083,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const movementDate = expenseMovementDateInput.value ? toUTCDate(expenseMovementDateInput.value) : startDate;
         const paymentMethod = expensePaymentMethodSelect.value;
         const creditCard = paymentMethod === 'Credito' ? expenseCreditCardSelect.value : null;
-        const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal, movement_date: movementDate, payment_method: paymentMethod, credit_card: creditCard, installments };
+        const expenseEntry = { name, amount, category, type: expenseType, frequency, start_date: startDate, end_date: endDate, is_real: isReal, movement_date: movementDate, payment_method: paymentMethod, credit_card: creditCard, installments, currency };
 
         if (editingExpenseIndex !== null) {
             currentBackupData.expenses[editingExpenseIndex] = expenseEntry;
@@ -1889,6 +2105,7 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseEndDateInput.disabled = true;
         expenseEndDateInput.value = '';
         expenseIsRealCheckbox.checked = true;
+        if (expenseCurrencySelect) expenseCurrencySelect.value = 'USD';
         populateExpenseCreditCardDropdown();
         expensePaymentMethodSelect.value = 'Credito';
         expensePaymentMethodSelect.dispatchEvent(new Event('change'));
@@ -1914,16 +2131,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderExpensesTable() {
         if (!expensesTableView || !currentBackupData || !currentBackupData.expenses) return;
         expensesTableView.innerHTML = '';
-        const currencySymbol = currentBackupData.display_currency_symbol || '$';
         const filteredExpenses = filterItemsWithIndex(currentBackupData.expenses, searchExpenseInput, (expense) => {
-            const amountStr = formatCurrencyJS(expense.amount, currencySymbol);
+            const amountStr = formatAmountWithCurrency(expense.amount, expense.currency);
             return {
                 strings: [
                     expense.name,
                     amountStr,
                     expense.category,
                     expense.frequency,
-                    expense.payment_method === 'Credito' ? 'tarjeta' : 'efectivo'
+                    expense.payment_method === 'Credito' ? 'tarjeta' : 'efectivo',
+                    expense.currency
                 ],
                 numeric: [amountStr.replace(/[^0-9]/g, '')]
             };
@@ -1936,7 +2153,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nameDiv.classList.add('name-scroll');
             nameCell.classList.add('expense-name-cell');
             nameCell.appendChild(nameDiv);
-            row.insertCell().textContent = formatCurrencyJS(expense.amount, currencySymbol);
+            row.insertCell().textContent = formatAmountWithCurrency(expense.amount, expense.currency);
             row.insertCell().textContent = expense.category;
             row.insertCell().textContent = expense.frequency;
             row.insertCell().textContent = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A');
@@ -1952,6 +2169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const expense = currentBackupData.expenses[index];
         expenseNameInput.value = expense.name; expenseAmountInput.value = expense.amount;
         expenseCategorySelect.value = expense.category; expenseFrequencySelect.value = expense.frequency;
+        if (expenseCurrencySelect) expenseCurrencySelect.value = expense.currency || 'USD';
         expenseMovementDateInput.value = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : '');
         expenseStartDateInput.value = expense.start_date ? getISODateString(new Date(expense.start_date)) : '';
         expenseIsRealCheckbox.checked = expense.is_real !== undefined ? expense.is_real : true;
@@ -2373,7 +2591,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     type: currentBackupData.expense_categories[expense.category] || 'Variable',
                     isReal: expense.is_real ? 'Sí' : 'No',
                     date: getISODateString(occDate),
-                    paymentKey: `${expense.name}|${getISODateString(occDate)}`
+                    paymentKey: `${expense.name}|${getISODateString(occDate)}`,
+                    currency: expense.currency
                 });
             });
         });
@@ -2381,7 +2600,7 @@ document.addEventListener('DOMContentLoaded', () => {
         rowsData.forEach(r => {
             const row = paymentsTableView.insertRow();
             row.insertCell().textContent = r.name;
-            row.insertCell().textContent = formatCurrencyJS(r.amount, currentBackupData.display_currency_symbol);
+            row.insertCell().textContent = formatAmountWithCurrency(r.amount, r.currency);
             row.insertCell().textContent = r.category;
             row.insertCell().textContent = r.type;
             row.insertCell().textContent = r.isReal;
@@ -2408,13 +2627,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- LÓGICA PESTAÑA FLUJO DE CAJA ---
-    function renderCashflowTable() {
-        updateAnalysisModeLabels();
-        renderCashflowTableFor('Mensual', cashflowMensualTableHead, cashflowMensualTableBody, cashflowMensualTitle);
-        renderCashflowTableFor('Semanal', cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle);
+    async function renderCashflowTable() {
+        try {
+            updateAnalysisModeLabels();
+            await renderCashflowTableFor('Mensual', cashflowMensualTableHead, cashflowMensualTableBody, cashflowMensualTitle);
+            await renderCashflowTableFor('Semanal', cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle);
+        } catch (error) {
+            console.error('Error al renderizar el flujo de caja:', error);
+        }
     }
 
-    function renderCashflowTableFor(periodicity, tableHeadEl, tableBodyEl, titleEl) {
+    async function renderCashflowTableFor(periodicity, tableHeadEl, tableBodyEl, titleEl) {
         if (!currentBackupData || !tableBodyEl || !tableHeadEl) return;
         tableHeadEl.innerHTML = '';
         tableBodyEl.innerHTML = '';
@@ -2453,6 +2676,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 end_date: exp.end_date ? new Date(exp.end_date) : null
             }))
         };
+
+        const rateDateCandidates = [];
+        let periodCursor = new Date(analysisStart.getTime());
+        for (let i = 0; i < duration; i++) {
+            const periodStart = getPeriodStartDate(periodCursor, periodicity);
+            const periodEnd = getPeriodEndDate(periodCursor, periodicity);
+            rateDateCandidates.push(
+                ...collectUsdRateDatesForExpenses(tempCalcData.expenses, periodStart, periodEnd, tempCalcData.use_instant_expenses)
+            );
+            rateDateCandidates.push(
+                ...collectUsdRateDatesForIncomes(tempCalcData.incomes, periodStart, periodEnd, periodicity)
+            );
+            periodCursor = (periodicity === 'Mensual') ? addMonths(periodStart, 1) : addWeeks(periodStart, 1);
+        }
+
+        await ensureUsdClpRatesForDates(rateDateCandidates);
 
         const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData);
         cashflowPeriodDatesMap[periodicity] = periodDates;
@@ -2558,6 +2797,77 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBudgetSummaryTableForSelectedPeriod();
     }
 
+    function buildExpenseOccurrenceContext(expense, useInstant) {
+        if (!expense) return { normalizedExpense: expense, amountPerOccurrence: 0 };
+        const baseStart = useInstant && expense.movement_date ? new Date(expense.movement_date) : (expense.start_date ? new Date(expense.start_date) : null);
+        if (!baseStart) return { normalizedExpense: expense, amountPerOccurrence: 0 };
+        let start = baseStart;
+        let end = expense.end_date ? new Date(expense.end_date) : null;
+        if (useInstant && expense.end_date && expense.movement_date) {
+            const diff = new Date(expense.start_date).getTime() - new Date(expense.movement_date).getTime();
+            end = new Date(new Date(expense.end_date).getTime() - diff);
+        }
+        let amountPerOccurrence = parseFloat(expense.amount || 0);
+        const installments = parseInt(expense.installments || 1, 10);
+        let frequency = expense.frequency || 'Mensual';
+        if (installments > 1 && !useInstant) {
+            frequency = 'Mensual';
+            amountPerOccurrence = amountPerOccurrence / installments;
+            end = addMonths(new Date(start), installments - 1);
+        }
+        const normalizedExpense = { ...expense, start_date: start, end_date: end, frequency };
+        return { normalizedExpense, amountPerOccurrence: isNaN(amountPerOccurrence) ? 0 : amountPerOccurrence };
+    }
+
+    function getIncomeOccurrenceDatesInPeriod(income, pStart, pEnd, periodicity) {
+        if (!income || !income.start_date || !(pStart instanceof Date) || !(pEnd instanceof Date) || pStart > pEnd) return [];
+        const start = new Date(income.start_date);
+        const end = income.end_date ? new Date(income.end_date) : null;
+        const freq = income.frequency || 'Mensual';
+        const dates = [];
+
+        if (freq === 'Único') {
+            if (start >= pStart && start <= pEnd) dates.push(new Date(start));
+        } else if (freq === 'Mensual') {
+            if (start > pEnd || (end && end < pStart)) return [];
+            const payDay = start.getUTCDate();
+            const monthsToCheck = new Set();
+            let iter = new Date(Date.UTC(pStart.getUTCFullYear(), pStart.getUTCMonth(), 1));
+            while (iter <= pEnd) {
+                monthsToCheck.add(`${iter.getUTCFullYear()}-${iter.getUTCMonth()}`);
+                iter.setUTCMonth(iter.getUTCMonth() + 1);
+            }
+            monthsToCheck.forEach(key => {
+                const [y, m] = key.split('-').map(n => parseInt(n, 10));
+                const daysInMonth = getDaysInMonth(y, m);
+                const payDate = new Date(Date.UTC(y, m, Math.min(payDay, daysInMonth)));
+                if (payDate >= pStart && payDate <= pEnd && payDate >= start && (!end || payDate <= end)) {
+                    dates.push(payDate);
+                }
+            });
+        } else if (freq === 'Semanal') {
+            if (start > pEnd || (end && end < pStart)) return [];
+            const payDow = start.getUTCDay();
+            let d = new Date(pStart.getTime());
+            while (d <= pEnd) {
+                if (d.getUTCDay() === payDow && d >= start && (!end || d <= end)) dates.push(new Date(d));
+                d.setUTCDate(d.getUTCDate() + 1);
+            }
+        } else if (freq === 'Bi-semanal') {
+            if (start > pEnd || (end && end < pStart)) return [];
+            let payDate = new Date(start.getTime());
+            while (payDate < pStart) {
+                payDate = addWeeks(payDate, 2);
+                if (end && payDate > end) return dates;
+            }
+            while (payDate <= pEnd) {
+                if (!end || payDate <= end) dates.push(new Date(payDate));
+                payDate = addWeeks(payDate, 2);
+            }
+        }
+        return dates;
+    }
+
     function calculateCashFlowData(data) {
         const startDate = data.analysis_start_date; const duration = parseInt(data.analysis_duration, 10); const periodicity = data.analysis_periodicity; const initialBalance = parseFloat(data.analysis_initial_balance);
         let periodDates = []; let income_p = Array(duration).fill(0.0); let fixed_exp_p = Array(duration).fill(0.0); let var_exp_p = Array(duration).fill(0.0); let net_flow_p = Array(duration).fill(0.0); let end_bal_p = Array(duration).fill(0.0); let expenses_by_cat_p = Array(duration).fill(null).map(() => ({}));
@@ -2577,316 +2887,56 @@ document.addEventListener('DOMContentLoaded', () => {
             periodDates.push(p_start);
             let p_inc_total = 0.0;
 
-            (data.incomes || []).forEach(inc => {
-                if (!inc.start_date) return;
-                if (inc.is_reimbursement) return; // Exclude reimbursements from direct income calculation here
-
-                const inc_start = inc.start_date; const inc_end = inc.end_date; const net_amount = parseFloat(inc.net_monthly || 0); const inc_freq = inc.frequency || "Mensual";
-            const isActiveRange = (inc_start <= p_end && (inc_end == null || inc_end >= p_start)); if (!isActiveRange) return;
-                
-                let income_to_add = 0.0;
-
-                if (inc_freq === "Único") {
-                    if (inc_start >= p_start && inc_start <= p_end) {
-                        income_to_add = net_amount;
-                    }
-                } else if (inc_freq === "Mensual") {
-                    const itemPaymentDay = inc_start.getUTCDate();
-                    let paymentOccurred = false;
-
-                    // Check for payment in p_start's month
-                    const p_start_year = p_start.getUTCFullYear();
-                    const p_start_month = p_start.getUTCMonth();
-                    const daysInPStartMonth = getDaysInMonth(p_start_year, p_start_month);
-                    const actualPaymentDayInPStartMonth = Math.min(itemPaymentDay, daysInPStartMonth);
-                    const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
-
-                    if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
-                        if (inc_start <= paymentDateInPStartMonth && (inc_end == null || inc_end >= paymentDateInPStartMonth)) {
-                            income_to_add = net_amount;
-                            paymentOccurred = true;
-                        }
-                    }
-
-                    // If period spans months and payment not yet counted, check p_end's month
-                    if (!paymentOccurred) {
-                        const p_end_year = p_end.getUTCFullYear();
-                        const p_end_month = p_end.getUTCMonth();
-                        if (p_start_month !== p_end_month) { // Check if the period actually spans different months
-                            const daysInPEndMonth = getDaysInMonth(p_end_year, p_end_month);
-                            const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
-                            const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
-                            if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
-                                if (inc_start <= paymentDateInPEndMonth && (inc_end == null || inc_end >= paymentDateInPEndMonth)) {
-                                    income_to_add = net_amount;
-                                }
-                            }
-                        }
-                    }
-                } else if (inc_freq === "Semanal") {
-                    if (periodicity === "Semanal") {
-                        // If analysis is weekly, and item is active in this period, add amount
-                        income_to_add = net_amount;
-                    } else { // Analysis periodicity is "Mensual"
-                        let occurrences = 0;
-                        let dayIterator = new Date(p_start.getTime());
-                        const incomePaymentUTCDay = inc_start.getUTCDay(); // Day of week for the income's start_date
-
-                        while (dayIterator <= p_end) {
-                            if (dayIterator.getUTCDay() === incomePaymentUTCDay) {
-                                // Check if the income item is active on this specific dayIterator occurrence
-                                if (inc_start <= dayIterator && (inc_end == null || inc_end >= dayIterator)) {
-                                    occurrences++;
-                                }
-                            }
-                            dayIterator.setUTCDate(dayIterator.getUTCDate() + 1);
-                        }
-                        income_to_add = net_amount * occurrences;
-                    }
-                } else if (inc_freq === "Bi-semanal") {
-                    let current_payment_date = new Date(inc_start.getTime());
-                    // Ensure first payment is not before inc_start, adjust if p_start is much later.
-                    // This loop correctly finds the first payment date that is >= inc_start.
-                    // We need to find the first payment date that is also >= p_start for the current period.
-                    
-                    // Adjust current_payment_date to be the first relevant payment date for this period
-                    // The first loop `while (current_payment_date < p_start && current_payment_date < inc_start)` was redundant
-                    // because current_payment_date is initialized from inc_start, so current_payment_date < inc_start is never true.
-                     // If the income starts mid-period, ensure we catch up to the first payment date
-                    // that is also on or after the period start.
-                    while (current_payment_date < p_start) {
-                        current_payment_date = addWeeks(current_payment_date, 2);
-                        if (inc_end && current_payment_date > inc_end) break;
-                    }
-
-
-                    while (current_payment_date <= p_end) {
-                        if (inc_end && current_payment_date > inc_end) {
-                            break; // Stop if we've passed the income's end date
-                        }
-                        // Check if this specific payment date is within the income's overall active range
-                        // (inc_start to inc_end) AND within the current period (p_start to p_end).
-                        // The loop condition current_payment_date <= p_end handles the upper bound of the period.
-                        // The isActiveRange check at the beginning handles the general overlap.
-                        // This specific check ensures we only count payments that fall within the item's own lifecycle.
-                        if (current_payment_date >= inc_start) { // Payment must be on or after income start
-                           income_to_add += net_amount;
-                        }
-                        current_payment_date = addWeeks(current_payment_date, 2);
-                    }
-                }
-                p_inc_total += income_to_add;
+                        (data.incomes || []).forEach(inc => {
+                if (!inc.start_date || inc.is_reimbursement) return;
+                const occurrenceDates = getIncomeOccurrenceDatesInPeriod(inc, p_start, p_end, periodicity);
+                if (!occurrenceDates || occurrenceDates.length === 0) return;
+                const netAmount = parseFloat(inc.net_monthly || 0);
+                occurrenceDates.forEach(date => {
+                    p_inc_total += convertAmountToUsd(netAmount, inc.currency, date);
+                });
             });
             income_p[i] = p_inc_total;
 
-            let p_fix_exp_total_for_period = 0.0;
+                        let p_fix_exp_total_for_period = 0.0;
             let p_var_exp_total_for_period = 0.0;
 
             (data.expenses || []).forEach(exp => {
                 if (!exp.start_date) return;
-                const baseStart = data.use_instant_expenses && exp.movement_date ? exp.movement_date : exp.start_date;
-                const e_start = baseStart;
-                let e_end = exp.end_date;
-                if (data.use_instant_expenses && exp.end_date && exp.movement_date) {
-                    const diff = exp.start_date.getTime() - exp.movement_date.getTime();
-                    e_end = new Date(exp.end_date.getTime() - diff);
-                }
-                let amt_raw = parseFloat(exp.amount || 0);
-                const inst = parseInt(exp.installments || 1);
-                let freq = exp.frequency || "Mensual";
-                if (inst > 1 && !data.use_instant_expenses) {
-                    freq = "Mensual";
-                    amt_raw = amt_raw / inst;
-                    e_end = addMonths(new Date(e_start), inst - 1);
-                }
+                const { normalizedExpense, amountPerOccurrence } = buildExpenseOccurrenceContext(exp, data.use_instant_expenses);
+                if (!normalizedExpense.start_date) return;
                 const typ = exp.type || (data.expense_categories && data.expense_categories[exp.category]) || "Variable";
                 const cat = exp.category;
-                if (amt_raw < 0 || !cat || !orderedCategories.includes(cat)) return;
-            const isActiveRange = (e_start <= p_end && (e_end == null || e_end >= p_start)); if (!isActiveRange) return;
-                
-                let exp_add_this_period = 0.0;
+                if (!cat || !orderedCategories.includes(cat)) return;
 
-                if (freq === "Único") {
-                    if (e_start >= p_start && e_start <= p_end) {
-                        exp_add_this_period = amt_raw;
-                    }
-                } else if (freq === "Mensual") {
-                    const itemPaymentDay = e_start.getUTCDate();
-                    let paymentOccurred = false;
+                const occurrenceDates = getExpenseOccurrenceDatesInPeriod(normalizedExpense, p_start, p_end, data.use_instant_expenses);
+                if (!occurrenceDates || occurrenceDates.length === 0) return;
 
-                    // Check for payment in p_start's month
-                    const p_start_year = p_start.getUTCFullYear();
-                    const p_start_month = p_start.getUTCMonth();
-                    const daysInPStartMonth = getDaysInMonth(p_start_year, p_start_month);
-                    const actualPaymentDayInPStartMonth = Math.min(itemPaymentDay, daysInPStartMonth);
-                    const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
+                let expTotalForPeriod = 0.0;
+                occurrenceDates.forEach(date => {
+                    expTotalForPeriod += convertAmountToUsd(amountPerOccurrence, exp.currency, date);
+                });
 
-                    if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
-                        if (e_start <= paymentDateInPStartMonth && (e_end == null || e_end >= paymentDateInPStartMonth)) {
-                            exp_add_this_period = amt_raw;
-                            paymentOccurred = true;
-                        }
-                    }
-
-                    // If period spans months and payment not yet counted, check p_end's month
-                    if (!paymentOccurred) {
-                        const p_end_year = p_end.getUTCFullYear();
-                        const p_end_month = p_end.getUTCMonth();
-                        if (p_start_month !== p_end_month) { // Check if the period actually spans different months
-                            const daysInPEndMonth = getDaysInMonth(p_end_year, p_end_month);
-                            const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
-                            const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
-                            if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
-                                if (e_start <= paymentDateInPEndMonth && (e_end == null || e_end >= paymentDateInPEndMonth)) {
-                                    exp_add_this_period = amt_raw;
-                                }
-                            }
-                        }
-                    }
-                } else if (freq === "Semanal") {
-                    if (periodicity === "Semanal") {
-                        exp_add_this_period = amt_raw;
-                    } else { // Analysis periodicity is "Mensual"
-                        let occurrences = 0;
-                        let dayIterator = new Date(p_start.getTime());
-                        const expensePaymentUTCDay = e_start.getUTCDay();
-
-                        while (dayIterator <= p_end) {
-                            if (dayIterator.getUTCDay() === expensePaymentUTCDay) {
-                                if (e_start <= dayIterator && (e_end == null || e_end >= dayIterator)) {
-                                    occurrences++;
-                                }
-                            }
-                            dayIterator.setUTCDate(dayIterator.getUTCDate() + 1);
-                        }
-                        exp_add_this_period = amt_raw * occurrences;
-                    }
-                } else if (freq === "Bi-semanal") {
-                    let current_payment_date = new Date(e_start.getTime());
-
-                    // Adjust current_payment_date to be the first relevant payment date for this period
-                    // The first loop `while (current_payment_date < p_start && current_payment_date < e_start)` was redundant
-                    // because current_payment_date is initialized from e_start, so current_payment_date < e_start is never true.
-                    while (current_payment_date < p_start) {
-                        current_payment_date = addWeeks(current_payment_date, 2);
-                        if (e_end && current_payment_date > e_end) break;
-                    }
-
-                    while (current_payment_date <= p_end) {
-                        if (e_end && current_payment_date > e_end) {
-                            break; 
-                        }
-                        if (current_payment_date >= e_start) { 
-                            exp_add_this_period += amt_raw;
-                        }
-                        current_payment_date = addWeeks(current_payment_date, 2);
-                    }
-                }
-
-                if (exp_add_this_period > 0) {
-                    expenses_by_cat_p[i][cat] = (expenses_by_cat_p[i][cat] || 0) + exp_add_this_period;
-                    // Totals will be recalculated after reimbursements
+                if (expTotalForPeriod > 0) {
+                    expenses_by_cat_p[i][cat] = (expenses_by_cat_p[i][cat] || 0) + expTotalForPeriod;
                 }
             });
 
-            // Apply reimbursements to expenses of this period
             (data.incomes || []).forEach(reimbInc => {
                 if (!reimbInc.is_reimbursement || !reimbInc.reimbursement_category || !reimbInc.start_date) return;
+                const occurrenceDates = getIncomeOccurrenceDatesInPeriod(reimbInc, p_start, p_end, periodicity);
+                if (!occurrenceDates || occurrenceDates.length === 0) return;
+                const reimbAmount = parseFloat(reimbInc.net_monthly || 0);
+                let reimbursementTotal = 0.0;
+                occurrenceDates.forEach(date => {
+                    reimbursementTotal += convertAmountToUsd(reimbAmount, reimbInc.currency, date);
+                });
 
-                const reimb_start = reimbInc.start_date;
-                const reimb_end = reimbInc.end_date;
-                const reimb_amount_raw = parseFloat(reimbInc.net_monthly || 0);
-                const reimb_freq = reimbInc.frequency || "Mensual";
-                const reimb_cat = reimbInc.reimbursement_category;
-
-            const isActiveRange = (reimb_start <= p_end && (reimb_end == null || reimb_end >= p_start));
-                if (!isActiveRange) return;
-
-                let amount_of_reimbursement_in_this_period = 0.0;
-
-                if (reimb_freq === "Único") {
-                    if (reimb_start >= p_start && reimb_start <= p_end) {
-                        amount_of_reimbursement_in_this_period = reimb_amount_raw;
-                    }
-                } else if (reimb_freq === "Mensual") {
-                    const itemPaymentDay = reimb_start.getUTCDate();
-                    let paymentOccurred = false;
-
-                    // Check for payment in p_start's month
-                    const p_start_year = p_start.getUTCFullYear();
-                    const p_start_month = p_start.getUTCMonth();
-                    const daysInPStartMonth = getDaysInMonth(p_start_year, p_start_month);
-                    const actualPaymentDayInPStartMonth = Math.min(itemPaymentDay, daysInPStartMonth);
-                    const paymentDateInPStartMonth = new Date(Date.UTC(p_start_year, p_start_month, actualPaymentDayInPStartMonth));
-
-                    if (paymentDateInPStartMonth >= p_start && paymentDateInPStartMonth <= p_end) {
-                        if (reimb_start <= paymentDateInPStartMonth && (reimb_end == null || reimb_end >= paymentDateInPStartMonth)) {
-                            amount_of_reimbursement_in_this_period = reimb_amount_raw;
-                            paymentOccurred = true;
-                        }
-                    }
-
-                    // If period spans months and payment not yet counted, check p_end's month
-                    if (!paymentOccurred) {
-                        const p_end_year = p_end.getUTCFullYear();
-                        const p_end_month = p_end.getUTCMonth();
-                        if (p_start_month !== p_end_month) { // Check if the period actually spans different months
-                            const daysInPEndMonth = getDaysInMonth(p_end_year, p_end_month);
-                            const actualPaymentDayInPEndMonth = Math.min(itemPaymentDay, daysInPEndMonth);
-                            const paymentDateInPEndMonth = new Date(Date.UTC(p_end_year, p_end_month, actualPaymentDayInPEndMonth));
-                            if (paymentDateInPEndMonth >= p_start && paymentDateInPEndMonth <= p_end) {
-                                if (reimb_start <= paymentDateInPEndMonth && (reimb_end == null || reimb_end >= paymentDateInPEndMonth)) {
-                                    amount_of_reimbursement_in_this_period = reimb_amount_raw;
-                                }
-                            }
-                        }
-                    }
-                } else if (reimb_freq === "Semanal") {
-                    if (periodicity === "Semanal") {
-                        amount_of_reimbursement_in_this_period = reimb_amount_raw;
-                    } else { // Analysis periodicity is "Mensual"
-                        let occurrences = 0;
-                        let dayIterator = new Date(p_start.getTime());
-                        const reimbursementPaymentUTCDay = reimb_start.getUTCDay();
-
-                        while (dayIterator <= p_end) {
-                            if (dayIterator.getUTCDay() === reimbursementPaymentUTCDay) {
-                                if (reimb_start <= dayIterator && (reimb_end == null || reimb_end >= dayIterator)) {
-                                    occurrences++;
-                                }
-                            }
-                            dayIterator.setUTCDate(dayIterator.getUTCDate() + 1);
-                        }
-                        amount_of_reimbursement_in_this_period = reimb_amount_raw * occurrences;
-                    }
-                } else if (reimb_freq === "Bi-semanal") {
-                    let current_payment_date = new Date(reimb_start.getTime());
-
-                    // Adjust current_payment_date to be the first relevant payment date for this period
-                    // The first loop `while (current_payment_date < p_start && current_payment_date < reimb_start)` was redundant
-                    // because current_payment_date is initialized from reimb_start, so current_payment_date < reimb_start is never true.
-                     while (current_payment_date < p_start) {
-                        current_payment_date = addWeeks(current_payment_date, 2);
-                        if (reimb_end && current_payment_date > reimb_end) break;
-                    }
-                    
-                    while (current_payment_date <= p_end) {
-                        if (reimb_end && current_payment_date > reimb_end) {
-                            break;
-                        }
-                        if (current_payment_date >= reimb_start) { // Payment must be on or after reimbursement start
-                           amount_of_reimbursement_in_this_period += reimb_amount_raw;
-                        }
-                        current_payment_date = addWeeks(current_payment_date, 2);
-                    }
-                }
-
-                // Apply reimbursement even if it exceeds expenses to allow negative balance
-                if (amount_of_reimbursement_in_this_period > 0 && expenses_by_cat_p[i][reimb_cat] !== undefined) {
-                    expenses_by_cat_p[i][reimb_cat] = (expenses_by_cat_p[i][reimb_cat] || 0) - amount_of_reimbursement_in_this_period;
+                if (reimbursementTotal > 0 && expenses_by_cat_p[i][reimbInc.reimbursement_category] !== undefined) {
+                    expenses_by_cat_p[i][reimbInc.reimbursement_category] = (expenses_by_cat_p[i][reimbInc.reimbursement_category] || 0) - reimbursementTotal;
                 }
             });
-            
+
             // Recalculate total fixed/variable expenses after reimbursements
             p_fix_exp_total_for_period = 0;
             p_var_exp_total_for_period = 0;
@@ -2972,12 +3022,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
-        cashflowChartCanvas.onclick = (evt) => {
+        cashflowChartCanvas.onclick = async (evt) => {
             if (!cashflowChartInstance) return;
             const points = cashflowChartInstance.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
             if (points.length) {
                 const idx = points[0].index;
-                const rows = gatherPeriodTransactions(periodDates[idx], activeCashflowPeriodicity);
+                const rows = await gatherPeriodTransactions(periodDates[idx], activeCashflowPeriodicity);
                 openChartModal(`Transacciones - ${labels[idx]}`, rows);
             }
         };
@@ -3187,31 +3237,40 @@ document.addEventListener('DOMContentLoaded', () => {
         return 0;
     }
 
-    function calculateExpenseDistribution(periodStart, periodicity) {
+    async function calculateExpenseDistribution(periodStart, periodicity) {
         const periodEnd = getPeriodEndDate(periodStart, periodicity);
+        if (!currentBackupData) return { totals: {}, methodTotals: {} };
+        await ensureUsdClpRatesForPeriodRange(periodStart, periodEnd, {
+            expenses: currentBackupData.expenses,
+            useInstantExpenses: currentBackupData.use_instant_expenses,
+            periodicity,
+            includeIncomes: false
+        });
         const totals = {};
         const methodTotals = {};
         (currentBackupData.expenses || []).forEach(exp => {
-            const occ = getExpenseOccurrencesInPeriod(exp, periodStart, periodEnd, periodicity, currentBackupData.use_instant_expenses);
-            if (occ <= 0) return;
-            let baseAmt = parseFloat(exp.amount || 0);
-            const inst = parseInt(exp.installments || 1);
-            if (inst > 1 && !currentBackupData.use_instant_expenses) baseAmt = baseAmt / inst;
-            const amt = baseAmt * occ;
+            const { normalizedExpense, amountPerOccurrence } = buildExpenseOccurrenceContext(exp, currentBackupData.use_instant_expenses);
+            if (!normalizedExpense || !normalizedExpense.start_date) return;
+            const occurrenceDates = getExpenseOccurrenceDatesInPeriod(normalizedExpense, periodStart, periodEnd, currentBackupData.use_instant_expenses);
+            if (!occurrenceDates || occurrenceDates.length === 0) return;
+
+            const totalUsd = occurrenceDates.reduce((sum, date) => sum + convertAmountToUsd(amountPerOccurrence, exp.currency, date), 0);
+            if (totalUsd <= 0) return;
+
             if (!totals[exp.category]) {
                 totals[exp.category] = 0;
                 methodTotals[exp.category] = { Efectivo: 0, Credito: 0 };
             }
-            totals[exp.category] += amt;
-            if (exp.payment_method === 'Credito') methodTotals[exp.category].Credito += amt;
-            else methodTotals[exp.category].Efectivo += amt;
+            totals[exp.category] += totalUsd;
+            const methodKey = exp.payment_method === 'Credito' ? 'Credito' : 'Efectivo';
+            methodTotals[exp.category][methodKey] += totalUsd;
         });
         return { totals, methodTotals };
     }
 
-    function renderExpenseDistributionChart(periodStart, periodicity, canvas, existingInstance) {
+    async function renderExpenseDistributionChart(periodStart, periodicity, canvas, existingInstance, precomputedData = null) {
         if (!canvas) return null;
-        const { totals, methodTotals } = calculateExpenseDistribution(periodStart, periodicity);
+        const { totals, methodTotals } = precomputedData || await calculateExpenseDistribution(periodStart, periodicity);
         const categories = Object.keys(totals).filter(cat => totals[cat] > 0);
         if (existingInstance) { existingInstance.destroy(); }
         if (categories.length === 0) {
@@ -3243,12 +3302,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
-        canvas.onclick = (evt) => {
+        canvas.onclick = async (evt) => {
             const points = newChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
             if (points.length) {
                 const idx = points[0].index;
                 const cat = newChart.data.labels[idx];
-                const rows = gatherPeriodTransactions(periodStart, periodicity, cat);
+                const rows = await gatherPeriodTransactions(periodStart, periodicity, cat);
                 openChartModal(`Transacciones - ${cat}`, rows);
             }
         };
@@ -3455,6 +3514,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- FUNCIONES AUXILIARES DE FECHAS Y FORMATO ---
     function formatCurrencyJS(value, symbol = '$') { if (value === null || typeof value !== 'number' || isNaN(value)) return `${symbol}0`; return `${symbol}${Math.round(value).toLocaleString('es-CL')}`; }
+    function getCurrencyDisplaySymbol(code) {
+        if (!code) return currentBackupData && currentBackupData.display_currency_symbol ? currentBackupData.display_currency_symbol : '$';
+        if (code === 'USD') return 'US$';
+        if (code === 'CLP') return '$';
+        return currentBackupData && currentBackupData.display_currency_symbol ? currentBackupData.display_currency_symbol : '$';
+    }
+    function formatAmountWithCurrency(amount, currencyCode) {
+        const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount || 0);
+        const symbol = getCurrencyDisplaySymbol(currencyCode);
+        const formatted = formatCurrencyJS(isNaN(numericAmount) ? 0 : numericAmount, symbol);
+        return currencyCode ? `${formatted} ${currencyCode}` : formatted;
+    }
     function addMonths(date, months) { const d = new Date(date.getTime()); d.setUTCMonth(d.getUTCMonth() + months); return d; }
     function addWeeks(date, weeks) { const d = new Date(date.getTime()); d.setUTCDate(d.getUTCDate() + (weeks * 7)); return d; }
     function getISODateString(date) { if (!(date instanceof Date) || isNaN(date.getTime())) return ''; return date.getUTCFullYear() + '-' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date.getUTCDate()).slice(-2); }
@@ -3580,7 +3651,7 @@ function getMondayOfWeek(year, week) {
         hideBreakdownPopup();
     }
 
-    function showBreakdownPopup(cell) {
+    async function showBreakdownPopup(cell) {
         if (!cell || !breakdownPopup) return;
         const periodicity = cell.dataset.periodicity;
         const idx = parseInt(cell.dataset.periodIndex, 10);
@@ -3588,7 +3659,8 @@ function getMondayOfWeek(year, week) {
         const category = cell.dataset.category || null;
         const startDate = cashflowPeriodDatesMap[periodicity] && cashflowPeriodDatesMap[periodicity][idx];
         if (!startDate) return;
-        let rows = gatherPeriodTransactions(startDate, periodicity, category);
+        let rows = await gatherPeriodTransactions(startDate, periodicity, category);
+        if (cell !== hoveredCell) return;
         if (rowKey === 'NET_INCOME') {
             rows = rows.filter(r => r.type === 'Ingreso');
         } else if (rowKey === 'FIXED_EXP_TOTAL' || rowKey === 'VAR_EXP_TOTAL') {
@@ -3669,54 +3741,76 @@ function getMondayOfWeek(year, week) {
         pieWeekInputs.forEach(inp => { if (inp) inp.value = `${ywYear}-W${('0'+ywWeek).slice(-2)}`; });
     }
 
-    function updatePieMonthCharts() {
-        const allCats = new Set();
-        pieMonthInputs.forEach((inp, idx) => {
-            const val = inp.value;
-            if (!val) {
-                if (pieMonthChartInstances[idx]) { pieMonthChartInstances[idx].destroy(); pieMonthChartInstances[idx] = null; }
-                const ctx = pieMonthCanvases[idx].getContext('2d');
-                ctx.clearRect(0,0,pieMonthCanvases[idx].width, pieMonthCanvases[idx].height);
-                return;
+    async function updatePieMonthCharts() {
+        try {
+            const allCats = new Set();
+            const distributionCache = new Array(pieMonthInputs.length);
+            for (let idx = 0; idx < pieMonthInputs.length; idx++) {
+                const inp = pieMonthInputs[idx];
+                if (!inp) continue;
+                const val = inp.value;
+                if (!val) {
+                    if (pieMonthChartInstances[idx]) { pieMonthChartInstances[idx].destroy(); pieMonthChartInstances[idx] = null; }
+                    const canvas = pieMonthCanvases[idx];
+                    if (canvas) {
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0,0,canvas.width,canvas.height);
+                    }
+                    distributionCache[idx] = null;
+                    continue;
+                }
+                const [y, m] = val.split('-');
+                const start = new Date(Date.UTC(parseInt(y, 10), parseInt(m, 10) - 1, 1));
+                const data = await calculateExpenseDistribution(start, 'Mensual');
+                distributionCache[idx] = { start, data };
+                Object.keys(data.totals).filter(c => data.totals[c] > 0).forEach(c => allCats.add(c));
             }
-            const [y,m] = val.split('-');
-            const start = new Date(Date.UTC(parseInt(y), parseInt(m)-1, 1));
-            const { totals } = calculateExpenseDistribution(start, 'Mensual');
-            Object.keys(totals).filter(c => totals[c] > 0).forEach(c => allCats.add(c));
-        });
-        renderSharedLegend(pieMonthLegend, Array.from(allCats));
-        pieMonthInputs.forEach((inp, idx) => {
-            const val = inp.value;
-            if (!val) return;
-            const [y,m] = val.split('-');
-            const start = new Date(Date.UTC(parseInt(y), parseInt(m)-1, 1));
-            pieMonthChartInstances[idx] = renderExpenseDistributionChart(start, 'Mensual', pieMonthCanvases[idx], pieMonthChartInstances[idx]);
-        });
+            renderSharedLegend(pieMonthLegend, Array.from(allCats));
+            for (let idx = 0; idx < pieMonthInputs.length; idx++) {
+                const cacheEntry = distributionCache[idx];
+                const canvas = pieMonthCanvases[idx];
+                if (!canvas || !cacheEntry) continue;
+                pieMonthChartInstances[idx] = await renderExpenseDistributionChart(cacheEntry.start, 'Mensual', canvas, pieMonthChartInstances[idx], cacheEntry.data);
+            }
+        } catch (error) {
+            console.error('Error al actualizar los gráficos de distribución mensual:', error);
+        }
     }
 
-    function updatePieWeekCharts() {
-        const allCats = new Set();
-        pieWeekInputs.forEach((inp, idx) => {
-            const val = inp.value;
-            if (!val) {
-                if (pieWeekChartInstances[idx]) { pieWeekChartInstances[idx].destroy(); pieWeekChartInstances[idx] = null; }
-                const ctx = pieWeekCanvases[idx].getContext('2d');
-                ctx.clearRect(0,0,pieWeekCanvases[idx].width, pieWeekCanvases[idx].height);
-                return;
+    async function updatePieWeekCharts() {
+        try {
+            const allCats = new Set();
+            const distributionCache = new Array(pieWeekInputs.length);
+            for (let idx = 0; idx < pieWeekInputs.length; idx++) {
+                const inp = pieWeekInputs[idx];
+                if (!inp) continue;
+                const val = inp.value;
+                if (!val) {
+                    if (pieWeekChartInstances[idx]) { pieWeekChartInstances[idx].destroy(); pieWeekChartInstances[idx] = null; }
+                    const canvas = pieWeekCanvases[idx];
+                    if (canvas) {
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0,0,canvas.width,canvas.height);
+                    }
+                    distributionCache[idx] = null;
+                    continue;
+                }
+                const [y, w] = val.split('-W');
+                const start = getMondayOfWeek(parseInt(y, 10), parseInt(w, 10));
+                const data = await calculateExpenseDistribution(start, 'Semanal');
+                distributionCache[idx] = { start, data };
+                Object.keys(data.totals).filter(c => data.totals[c] > 0).forEach(c => allCats.add(c));
             }
-            const [y,w] = val.split('-W');
-            const start = getMondayOfWeek(parseInt(y), parseInt(w));
-            const { totals } = calculateExpenseDistribution(start, 'Semanal');
-            Object.keys(totals).filter(c => totals[c] > 0).forEach(c => allCats.add(c));
-        });
-        renderSharedLegend(pieWeekLegend, Array.from(allCats));
-        pieWeekInputs.forEach((inp, idx) => {
-            const val = inp.value;
-            if (!val) return;
-            const [y,w] = val.split('-W');
-            const start = getMondayOfWeek(parseInt(y), parseInt(w));
-            pieWeekChartInstances[idx] = renderExpenseDistributionChart(start, 'Semanal', pieWeekCanvases[idx], pieWeekChartInstances[idx]);
-        });
+            renderSharedLegend(pieWeekLegend, Array.from(allCats));
+            for (let idx = 0; idx < pieWeekInputs.length; idx++) {
+                const cacheEntry = distributionCache[idx];
+                const canvas = pieWeekCanvases[idx];
+                if (!canvas || !cacheEntry) continue;
+                pieWeekChartInstances[idx] = await renderExpenseDistributionChart(cacheEntry.start, 'Semanal', canvas, pieWeekChartInstances[idx], cacheEntry.data);
+            }
+        } catch (error) {
+            console.error('Error al actualizar los gráficos de distribución semanal:', error);
+        }
     }
 
     pieMonthInputs.forEach(inp => inp && inp.addEventListener('change', updatePieMonthCharts));
@@ -3816,49 +3910,52 @@ function getMondayOfWeek(year, week) {
     }
     if (chartModal) chartModal.addEventListener("click", function(e) { if (e.target === chartModal) closeChartModal(); });
 
-    function gatherPeriodTransactions(pStart, periodicity, categoryFilter = null) {
+    async function gatherPeriodTransactions(pStart, periodicity, categoryFilter = null) {
         const pEnd = getPeriodEndDate(pStart, periodicity);
+        if (!currentBackupData) return [];
+        await ensureUsdClpRatesForPeriodRange(pStart, pEnd, {
+            expenses: currentBackupData.expenses,
+            incomes: currentBackupData.incomes,
+            useInstantExpenses: currentBackupData.use_instant_expenses,
+            periodicity
+        });
         const rows = [];
         (currentBackupData.incomes || []).forEach(inc => {
-            const occ = getIncomeOccurrencesInPeriod(inc, pStart, pEnd, periodicity);
-            if (occ > 0) {
-                const monthly = parseFloat(inc.net_monthly || 0);
-                const amount = monthly * occ;
-                const category = inc.is_reimbursement ? inc.reimbursement_category : '';
-                if (categoryFilter && categoryFilter !== category) return;
-                rows.push({
-                    type: inc.is_reimbursement ? 'Reembolso' : 'Ingreso',
-                    name: inc.name,
-                    amount,
-                    originalAmount: monthly,
-                    occurrences: occ,
-                    category,
-                    date: getISODateString(new Date(inc.start_date))
-                });
-            }
+            const occurrenceDates = getIncomeOccurrenceDatesInPeriod(inc, pStart, pEnd, periodicity);
+            if (!occurrenceDates || occurrenceDates.length === 0) return;
+            const amountPerOccurrence = parseFloat(inc.net_monthly || 0);
+            const totalAmount = occurrenceDates.reduce((sum, date) => sum + convertAmountToUsd(amountPerOccurrence, inc.currency, date), 0);
+            if (totalAmount <= 0) return;
+            const category = inc.is_reimbursement ? inc.reimbursement_category : '';
+            if (categoryFilter && categoryFilter !== category) return;
+            rows.push({
+                type: inc.is_reimbursement ? 'Reembolso' : 'Ingreso',
+                name: inc.name,
+                amount: totalAmount,
+                originalAmount: amountPerOccurrence,
+                occurrences: occurrenceDates.length,
+                category,
+                date: getISODateString(new Date(inc.start_date))
+            });
         });
         (currentBackupData.expenses || []).forEach(exp => {
             if (categoryFilter && categoryFilter !== exp.category) return;
-            const occ = getExpenseOccurrencesInPeriod(exp, pStart, pEnd, periodicity, currentBackupData.use_instant_expenses);
-            if (occ > 0) {
-                const baseAmount = parseFloat(exp.amount || 0);
-                const inst = parseInt(exp.installments || 1);
-                let perPeriodAmount = baseAmount;
-                if (inst > 1 && !currentBackupData.use_instant_expenses) {
-                    perPeriodAmount = baseAmount / inst;
-                }
-                const amount = perPeriodAmount * occ;
-                rows.push({
-                    type: 'Gasto',
-                    name: exp.name,
-                    amount,
-                    originalAmount: baseAmount,
-                    installments: inst,
-                    occurrences: occ,
-                    category: exp.category,
-                    date: getISODateString(new Date(exp.start_date))
-                });
-            }
+            const { normalizedExpense, amountPerOccurrence } = buildExpenseOccurrenceContext(exp, currentBackupData.use_instant_expenses);
+            if (!normalizedExpense || !normalizedExpense.start_date) return;
+            const occurrenceDates = getExpenseOccurrenceDatesInPeriod(normalizedExpense, pStart, pEnd, currentBackupData.use_instant_expenses);
+            if (!occurrenceDates || occurrenceDates.length === 0) return;
+            const totalAmount = occurrenceDates.reduce((sum, date) => sum + convertAmountToUsd(amountPerOccurrence, exp.currency, date), 0);
+            if (totalAmount <= 0) return;
+            rows.push({
+                type: 'Gasto',
+                name: exp.name,
+                amount: totalAmount,
+                originalAmount: parseFloat(exp.amount || 0),
+                installments: parseInt(exp.installments || 1),
+                occurrences: occurrenceDates.length,
+                category: exp.category,
+                date: getISODateString(new Date(exp.start_date))
+            });
         });
         return rows;
     }
@@ -3975,7 +4072,7 @@ function getMondayOfWeek(year, week) {
         return startY;
     }
 
-    function printCashflowSummary() {
+    async function printCashflowSummary() {
         const { jsPDF } = window.jspdf || {};
         if (!jsPDF) {
             alert('Biblioteca jsPDF no cargada.');
@@ -4019,7 +4116,7 @@ function getMondayOfWeek(year, week) {
             let d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
             for (let i = 0; i < duration; i++) {
                 const monthLabel = `${MONTH_NAMES_FULL_ES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
-                const trs = gatherPeriodTransactions(d, 'Mensual');
+                const trs = await gatherPeriodTransactions(d, 'Mensual');
                 trs.forEach(t => {
                     const amt = formatCurrencyJS(t.amount, symbol);
                     if (t.type === 'Gasto') {

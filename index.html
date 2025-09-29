@@ -107,8 +107,14 @@
                             <label for="income-name">Nombre:</label>
                             <input type="text" id="income-name" required>
 
-                            <label for="income-amount">Monto Neto:</label>
-                            <input type="number" id="income-amount" step="any" required>
+                        <label for="income-amount">Monto Neto:</label>
+                        <input type="number" id="income-amount" step="any" required>
+
+                        <label for="income-currency">Moneda:</label>
+                        <select id="income-currency">
+                            <option value="USD" selected>USD - Dólar Estadounidense</option>
+                            <option value="CLP">CLP - Peso Chileno</option>
+                        </select>
 
                             <label for="income-frequency">Frecuencia:</label>
                             <select id="income-frequency">
@@ -178,6 +184,12 @@
 
                             <label for="expense-amount">Monto:</label>
                             <input type="number" id="expense-amount" step="any" required>
+
+                            <label for="expense-currency">Moneda:</label>
+                            <select id="expense-currency">
+                                <option value="USD" selected>USD - Dólar Estadounidense</option>
+                                <option value="CLP">CLP - Peso Chileno</option>
+                            </select>
 
                             <label for="expense-category">Categoría:</label>
                             <div class="category-input-group">
