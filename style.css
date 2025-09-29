@@ -305,87 +305,157 @@ button.button-large {
 .dynamic-table-scroll {
     flex-grow: 1;
     overflow: auto;
-    max-height: 500px;
+    max-height: min(60vh, 520px);
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
+    background-color: var(--card-bg);
+    box-shadow: var(--shadow);
 }
 
-/* Tablas dinámicas (Ingresos/Gastos/Presupuestos) */
-#incomes-table-view, #expenses-table-view, #budgets-table-view, #payments-table-view, #budget-summary-table {
+.dynamic-table-scroll table {
     width: 100%;
-    min-width: max-content;
     border-collapse: separate;
     border-spacing: 0;
-    font-size: 0.85rem;
+    table-layout: auto;
+    font-size: clamp(0.78rem, 0.72rem + 0.2vw, 0.92rem);
 }
 
-/* Ajustes específicos para la tabla de gastos */
-#expenses-table-view {
-    table-layout: fixed;
-    min-width: unset;
-}
-
-#expenses-table-view th,
-#expenses-table-view td {
-    width: calc(100% / 12);
-}
-
-/* Nombre y Acciones ocupan el doble de espacio */
-#expenses-table-view th:nth-child(1),
-#expenses-table-view th:nth-child(10),
-#expenses-table-view td:nth-child(1),
-#expenses-table-view td:nth-child(10) {
-    width: calc(100% / 12 * 2);
-}
-
-#incomes-table-view th, #incomes-table-view td,
-#expenses-table-view th, #expenses-table-view td,
-#budgets-table-view th, #budgets-table-view td,
-#payments-table-view th, #payments-table-view td,
-#budget-summary-table th, #budget-summary-table td {
-    padding: 8px 10px;
+.dynamic-table-scroll table thead th,
+.dynamic-table-scroll table tbody td {
+    padding: clamp(8px, 0.8vw + 6px, 12px);
     text-align: left;
     border-bottom: 1px solid var(--border-color);
-    white-space: nowrap;
     background-color: var(--card-bg);
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+    vertical-align: top;
 }
 
-/* Cabeceras de tabla */
-#incomes-table-view thead th,
-#expenses-table-view thead th,
-#budgets-table-view thead th,
-#payments-table-view thead th,
-#budget-summary-table thead th {
+.dynamic-table-scroll table thead th {
     background-color: var(--header-bg);
     color: var(--primary-color);
     font-weight: 600;
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: 5;
 }
 
-/* Estilo Hover para filas */
-#incomes-table-view tbody tr:hover td,
-#expenses-table-view tbody tr:hover td,
-#budgets-table-view tbody tr:hover td,
-#payments-table-view tbody tr:hover td,
-#budget-summary-table tbody tr:hover td {
+.dynamic-table-scroll table tbody tr:hover td {
     background-color: var(--row-hover-bg);
 }
 
-#incomes-table-view td button, #expenses-table-view td button {
-    padding: 4px 8px;
-    font-size: 0.8rem;
-    margin-right: 5px;
+.dynamic-table-scroll table tbody tr:last-child td {
+    border-bottom: none;
 }
 
-/* Ajuste de ancho y scroll para columna Nombre en Gastos */
+.dynamic-table-scroll table td button {
+    padding: 4px 10px;
+    font-size: 0.82rem;
+    margin-right: 6px;
+    margin-bottom: 0;
+}
+
+@media (max-width: 900px) {
+    .dynamic-table-scroll {
+        max-height: min(60vh, 460px);
+    }
+}
+
+/* Columnas y filas responsivas para tablas dinámicas */
+#incomes-table-view th:first-child,
+#incomes-table-view td:first-child,
+#expenses-table-view th:first-child,
+#expenses-table-view td:first-child,
+#budgets-table-view th:first-child,
+#budgets-table-view td:first-child,
+#budget-summary-table th:first-child,
+#budget-summary-table td:first-child,
+#payments-table-view th:first-child,
+#payments-table-view td:first-child {
+    min-width: clamp(120px, 24vw, 300px);
+}
+
+#incomes-table-view th:last-child,
+#incomes-table-view td:last-child,
+#expenses-table-view th:last-child,
+#expenses-table-view td:last-child,
+#payments-table-view th:last-child,
+#payments-table-view td:last-child {
+    min-width: clamp(140px, 20vw, 220px);
+}
+
+#incomes-table-view th:nth-child(2),
+#incomes-table-view td:nth-child(2),
+#expenses-table-view th:nth-child(2),
+#expenses-table-view td:nth-child(2),
+#payments-table-view th:nth-child(2),
+#payments-table-view td:nth-child(2),
+#budget-summary-table th:nth-child(2),
+#budget-summary-table td:nth-child(2),
+#budget-summary-table th:nth-child(3),
+#budget-summary-table td:nth-child(3),
+#budget-summary-table th:nth-child(4),
+#budget-summary-table td:nth-child(4),
+#budget-summary-table th:nth-child(5),
+#budget-summary-table td:nth-child(5) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+#budgets-table-view th:nth-child(3),
+#budgets-table-view td:nth-child(3) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+#payments-table-view th:nth-child(6),
+#payments-table-view td:nth-child(6) {
+    white-space: nowrap;
+}
+
+#payments-table-view th:nth-child(7),
+#payments-table-view td:nth-child(7) {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.table-actions-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 40px;
+}
+
+.table-actions-cell button {
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .table-actions-cell {
+        gap: 6px;
+    }
+    .table-actions-cell button {
+        flex: 1 1 120px;
+    }
+}
+
+
+/* Ajustes responsivos para la columna Nombre en Gastos */
 #expenses-table-view td.expense-name-cell {
     /* allow width to adapt to the widest value */
 }
 #expenses-table-view td.expense-name-cell .name-scroll {
     display: block;
-    overflow-x: auto;
+    max-width: 100%;
+    overflow: visible;
+    white-space: normal;
+    word-break: break-word;
 }
 /* Estilo para el icono de reembolso y la celda */
 .reimbursement-icon {
@@ -1301,13 +1371,36 @@ td.reimbursement-income {
 }
 .import-preview-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     margin-bottom: 10px;
+    table-layout: auto;
+    font-size: clamp(0.78rem, 0.72rem + 0.2vw, 0.9rem);
 }
 .import-preview-table th,
 .import-preview-table td {
     border: 1px solid var(--border-color);
-    padding: 4px;
+    padding: clamp(6px, 0.6vw + 4px, 10px);
+    background-color: var(--card-bg);
+    white-space: normal;
+    word-break: break-word;
+}
+.import-preview-table thead th {
+    background-color: var(--header-bg);
+    color: var(--primary-color);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+.import-preview-table tbody tr:hover td {
+    background-color: var(--row-hover-bg);
+}
+.import-preview-table th:nth-child(4),
+.import-preview-table td:nth-child(4) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 .duplicate-row {
     background-color: var(--alt-row-bg);
@@ -1323,6 +1416,44 @@ td.reimbursement-income {
 .desktop-only { display: none; }
 @media (min-width: 769px) {
     .desktop-only { display: inline-block; }
+}
+
+/* Tabla mostrada en modal del gráfico */
+#chart-modal-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: auto;
+    font-size: clamp(0.78rem, 0.72rem + 0.2vw, 0.92rem);
+}
+
+#chart-modal-table th,
+#chart-modal-table td {
+    padding: clamp(8px, 0.8vw + 6px, 12px);
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+    white-space: normal;
+    word-break: break-word;
+}
+
+#chart-modal-table th {
+    background-color: var(--header-bg);
+    color: var(--primary-color);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+#chart-modal-table tbody tr:hover td {
+    background-color: var(--row-hover-bg);
+}
+
+#chart-modal-table th:nth-child(3),
+#chart-modal-table td:nth-child(3) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 /* Popup de desglose de celda */

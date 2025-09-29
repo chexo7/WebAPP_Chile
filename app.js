@@ -1811,6 +1811,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function appendActionButtons(row, onEdit, onDelete) {
         const actionsCell = row.insertCell();
+        actionsCell.classList.add('table-actions-cell');
         if (typeof onEdit === 'function') {
             const editButton = document.createElement('button');
             editButton.textContent = 'Editar';
