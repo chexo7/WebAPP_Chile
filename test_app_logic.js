@@ -270,7 +270,8 @@ function getPeriodEndDate(date, periodicity) {
         const monday = getMondayOfWeek(isoYearForWeek, weekNumber);
         periodEnd = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 6, 0, 0, 0, 0));
     } else if (periodicity === "Diario") {
-        periodEnd = new Date(Date.UTC(year, month, date.getUTCDate(), 0, 0, 0, 0));
+        const nextDay = new Date(Date.UTC(year, month, date.getUTCDate() + 1, 0, 0, 0, 0));
+        periodEnd = new Date(nextDay.getTime() - 1);
     } else {
         throw new Error("Invalid periodicity provided to getPeriodEndDate. Must be 'Mensual', 'Semanal' o 'Diario'.");
     }
@@ -692,8 +693,9 @@ runTest("getPeriodStartDate - Diario - Same day", () => {
 
 runTest("getPeriodEndDate - Diario - Same day", () => {
     const date = new Date(Date.UTC(2024, 0, 15, 23, 30));
-    const expected = new Date(Date.UTC(2024, 0, 15));
-    assertEquals(expected.toISOString(), getPeriodEndDate(date, "Diario").toISOString(), "Jan 15 -> Jan 15");
+    const expected = new Date(Date.UTC(2024, 0, 16));
+    expected.setUTCMilliseconds(expected.getUTCMilliseconds() - 1);
+    assertEquals(expected.toISOString(), getPeriodEndDate(date, "Diario").toISOString(), "Jan 15 -> Jan 15 23:59:59.999");
 });
 
 // --- calculateCashFlowData Tests ---

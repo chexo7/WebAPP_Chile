@@ -3790,7 +3790,8 @@ function getMondayOfWeek(year, week) {
             // Sunday is Monday + 6 days
             periodEnd = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 6, 0, 0, 0, 0));
         } else if (periodicity === "Diario") {
-            periodEnd = new Date(Date.UTC(year, month, date.getUTCDate(), 0, 0, 0, 0));
+            const nextDay = new Date(Date.UTC(year, month, date.getUTCDate() + 1, 0, 0, 0, 0));
+            periodEnd = new Date(nextDay.getTime() - 1);
         } else {
             throw new Error("Invalid periodicity provided to getPeriodEndDate. Must be 'Mensual', 'Semanal' o 'Diario'.");
         }
