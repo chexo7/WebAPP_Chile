@@ -661,6 +661,21 @@ td.reimbursement-income {
     font-size: 1.05rem;
 }
 
+.local-backup-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.local-backup-container button {
+    flex: 1 1 220px;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
 /* Estilos específicos para Pestaña Ajustes */
 .settings-form-container {
     max-width: 600px;

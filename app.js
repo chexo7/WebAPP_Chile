@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
         '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
     ];
+    const LOCAL_BACKUP_FILE_TYPE = 'webapp_chile_local_backup_v1';
     const globalCategoryColors = {};
     let nextCategoryColorIndex = 0;
     function getCategoryColor(cat) {
@@ -68,6 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContentContainer = document.getElementById('main-content-container');
     const tabsContainer = document.querySelector('.tabs-container');
     const saveChangesButton = document.getElementById('save-changes-button');
+    const downloadLocalBackupButton = document.getElementById('download-local-backup-button');
+    const importLocalBackupButton = document.getElementById('import-local-backup-button');
+    const localBackupFileInput = document.getElementById('local-backup-file-input');
     const cashflowTabButton = tabsContainer ? tabsContainer.querySelector('.tab-button[data-tab="flujo-caja"]') : null;
 
     // --- ELEMENTOS PESTAÑA AJUSTES ---
@@ -612,6 +616,240 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function createDefaultBackupData() {
+        return {
+            version: "1.0_web_v3_usd_clp_auto",
+            analysis_start_date: new Date(),
+            analysis_duration: 12,
+            analysis_periodicity: "Mensual",
+            analysis_initial_balance: 0,
+            display_currency_symbol: "$",
+            use_instant_expenses: false,
+            incomes: [],
+            expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
+            expenses: [],
+            credit_cards: [],
+            payments: {},
+            budgets: {},
+            baby_steps_status: BABY_STEPS_DATA_JS.map(step => ({
+                dos: new Array(step.dos.length).fill(false),
+                donts: new Array(step.donts.length).fill(false)
+            })),
+            reminders_todos: [],
+            change_log: []
+        };
+    }
+
+    function hydrateBackupData(rawData) {
+        if (!rawData || typeof rawData !== 'object') {
+            return null;
+        }
+
+        const hydrated = JSON.parse(JSON.stringify(rawData));
+
+        if (!Array.isArray(hydrated.incomes)) hydrated.incomes = [];
+        hydrated.incomes.forEach(inc => {
+            if (typeof inc.is_reimbursement === 'undefined') inc.is_reimbursement = false;
+            if (typeof inc.reimbursement_category === 'undefined') inc.reimbursement_category = null;
+            inc.currency = inc.currency || 'USD';
+            if (inc.start_date) inc.start_date = toUTCDate(inc.start_date);
+            if (inc.end_date) inc.end_date = toUTCDate(inc.end_date);
+        });
+
+        if (!Array.isArray(hydrated.expenses)) hydrated.expenses = [];
+        hydrated.expenses.forEach(exp => {
+            if (exp.start_date) exp.start_date = toUTCDate(exp.start_date);
+            if (exp.end_date) exp.end_date = toUTCDate(exp.end_date);
+            if (exp.movement_date) exp.movement_date = toUTCDate(exp.movement_date);
+            else exp.movement_date = exp.start_date ? toUTCDate(exp.start_date) : null;
+            if (!exp.payment_method) exp.payment_method = 'Efectivo';
+            exp.currency = exp.currency || 'USD';
+        });
+
+        if (!hydrated.expense_categories || Object.keys(hydrated.expense_categories).length === 0) {
+            hydrated.expense_categories = JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS));
+        }
+
+        if (!hydrated.budgets || typeof hydrated.budgets !== 'object') hydrated.budgets = {};
+        if (!hydrated.payments || typeof hydrated.payments !== 'object') hydrated.payments = {};
+
+        if (!Array.isArray(hydrated.credit_cards)) {
+            hydrated.credit_cards = [];
+        } else {
+            hydrated.credit_cards.forEach(card => {
+                card.cutoff_day = parseInt(card.cutoff_day, 10) || 1;
+                card.payment_day = parseInt(card.payment_day, 10) || 1;
+            });
+        }
+
+        if (!Array.isArray(hydrated.baby_steps_status) || hydrated.baby_steps_status.length === 0) {
+            hydrated.baby_steps_status = BABY_STEPS_DATA_JS.map(step => ({
+                dos: new Array(step.dos.length).fill(false),
+                donts: new Array(step.donts.length).fill(false)
+            }));
+        }
+
+        if (!Array.isArray(hydrated.reminders_todos)) hydrated.reminders_todos = [];
+
+        let hydratedChangeLog = hydrated.change_log;
+        if (!Array.isArray(hydratedChangeLog)) hydratedChangeLog = [];
+        hydratedChangeLog.forEach(entry => {
+            if (entry && typeof entry === 'object' && !entry.user) {
+                entry.user = "Desconocido (Versión Antigua)";
+            }
+        });
+        hydrated.change_log = hydratedChangeLog;
+
+        hydrated.analysis_start_date = toUTCDate(hydrated.analysis_start_date, new Date());
+        hydrated.analysis_duration = parseInt(hydrated.analysis_duration, 10) || 12;
+        hydrated.analysis_periodicity = hydrated.analysis_periodicity || "Mensual";
+        hydrated.analysis_initial_balance = parseFloat(hydrated.analysis_initial_balance) || 0;
+        hydrated.display_currency_symbol = hydrated.display_currency_symbol || "$";
+        hydrated.use_instant_expenses = !!hydrated.use_instant_expenses;
+
+        return hydrated;
+    }
+
+    function applyBackupDataToApp(backupData, key = null) {
+        if (!backupData) {
+            return;
+        }
+
+        currentBackupData = backupData;
+        currentBackupKey = key;
+        changeLogEntries = backupData.change_log || [];
+
+        originalLoadedData = JSON.parse(JSON.stringify(currentBackupData));
+
+        if (backupSelector) {
+            if (key) {
+                backupSelector.value = key;
+            } else {
+                backupSelector.value = '';
+            }
+        }
+
+        populateSettingsForm();
+        renderCreditCards();
+        populateExpenseCategoriesDropdowns();
+        populateIncomeReimbursementCategoriesDropdown();
+        renderIncomesTable();
+        renderExpensesTable();
+        renderBudgetsTable();
+        renderBabySteps();
+        renderReminders();
+        renderLogTab();
+
+        activePaymentsPeriodicity = currentBackupData.analysis_periodicity || 'Mensual';
+        setupPaymentPeriodSelectors();
+        setupBudgetPeriodSelectors();
+        setPaymentPeriodicity(activePaymentsPeriodicity);
+        renderCashflowTable();
+        updateAnalysisModeLabels();
+
+        hideElement(dataSelectionContainer);
+        hideElement(loadingMessage);
+        showMainContentScreen();
+    }
+
+    function cloneBackupDataForExport(data) {
+        return JSON.parse(JSON.stringify(data, (key, value) => {
+            if (value instanceof Date) {
+                return value.toISOString();
+            }
+            return value;
+        }));
+    }
+
+    function buildLocalBackupPayload() {
+        if (!currentBackupData) {
+            return null;
+        }
+        return {
+            type: LOCAL_BACKUP_FILE_TYPE,
+            savedAt: new Date().toISOString(),
+            sourceBackupKey: currentBackupKey || null,
+            data: cloneBackupDataForExport(currentBackupData)
+        };
+    }
+
+    function describePotentialDataLoss(targetData) {
+        if (!currentBackupData) {
+            return [];
+        }
+        const differences = generateDetailedChangeLog(targetData, currentBackupData) || [];
+        return differences.filter(detail => detail !== "No se detectaron cambios significativos en los datos.");
+    }
+
+    function handleLocalBackupFileSelection(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) {
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const text = e.target.result;
+                let parsed = JSON.parse(text);
+                let metadata = {};
+                if (parsed && parsed.type === LOCAL_BACKUP_FILE_TYPE && parsed.data) {
+                    metadata = parsed;
+                    parsed = parsed.data;
+                }
+
+                const hydratedData = hydrateBackupData(parsed);
+                if (!hydratedData) {
+                    throw new Error('El archivo no contiene una copia de seguridad válida.');
+                }
+
+                const lossDetails = describePotentialDataLoss(hydratedData);
+                let proceed = true;
+                if (lossDetails.length > 0) {
+                    const formattedLoss = lossDetails.map(detail => `- ${detail}`).join('\n');
+                    const savedAtDate = metadata.savedAt ? new Date(metadata.savedAt) : null;
+                    const savedAtText = savedAtDate && !isNaN(savedAtDate.getTime())
+                        ? savedAtDate.toLocaleString()
+                        : 'archivo seleccionado';
+                    proceed = confirm(`Al cargar esta copia de seguridad se reemplazarán los datos actuales por la versión del ${savedAtText}. Podrías perder los siguientes cambios:\n\n${formattedLoss}\n\n¿Deseas continuar?`);
+                } else if (currentBackupData) {
+                    proceed = confirm('La copia de seguridad seleccionada no introduce cambios significativos respecto a los datos actuales. ¿Deseas cargarla igualmente?');
+                } else {
+                    proceed = confirm('Se cargará la copia de seguridad seleccionada. ¿Deseas continuar?');
+                }
+
+                if (!proceed) {
+                    return;
+                }
+
+                const keyFromMetadata = metadata.sourceBackupKey || null;
+                applyBackupDataToApp(hydratedData, keyFromMetadata);
+                if (metadata.savedAt) {
+                    const savedDate = new Date(metadata.savedAt);
+                    if (!isNaN(savedDate.getTime())) {
+                        alert(`Copia de seguridad local cargada correctamente (${savedDate.toLocaleString()}).`);
+                    } else {
+                        alert('Copia de seguridad local cargada correctamente.');
+                    }
+                } else {
+                    alert('Copia de seguridad local cargada correctamente.');
+                }
+            } catch (error) {
+                console.error('Error al cargar la copia de seguridad local:', error);
+                alert(`No se pudo cargar la copia de seguridad: ${error.message}`);
+            } finally {
+                event.target.value = '';
+            }
+        };
+
+        reader.onerror = () => {
+            alert('No se pudo leer el archivo seleccionado.');
+            event.target.value = '';
+        };
+
+        reader.readAsText(file);
+    }
+
     function loadSpecificBackup(key) {
         const userRef = getUserDataRef();
         if (!userRef) {
@@ -629,136 +867,16 @@ document.addEventListener('DOMContentLoaded', () => {
         userRef.child(`backups/${key}`).once('value')
             .then(snapshot => {
                 if (snapshot.exists()) {
-                    currentBackupData = snapshot.val();
-                    currentBackupKey = key;
-
-                    if (!currentBackupData.incomes) currentBackupData.incomes = [];
-                    currentBackupData.incomes.forEach(inc => {
-                        if (typeof inc.is_reimbursement === 'undefined') inc.is_reimbursement = false;
-                        if (typeof inc.reimbursement_category === 'undefined') inc.reimbursement_category = null;
-                        inc.currency = inc.currency || 'USD';
-                    });
-
-                    if (!currentBackupData.expenses) currentBackupData.expenses = [];
-                    if (!currentBackupData.expense_categories || Object.keys(currentBackupData.expense_categories).length === 0) {
-                        currentBackupData.expense_categories = JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS));
+                    const hydratedData = hydrateBackupData(snapshot.val());
+                    applyBackupDataToApp(hydratedData, key);
+                    if (backupSelector) {
+                        backupSelector.value = key;
                     }
-                    if (!currentBackupData.budgets) currentBackupData.budgets = {};
-                    if (!currentBackupData.payments) currentBackupData.payments = {};
-                    if (!currentBackupData.baby_steps_status || currentBackupData.baby_steps_status.length === 0) {
-                        currentBackupData.baby_steps_status = BABY_STEPS_DATA_JS.map(step => ({
-                            dos: new Array(step.dos.length).fill(false),
-                            donts: new Array(step.donts.length).fill(false)
-                        }));
-                    }
-                    if (!currentBackupData.reminders_todos) currentBackupData.reminders_todos = [];
-
-                    changeLogEntries = currentBackupData.change_log || [];
-                    if (!Array.isArray(changeLogEntries)) { 
-                        changeLogEntries = [];
-                    }
-                    changeLogEntries.forEach(entry => {
-                        if (!entry.user) {
-                            entry.user = "Desconocido (Versión Antigua)";
-                        }
-                    });
-                    currentBackupData.change_log = changeLogEntries;
-
-
-                    currentBackupData.analysis_start_date = toUTCDate(currentBackupData.analysis_start_date, new Date());
-                    currentBackupData.analysis_duration = parseInt(currentBackupData.analysis_duration, 10) || 12;
-                    currentBackupData.analysis_periodicity = currentBackupData.analysis_periodicity || "Mensual";
-                    currentBackupData.analysis_initial_balance = parseFloat(currentBackupData.analysis_initial_balance) || 0;
-                    currentBackupData.display_currency_symbol = currentBackupData.display_currency_symbol || "$";
-                    currentBackupData.use_instant_expenses = !!currentBackupData.use_instant_expenses;
-
-                    (currentBackupData.incomes || []).forEach(inc => {
-                        if (inc.start_date) inc.start_date = toUTCDate(inc.start_date);
-                        if (inc.end_date) inc.end_date = toUTCDate(inc.end_date);
-                    });
-                    (currentBackupData.expenses || []).forEach(exp => {
-                        if (exp.start_date) exp.start_date = toUTCDate(exp.start_date);
-                        if (exp.end_date) exp.end_date = toUTCDate(exp.end_date);
-                        if (exp.movement_date) exp.movement_date = toUTCDate(exp.movement_date);
-                        else exp.movement_date = exp.start_date;
-                        if (!exp.payment_method) exp.payment_method = 'Efectivo';
-                        exp.currency = exp.currency || 'USD';
-                    });
-                    if (Array.isArray(currentBackupData.credit_cards)) {
-                        currentBackupData.credit_cards.forEach(card => {
-                            card.cutoff_day = parseInt(card.cutoff_day, 10) || 1;
-                            card.payment_day = parseInt(card.payment_day, 10) || 1;
-                        });
-                    } else {
-                        currentBackupData.credit_cards = [];
-                    }
-
-                    originalLoadedData = JSON.parse(JSON.stringify(currentBackupData));
-
-                    populateSettingsForm();
-                    renderCreditCards();
-                    populateExpenseCategoriesDropdowns();
-                    populateIncomeReimbursementCategoriesDropdown();
-                    renderIncomesTable();
-                    renderExpensesTable();
-                    renderBudgetsTable();
-                    renderBabySteps();
-                    renderReminders();
-                    renderLogTab();
-                    activePaymentsPeriodicity = currentBackupData.analysis_periodicity || 'Mensual';
-                    setupPaymentPeriodSelectors();
-                    setupBudgetPeriodSelectors();
-                    setPaymentPeriodicity(activePaymentsPeriodicity);
-                    renderCashflowTable();
-
-                    showMainContentScreen();
                 } else {
-                    // MODIFICADO: Si no existe el backup, carga los datos por defecto y permite guardar
                     alert("La versión seleccionada no contiene datos válidos o está vacía. Se cargarán los datos por defecto.");
-                    currentBackupData = {
-                        version: "1.0_web_v3_usd_clp_auto",
-                        analysis_start_date: new Date(),
-                        analysis_duration: 12,
-                        analysis_periodicity: "Mensual",
-                        analysis_initial_balance: 0,
-                        display_currency_symbol: "$",
-                        use_instant_expenses: false,
-                        incomes: [],
-                        expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
-                        expenses: [],
-                        credit_cards: [],
-                        payments: {},
-                        budgets: {},
-                        baby_steps_status: BABY_STEPS_DATA_JS.map(step => ({
-                            dos: new Array(step.dos.length).fill(false),
-                            donts: new Array(step.donts.length).fill(false)
-                        })),
-                        reminders_todos: [],
-                        change_log: []
-                    };
-                    currentBackupKey = null; // No hay un backup previo para este caso
-                    originalLoadedData = JSON.parse(JSON.stringify(currentBackupData));
-                    changeLogEntries = [];
-
-                    populateSettingsForm();
-                    renderCreditCards();
-                    populateExpenseCategoriesDropdowns();
-                    populateIncomeReimbursementCategoriesDropdown();
-                    renderIncomesTable();
-                    renderExpensesTable();
-                    renderBudgetsTable();
-                    renderBabySteps();
-                    renderReminders();
-                    renderLogTab();
-                    activePaymentsPeriodicity = currentBackupData.analysis_periodicity || 'Mensual';
-                    setupPaymentPeriodSelectors();
-                    setupBudgetPeriodSelectors();
-                    setPaymentPeriodicity(activePaymentsPeriodicity);
-                    renderCashflowTable();
-
-                    showMainContentScreen();
+                    const defaultData = hydrateBackupData(createDefaultBackupData());
+                    applyBackupDataToApp(defaultData, null);
                 }
-                hideElement(loadingMessage);
             })
             .catch(error => {
                 console.error("Error loading backup data:", error);
@@ -769,6 +887,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentBackupKey = null;
                 changeLogEntries = [];
             });
+    }
+
+    if (downloadLocalBackupButton) {
+        downloadLocalBackupButton.addEventListener('click', () => {
+            if (!currentBackupData) {
+                alert('No hay datos cargados para guardar como copia local.');
+                return;
+            }
+
+            const payload = buildLocalBackupPayload();
+            if (!payload) {
+                alert('No se pudo preparar la copia de seguridad local.');
+                return;
+            }
+
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `copia_seguridad_local_${timestamp}.json`;
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            URL.revokeObjectURL(url);
+
+            alert('Copia de seguridad local generada. Revisa tu carpeta de descargas.');
+        });
+    }
+
+    if (importLocalBackupButton && localBackupFileInput) {
+        importLocalBackupButton.addEventListener('click', () => {
+            localBackupFileInput.click();
+        });
+        localBackupFileInput.addEventListener('change', handleLocalBackupFileSelection);
     }
 
     function formatBackupKey(key) {
