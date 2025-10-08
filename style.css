@@ -523,7 +523,8 @@ td.reimbursement-income {
 }
 #cashflow-table tbody td:first-child,
 #cashflow-mensual-table tbody td:first-child,
-#cashflow-semanal-table tbody td:first-child {
+#cashflow-semanal-table tbody td:first-child,
+#cashflow-diario-table tbody td:first-child {
   font-weight: 500;
   z-index: 9;
   background-color: var(--card-bg);
@@ -535,7 +536,9 @@ td.reimbursement-income {
 #cashflow-mensual-table tbody tr.bg-alt-row td,
 #cashflow-mensual-table tbody tr.bg-alt-row td:first-child,
 #cashflow-semanal-table tbody tr.bg-alt-row td,
-#cashflow-semanal-table tbody tr.bg-alt-row td:first-child {
+#cashflow-semanal-table tbody tr.bg-alt-row td:first-child,
+#cashflow-diario-table tbody tr.bg-alt-row td,
+#cashflow-diario-table tbody tr.bg-alt-row td:first-child {
   background-color: var(--alt-row-bg) !important;
 }
 #cashflow-table tbody tr.bg-header td,
@@ -543,7 +546,9 @@ td.reimbursement-income {
 #cashflow-mensual-table tbody tr.bg-header td,
 #cashflow-mensual-table tbody tr.bg-header td:first-child,
 #cashflow-semanal-table tbody tr.bg-header td,
-#cashflow-semanal-table tbody tr.bg-header td:first-child {
+#cashflow-semanal-table tbody tr.bg-header td:first-child,
+#cashflow-diario-table tbody tr.bg-header td,
+#cashflow-diario-table tbody tr.bg-header td:first-child {
   background-color: var(--body-header-row-bg) !important;
 }
 #cashflow-table tbody tr:not(.bg-header):hover td,
@@ -551,13 +556,16 @@ td.reimbursement-income {
 #cashflow-mensual-table tbody tr:not(.bg-header):hover td,
 #cashflow-mensual-table tbody tr:not(.bg-header):hover td:first-child,
 #cashflow-semanal-table tbody tr:not(.bg-header):hover td,
-#cashflow-semanal-table tbody tr:not(.bg-header):hover td:first-child {
+#cashflow-semanal-table tbody tr:not(.bg-header):hover td:first-child,
+#cashflow-diario-table tbody tr:not(.bg-header):hover td,
+#cashflow-diario-table tbody tr:not(.bg-header):hover td:first-child {
   background-color: var(--row-hover-bg) !important;
 }
 
 #cashflow-table td:not(:first-child),
 #cashflow-mensual-table td:not(:first-child),
-#cashflow-semanal-table td:not(:first-child) {
+#cashflow-semanal-table td:not(:first-child),
+#cashflow-diario-table td:not(:first-child) {
   text-align: right;
   font-family: 'Consolas', monospace;
 }
@@ -572,7 +580,9 @@ td.reimbursement-income {
 #cashflow-mensual-table th.current-period,
 #cashflow-mensual-table td.current-period,
 #cashflow-semanal-table th.current-period,
-#cashflow-semanal-table td.current-period {
+#cashflow-semanal-table td.current-period,
+#cashflow-diario-table th.current-period,
+#cashflow-diario-table td.current-period {
   background-image: repeating-linear-gradient(
     45deg,
     rgba(0, 122, 255, 0.10) 0,

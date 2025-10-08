@@ -370,6 +370,7 @@
                 <div class="subtabs-container" id="cashflow-subtabs">
                     <button class="subtab-button active" data-parent="cashflow" data-period="Mensual">Mensual</button>
                     <button class="subtab-button" data-parent="cashflow" data-period="Semanal">Semanal</button>
+                    <button class="subtab-button" data-parent="cashflow" data-period="Diario">Diario</button>
                 </div>
                 <div id="cashflow-mensual-container">
                     <h2 id="cashflow-mensual-title">Flujo de Caja - Mensual</h2>
@@ -389,12 +390,22 @@
                         </table>
                     </div>
                 </div>
+                <div id="cashflow-diario-container" style="display:none;">
+                    <h2 id="cashflow-diario-title">Flujo de Caja - Diario</h2>
+                    <div class="table-responsive">
+                        <table id="cashflow-diario-table">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <div id="grafico" class="tab-content">
                 <div class="subtabs-container" id="chart-subtabs">
                     <button class="subtab-button active" data-parent="chart" data-period="Mensual">Mensual</button>
                     <button class="subtab-button" data-parent="chart" data-period="Semanal">Semanal</button>
+                    <button class="subtab-button" data-parent="chart" data-period="Diario">Diario</button>
                 </div>
                 <h2 id="grafico-title">Gráfico de Flujo de Caja</h2>
                 <div class="chart-container">
