@@ -70,6 +70,7 @@ const MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", 
 
 function addMonths(date, months) { const d = new Date(date.getTime()); d.setUTCMonth(d.getUTCMonth() + months); return d; }
 function addWeeks(date, weeks) { const d = new Date(date.getTime()); d.setUTCDate(d.getUTCDate() + (weeks * 7)); return d; }
+function addDays(date, days) { const d = new Date(date.getTime()); d.setUTCDate(d.getUTCDate() + days); return d; }
 function getISODateString(date) { if (!(date instanceof Date) || isNaN(date.getTime())) return ''; return date.getUTCFullYear() + '-' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date.getUTCDate()).slice(-2); }
 
 // getWeekNumber and getMondayOfWeek are crucial for weekly periodicity.
@@ -240,10 +241,12 @@ function getPeriodStartDate(date, periodicity) {
         periodStart = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
     } else if (periodicity === "Semanal") {
         const [isoYearForWeek, weekNumber] = getWeekNumber(date);
-        const monday = getMondayOfWeek(isoYearForWeek, weekNumber); 
+        const monday = getMondayOfWeek(isoYearForWeek, weekNumber);
         periodStart = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate(), 0, 0, 0, 0));
+    } else if (periodicity === "Diario") {
+        periodStart = new Date(Date.UTC(year, month, date.getUTCDate(), 0, 0, 0, 0));
     } else {
-        throw new Error("Invalid periodicity provided to getPeriodStartDate. Must be 'Mensual' or 'Semanal'.");
+        throw new Error("Invalid periodicity provided to getPeriodStartDate. Must be 'Mensual', 'Semanal' o 'Diario'.");
     }
     return periodStart;
 }
@@ -254,14 +257,16 @@ function getPeriodEndDate(date, periodicity) {
     let periodEnd;
 
     if (periodicity === "Mensual") {
-        periodEnd = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0, 0)); 
-        periodEnd.setUTCDate(periodEnd.getUTCDate() - 1); 
+        periodEnd = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0, 0));
+        periodEnd.setUTCDate(periodEnd.getUTCDate() - 1);
     } else if (periodicity === "Semanal") {
         const [isoYearForWeek, weekNumber] = getWeekNumber(date);
-        const monday = getMondayOfWeek(isoYearForWeek, weekNumber); 
+        const monday = getMondayOfWeek(isoYearForWeek, weekNumber);
         periodEnd = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 6, 0, 0, 0, 0));
+    } else if (periodicity === "Diario") {
+        periodEnd = new Date(Date.UTC(year, month, date.getUTCDate(), 0, 0, 0, 0));
     } else {
-        throw new Error("Invalid periodicity provided to getPeriodEndDate. Must be 'Mensual' or 'Semanal'.");
+        throw new Error("Invalid periodicity provided to getPeriodEndDate. Must be 'Mensual', 'Semanal' o 'Diario'.");
     }
     return periodEnd;
 }
@@ -573,8 +578,14 @@ function calculateCashFlowData(data) {
         net_flow_p[i] = net_flow;
         const end_bal = currentBalance + net_flow; 
         end_bal_p[i] = end_bal;
-        currentBalance = end_bal; 
-        currentDate = (periodicity === "Mensual") ? addMonths(currentDate, 1) : addWeeks(currentDate, 1);
+        currentBalance = end_bal;
+        if (periodicity === "Mensual") {
+            currentDate = addMonths(currentDate, 1);
+        } else if (periodicity === "Semanal") {
+            currentDate = addWeeks(currentDate, 1);
+        } else {
+            currentDate = addDays(currentDate, 1);
+        }
     }
     return { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p };
 }
@@ -630,6 +641,18 @@ runTest("getPeriodStartDate - Semanal - Year Boundary (Dec 31, 2023 - Sun, Week 
     assertEquals(expected.toISOString(), getPeriodStartDate(date, "Semanal").toISOString(), "Dec 31, 2023 (Sun) -> Dec 25, 2023 (Mon)");
 });
 
+runTest("getPeriodStartDate - Diario - preserves same day", () => {
+    const date = new Date(Date.UTC(2024, 4, 12, 15, 30));
+    const expected = new Date(Date.UTC(2024, 4, 12));
+    assertEquals(expected.toISOString(), getPeriodStartDate(date, "Diario").toISOString(), "May 12 -> May 12");
+});
+
+runTest("getPeriodStartDate - Diario - start of month", () => {
+    const date = new Date(Date.UTC(2024, 0, 1, 5));
+    const expected = new Date(Date.UTC(2024, 0, 1));
+    assertEquals(expected.toISOString(), getPeriodStartDate(date, "Diario").toISOString(), "Jan 1 -> Jan 1");
+});
+
 
 runTest("getPeriodEndDate - Mensual - Mid-month", () => {
     const date = new Date(Date.UTC(2024, 0, 15)); // Jan 15, 2024
@@ -673,10 +696,16 @@ runTest("getPeriodEndDate - Semanal - Sunday (Jan 14, 2024)", () => {
     assertEquals(expected.toISOString(), getPeriodEndDate(date, "Semanal").toISOString(), "Jan 14 (Sun) -> Jan 14 (Sun)");
 });
 
+runTest("getPeriodEndDate - Diario - same day", () => {
+    const date = new Date(Date.UTC(2024, 6, 4, 10));
+    const expected = new Date(Date.UTC(2024, 6, 4));
+    assertEquals(expected.toISOString(), getPeriodEndDate(date, "Diario").toISOString(), "Jul 4 -> Jul 4");
+});
+
 runTest("getPeriodStartDate - Invalid periodicity throws", () => {
     let threw = false;
     try {
-        getPeriodStartDate(new Date(), "Diario");
+        getPeriodStartDate(new Date(), "Anual");
     } catch (e) {
         threw = true;
     }
@@ -686,7 +715,7 @@ runTest("getPeriodStartDate - Invalid periodicity throws", () => {
 runTest("getPeriodEndDate - Invalid periodicity throws", () => {
     let threw = false;
     try {
-        getPeriodEndDate(new Date(), "Diario");
+        getPeriodEndDate(new Date(), "Anual");
     } catch (e) {
         threw = true;
     }
@@ -853,6 +882,30 @@ runTest("calculateCashFlowData - Scenario 6: Weekly Analysis, Bi-weekly Item", (
     
     assertEquals(0, result.income_p[1], "Scenario 6 - Income (Week 2: Jan 8-14, Inc pays Jan 15 - not in this week)");
     assertEquals(7, result.var_exp_p[1], "Scenario 6 - Expense (Week 2: Jan 8-14, Exp pays on Jan 8)");
+});
+
+runTest("calculateCashFlowData - Daily Analysis handles single-day movements", () => {
+    const data = {
+        analysis_start_date: new Date(Date.UTC(2024, 0, 1)),
+        analysis_duration: 3,
+        analysis_periodicity: "Diario",
+        analysis_initial_balance: 50,
+        expense_categories: mockExpenseCategories,
+        incomes: [
+            { name: "Ingreso Único", net_monthly: 100, frequency: "Único", start_date: new Date(Date.UTC(2024, 0, 2)), end_date: null, is_reimbursement: false }
+        ],
+        expenses: [
+            { name: "Compra", amount: 30, currency: "USD", frequency: "Único", start_date: new Date(Date.UTC(2024, 0, 1)), end_date: null, category: "Food", installments: 1 }
+        ]
+    };
+    const result = calculateCashFlowData(data);
+    assertEquals(3, result.periodDates.length, "Daily view generates expected number of days");
+    assertEquals(30, result.expenses_by_cat_p[0]["Food"], "Day 1 records expense in category");
+    assertEquals(0, result.income_p[0], "Day 1 has no income");
+    assertEquals(100, result.income_p[1], "Day 2 captures single income");
+    assertEquals(20, result.end_bal_p[0], "Balance after day 1 subtracts expense");
+    assertEquals(120, result.end_bal_p[1], "Balance after day 2 adds income");
+    assertEquals(120, result.end_bal_p[2], "Balance remains constant on day 3");
 });
 
 runTest("calculateCashFlowData - Scenario 7: Item starting/ending mid-period (Monthly)", () => {
