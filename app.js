@@ -199,9 +199,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const cashflowSemanalTableBody = document.querySelector('#cashflow-semanal-table tbody');
     const cashflowSemanalTableHead = document.querySelector('#cashflow-semanal-table thead');
     const cashflowSemanalTitle = document.getElementById('cashflow-semanal-title');
+
+    const cashflowDiarioTableBody = document.querySelector('#cashflow-diario-table tbody');
+    const cashflowDiarioTableHead = document.querySelector('#cashflow-diario-table thead');
+    const cashflowDiarioTitle = document.getElementById('cashflow-diario-title');
+
     const cashflowSubtabs = document.getElementById('cashflow-subtabs');
     const cashflowMensualContainer = document.getElementById('cashflow-mensual-container');
     const cashflowSemanalContainer = document.getElementById('cashflow-semanal-container');
+    const cashflowDiarioContainer = document.getElementById('cashflow-diario-container');
 
     // --- ELEMENTOS PESTAÑA GRÁFICO ---
     const cashflowChartCanvas = document.getElementById('cashflow-chart');
@@ -247,8 +253,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullChartData = null;
     let activeCashflowPeriodicity = 'Mensual';
     let activePaymentsPeriodicity = 'Mensual';
-    const cashflowPeriodDatesMap = { Mensual: [], Semanal: [] };
-    const cashflowCategoryTotalsMap = { Mensual: [], Semanal: [] };
+    const cashflowPeriodDatesMap = { Mensual: [], Semanal: [], Diario: [] };
+    const cashflowCategoryTotalsMap = { Mensual: [], Semanal: [], Diario: [] };
     const breakdownPopup = document.getElementById('cashflow-breakdown-popup');
     let hoverTimer = null;
     let hoverStartX = 0;
@@ -469,8 +475,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cashflowMensualTableBody) cashflowMensualTableBody.innerHTML = '';
         if (cashflowSemanalTableHead) cashflowSemanalTableHead.innerHTML = '';
         if (cashflowSemanalTableBody) cashflowSemanalTableBody.innerHTML = '';
+        if (cashflowDiarioTableHead) cashflowDiarioTableHead.innerHTML = '';
+        if (cashflowDiarioTableBody) cashflowDiarioTableBody.innerHTML = '';
         if (cashflowMensualTitle) cashflowMensualTitle.textContent = 'Flujo de Caja - Mensual';
         if (cashflowSemanalTitle) cashflowSemanalTitle.textContent = 'Flujo de Caja - Semanal';
+        if (cashflowDiarioTitle) cashflowDiarioTitle.textContent = 'Flujo de Caja - Diario';
         if (incomesTableView) incomesTableView.innerHTML = '';
         if (expensesTableView) expensesTableView.innerHTML = '';
         if (budgetsTableView) budgetsTableView.innerHTML = '';
@@ -1361,6 +1370,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cashflowTabButton) cashflowTabButton.textContent = instant ? 'Tabla de Gastos/Ingresos' : 'Flujo de Caja';
         if (cashflowMensualTitle) cashflowMensualTitle.textContent = (instant ? 'Tabla de Gastos/Ingresos' : 'Flujo de Caja') + ' - Mensual';
         if (cashflowSemanalTitle) cashflowSemanalTitle.textContent = (instant ? 'Tabla de Gastos/Ingresos' : 'Flujo de Caja') + ' - Semanal';
+        if (cashflowDiarioTitle) cashflowDiarioTitle.textContent = (instant ? 'Tabla de Gastos/Ingresos' : 'Flujo de Caja') + ' - Diario';
         if (graficoTitle) graficoTitle.textContent = (instant ? 'Gráfico de Gastos/Ingresos' : 'Gráfico de Flujo de Caja') + ` - ${activeCashflowPeriodicity}`;
     }
 
@@ -1370,9 +1380,10 @@ document.addEventListener('DOMContentLoaded', () => {
             cashflowSubtabs.querySelectorAll('.subtab-button').forEach(btn => btn.classList.remove('active'));
             const activeBtn = cashflowSubtabs.querySelector(`.subtab-button[data-period="${periodicity}"]`);
             if (activeBtn) activeBtn.classList.add('active');
-            if (cashflowMensualContainer && cashflowSemanalContainer) {
+            if (cashflowMensualContainer && cashflowSemanalContainer && cashflowDiarioContainer) {
                 setElementDisplay(cashflowMensualContainer, periodicity === 'Mensual' ? 'block' : 'none');
                 setElementDisplay(cashflowSemanalContainer, periodicity === 'Semanal' ? 'block' : 'none');
+                setElementDisplay(cashflowDiarioContainer, periodicity === 'Diario' ? 'block' : 'none');
             }
             renderCashflowTable();
         }
@@ -2786,6 +2797,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateAnalysisModeLabels();
             await renderCashflowTableFor('Mensual', cashflowMensualTableHead, cashflowMensualTableBody, cashflowMensualTitle);
             await renderCashflowTableFor('Semanal', cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle);
+            await renderCashflowTableFor('Diario', cashflowDiarioTableHead, cashflowDiarioTableBody, cashflowDiarioTitle);
         } catch (error) {
             console.error('Error al renderizar el flujo de caja:', error);
         }
@@ -2812,6 +2824,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const endOfLastMonth = getPeriodEndDate(addMonths(monthStart, duration - 1), 'Mensual');
             duration = 0; let d = new Date(analysisStart);
             while (d <= endOfLastMonth) { duration++; d = addWeeks(d, 1); }
+        } else if (periodicity === 'Diario') {
+            analysisStart = getPeriodStartDate(monthStart, 'Diario');
+            const endOfLastMonth = getPeriodEndDate(addMonths(monthStart, duration - 1), 'Mensual');
+            duration = 0; let d = new Date(analysisStart);
+            while (d <= endOfLastMonth) { duration++; d = addDays(d, 1); }
         }
 
         const tempCalcData = {
@@ -2842,7 +2859,13 @@ document.addEventListener('DOMContentLoaded', () => {
             rateDateCandidates.push(
                 ...collectUsdRateDatesForIncomes(tempCalcData.incomes, periodStart, periodEnd, periodicity)
             );
-            periodCursor = (periodicity === 'Mensual') ? addMonths(periodStart, 1) : addWeeks(periodStart, 1);
+            if (periodicity === 'Mensual') {
+                periodCursor = addMonths(periodStart, 1);
+            } else if (periodicity === 'Semanal') {
+                periodCursor = addWeeks(periodStart, 1);
+            } else {
+                periodCursor = addDays(periodStart, 1);
+            }
         }
 
         await ensureUsdClpRatesForDates(rateDateCandidates);
@@ -2878,6 +2901,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const [year, week] = getWeekNumber(d);
                 const mondayOfWeek = getMondayOfWeek(year, week);
                 th.innerHTML = `Sem ${week} (${DATE_WEEK_START_FORMAT(mondayOfWeek)})<br>${year}`;
+            } else if (periodicity === 'Diario') {
+                const day = ('0' + d.getUTCDate()).slice(-2);
+                const month = ('0' + (d.getUTCMonth() + 1)).slice(-2);
+                th.innerHTML = `${day}/${month}<br>${d.getUTCFullYear()}`;
             } else {
                 th.innerHTML = `${MONTH_NAMES_ES[d.getUTCMonth()]}<br>${d.getUTCFullYear()}`;
             }
@@ -3109,7 +3136,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const net_flow = p_inc_total - (fixed_exp_p[i] + var_exp_p[i]); net_flow_p[i] = net_flow;
             const end_bal = currentBalance + net_flow; end_bal_p[i] = end_bal;
-            currentBalance = end_bal; currentDate = (periodicity === "Mensual") ? addMonths(currentDate, 1) : addWeeks(currentDate, 1);
+            currentBalance = end_bal;
+            if (periodicity === "Mensual") {
+                currentDate = addMonths(currentDate, 1);
+            } else if (periodicity === "Semanal") {
+                currentDate = addWeeks(currentDate, 1);
+            } else {
+                currentDate = addDays(currentDate, 1);
+            }
         }
         return { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p };
     }
@@ -3126,7 +3160,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
         if (!periodDates || periodDates.length === 0) { if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
         if (chartMessage) chartMessage.textContent = "";
-        const labels = periodDates.map(date => activeCashflowPeriodicity === 'Semanal' ? `Sem ${getWeekNumber(date)[1]} ${getWeekNumber(date)[0]}` : `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`);
+        const labels = periodDates.map(date => {
+            if (activeCashflowPeriodicity === 'Semanal') {
+                return `Sem ${getWeekNumber(date)[1]} ${getWeekNumber(date)[0]}`;
+            }
+            if (activeCashflowPeriodicity === 'Diario') {
+                const day = ('0' + date.getUTCDate()).slice(-2);
+                const month = ('0' + (date.getUTCMonth() + 1)).slice(-2);
+                return `${day}/${month}/${date.getUTCFullYear()}`;
+            }
+            return `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+        });
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
             type: 'line',
             data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
@@ -3682,6 +3726,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function addMonths(date, months) { const d = new Date(date.getTime()); d.setUTCMonth(d.getUTCMonth() + months); return d; }
     function addWeeks(date, weeks) { const d = new Date(date.getTime()); d.setUTCDate(d.getUTCDate() + (weeks * 7)); return d; }
+    function addDays(date, days) { const d = new Date(date.getTime()); d.setUTCDate(d.getUTCDate() + days); return d; }
     function getISODateString(date) { if (!(date instanceof Date) || isNaN(date.getTime())) return ''; return date.getUTCFullYear() + '-' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date.getUTCDate()).slice(-2); }
     function getWeekNumber(d) { const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7)); const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1)); const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7); return [date.getUTCFullYear(), weekNo]; }
 function getMondayOfWeek(year, week) {
@@ -3718,10 +3763,12 @@ function getMondayOfWeek(year, week) {
         // getWeekNumber returns [year, weekNumber] for the week the date is in.
         // This year might be different from date.getUTCFullYear() for dates at year boundaries.
         const [isoYearForWeek, weekNumber] = getWeekNumber(date);
-        const monday = getMondayOfWeek(isoYearForWeek, weekNumber); 
+        const monday = getMondayOfWeek(isoYearForWeek, weekNumber);
             periodStart = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate(), 0, 0, 0, 0));
+        } else if (periodicity === "Diario") {
+            periodStart = new Date(Date.UTC(year, month, date.getUTCDate(), 0, 0, 0, 0));
         } else {
-            throw new Error("Invalid periodicity provided to getPeriodStartDate. Must be 'Mensual' or 'Semanal'.");
+            throw new Error("Invalid periodicity provided to getPeriodStartDate. Must be 'Mensual', 'Semanal' o 'Diario'.");
         }
         return periodStart;
     }
@@ -3749,8 +3796,10 @@ function getMondayOfWeek(year, week) {
         const monday = getMondayOfWeek(isoYearForWeek, weekNumber); // Monday of the current week (UTC midnight)
             // Sunday is Monday + 6 days
             periodEnd = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 6, 0, 0, 0, 0));
+        } else if (periodicity === "Diario") {
+            periodEnd = new Date(Date.UTC(year, month, date.getUTCDate(), 0, 0, 0, 0));
         } else {
-            throw new Error("Invalid periodicity provided to getPeriodEndDate. Must be 'Mensual' or 'Semanal'.");
+            throw new Error("Invalid periodicity provided to getPeriodEndDate. Must be 'Mensual', 'Semanal' o 'Diario'.");
         }
         return periodEnd;
     }
@@ -4243,6 +4292,9 @@ function getMondayOfWeek(year, week) {
         doc.addPage('letter', 'landscape');
         const semanalData = extractTableData(document.getElementById('cashflow-semanal-table'));
         addTableSectionsToPdf(doc, 'Flujo de Caja - Semanal', semanalData, margin);
+        doc.addPage('letter', 'landscape');
+        const diarioData = extractTableData(document.getElementById('cashflow-diario-table'));
+        addTableSectionsToPdf(doc, 'Flujo de Caja - Diario', diarioData, margin);
 
         // --- Ingresos y Gastos por Mes ---
         function addSimpleTable(title, headers, rows) {
