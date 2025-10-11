@@ -180,10 +180,15 @@
 
             <div id="gastos" class="tab-content">
                 <h2>Gestión de Gastos</h2>
-                <div class="form-and-table-layout">
-                    <div class="form-container">
-                        <h3>Registrar Nuevo Gasto</h3>
-                        <form id="expense-form">
+                <div class="subtabs-container" id="expenses-subtabs">
+                    <button class="subtab-button active" data-parent="expenses" data-view="ingresar-gastos">Ingresar Gastos</button>
+                    <button class="subtab-button" data-parent="expenses" data-view="gastos-tc">Gastos en TC</button>
+                </div>
+                <div id="gastos-ingresar-container" class="gastos-subsection" style="display:block;">
+                    <div class="form-and-table-layout">
+                        <div class="form-container">
+                            <h3>Registrar Nuevo Gasto</h3>
+                            <form id="expense-form">
                             <label for="expense-name">Nombre:</label>
                             <input type="text" id="expense-name" required>
 
@@ -274,6 +279,10 @@
                                     </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+                <div id="gastos-tc-container" class="gastos-subsection" style="display:none;">
+                    <div id="credit-card-statements-container" class="card-statements-container">
                     </div>
                 </div>
             </div>
