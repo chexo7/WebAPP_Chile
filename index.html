@@ -180,10 +180,15 @@
 
             <div id="gastos" class="tab-content">
                 <h2>Gestión de Gastos</h2>
-                <div class="form-and-table-layout">
-                    <div class="form-container">
-                        <h3>Registrar Nuevo Gasto</h3>
-                        <form id="expense-form">
+                <div class="subtabs-container" id="expenses-subtabs">
+                    <button class="subtab-button active" data-view="entry">Ingresar Gastos</button>
+                    <button class="subtab-button" data-view="credit-cards">Gastos en TC</button>
+                </div>
+                <div id="expenses-entry-container">
+                    <div class="form-and-table-layout">
+                        <div class="form-container">
+                            <h3>Registrar Nuevo Gasto</h3>
+                            <form id="expense-form">
                             <label for="expense-name">Nombre:</label>
                             <input type="text" id="expense-name" required>
 
@@ -275,6 +280,10 @@
                             </table>
                         </div>
                     </div>
+                </div>
+                <div id="expenses-credit-card-container" style="display:none;">
+                    <p class="credit-card-expenses-intro">Revisa el detalle de tus gastos por tarjeta considerando sus ciclos de facturación y fechas de pago.</p>
+                    <div id="credit-card-expenses-wrapper"></div>
                 </div>
             </div>
 
