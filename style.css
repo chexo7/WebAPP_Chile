@@ -668,6 +668,76 @@ td.reimbursement-income {
 }
 .subtab-button:hover:not(.active) { color: var(--primary-color); }
 
+.expenses-subtab-view { display: none; }
+.expenses-subtab-view.active { display: block; }
+
+.credit-card-period-selector {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 10px 0 15px 0;
+}
+
+.credit-card-period-selector button {
+  min-width: 40px;
+  padding: 6px 10px;
+}
+
+.credit-card-period-selector select {
+  min-width: 200px;
+  padding: 6px 8px;
+}
+
+.credit-card-period-hint {
+  margin-top: -5px;
+  margin-bottom: 15px;
+  color: var(--light-text);
+  font-size: 0.9rem;
+}
+
+.credit-card-expenses-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.credit-card-expense-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 15px;
+  background-color: #fdfdff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.credit-card-expense-card h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.credit-card-expense-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--light-text);
+  font-size: 0.9rem;
+}
+
+.credit-card-expense-summary strong {
+  color: var(--text-color);
+}
+
+.credit-card-expenses-table th,
+.credit-card-expenses-table td {
+  white-space: nowrap;
+}
+
+.credit-card-expenses-table td.name-cell {
+  min-width: 180px;
+  white-space: normal;
+}
+
 .save-changes-container {
     text-align: center;
     margin-top: 25px;
