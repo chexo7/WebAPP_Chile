@@ -668,6 +668,83 @@ td.reimbursement-income {
 }
 .subtab-button:hover:not(.active) { color: var(--primary-color); }
 
+.expense-subtab-content { display: none; }
+.expense-subtab-content.active { display: block; animation: fadeIn 0.4s ease-out; }
+
+.credit-card-visualizer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.credit-card-period-selector {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.credit-card-period-selector select {
+  width: auto;
+  min-width: 140px;
+}
+
+.credit-card-period-selector .small-button {
+  padding: 6px 12px;
+}
+
+.credit-card-period-summary {
+  margin-top: -0.5rem;
+}
+
+.credit-card-statements {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.credit-card-statement {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.credit-card-statement-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.credit-card-statement table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+}
+
+.credit-card-statement th,
+.credit-card-statement td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.credit-card-statement tbody tr:nth-child(even) {
+  background-color: var(--alt-row-bg);
+}
+
+.credit-card-totals {
+  margin-top: 0.75rem;
+  font-weight: 600;
+}
+
+.credit-card-empty-message {
+  margin-top: 0.5rem;
+  color: var(--light-text);
+}
+
 .save-changes-container {
     text-align: center;
     margin-top: 25px;

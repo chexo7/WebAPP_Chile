@@ -180,100 +180,118 @@
 
             <div id="gastos" class="tab-content">
                 <h2>Gestión de Gastos</h2>
-                <div class="form-and-table-layout">
-                    <div class="form-container">
-                        <h3>Registrar Nuevo Gasto</h3>
-                        <form id="expense-form">
-                            <label for="expense-name">Nombre:</label>
-                            <input type="text" id="expense-name" required>
+                <div class="subtabs-container" id="expenses-subtabs">
+                    <button class="subtab-button active" data-parent="expenses" data-target="expenses-entry-subtab">Ingresar Gastos</button>
+                    <button class="subtab-button" data-parent="expenses" data-target="credit-card-expenses-subtab">Gastos en TC</button>
+                </div>
+                <div id="expenses-entry-subtab" class="expense-subtab-content active" data-expense-subtab="entry">
+                    <div class="form-and-table-layout">
+                        <div class="form-container">
+                            <h3>Registrar Nuevo Gasto</h3>
+                            <form id="expense-form">
+                                <label for="expense-name">Nombre:</label>
+                                <input type="text" id="expense-name" required>
 
-                            <label for="expense-amount">Monto:</label>
-                            <input type="number" id="expense-amount" step="any" required>
+                                <label for="expense-amount">Monto:</label>
+                                <input type="number" id="expense-amount" step="any" required>
 
-                            <label for="expense-currency">Moneda:</label>
-                            <select id="expense-currency">
-                                <option value="USD" selected>USD - Dólar Estadounidense</option>
-                                <option value="CLP">CLP - Peso Chileno</option>
-                            </select>
+                                <label for="expense-currency">Moneda:</label>
+                                <select id="expense-currency">
+                                    <option value="USD" selected>USD - Dólar Estadounidense</option>
+                                    <option value="CLP">CLP - Peso Chileno</option>
+                                </select>
 
-                            <label for="expense-category">Categoría:</label>
-                            <div class="category-input-group">
-                                <select id="expense-category" required></select>
-                                <button type="button" id="add-category-button" class="small-button" title="Nueva Categoría">+</button>
-                                <button type="button" id="remove-category-button" class="small-button danger" title="Eliminar Categoría Seleccionada">-</button>
-                            </div>
-                            
-                            <label for="expense-frequency">Frecuencia:</label>
-                            <select id="expense-frequency">
-                                <option value="Mensual">Mensual</option>
-                                <option value="Semanal">Semanal</option>
-                                <option value="Bi-semanal">Bi-semanal</option>
-                                <option value="Único" selected>Único</option>
-                            </select>
+                                <label for="expense-category">Categoría:</label>
+                                <div class="category-input-group">
+                                    <select id="expense-category" required></select>
+                                    <button type="button" id="add-category-button" class="small-button" title="Nueva Categoría">+</button>
+                                    <button type="button" id="remove-category-button" class="small-button danger" title="Eliminar Categoría Seleccionada">-</button>
+                                </div>
 
-                            <label for="expense-movement-date">Fecha Movimiento:</label>
-                            <input type="date" id="expense-movement-date" required>
+                                <label for="expense-frequency">Frecuencia:</label>
+                                <select id="expense-frequency">
+                                    <option value="Mensual">Mensual</option>
+                                    <option value="Semanal">Semanal</option>
+                                    <option value="Bi-semanal">Bi-semanal</option>
+                                    <option value="Único" selected>Único</option>
+                                </select>
 
-                            <div id="expense-payment-date-container" style="display:none;">
-                                <label for="expense-start-date">Fecha de Gasto/Pago:</label>
-                                <input type="date" id="expense-start-date" disabled required>
-                            </div>
+                                <label for="expense-movement-date">Fecha Movimiento:</label>
+                                <input type="date" id="expense-movement-date" required>
 
-                            <label for="expense-end-date">Fecha Fin (si aplica):</label>
-                            <input type="date" id="expense-end-date">
-                             <div class="checkbox-container">
-                                <input type="checkbox" id="expense-ongoing">
-                                <label for="expense-ongoing">Gasto recurrente sin fin</label>
-                            </div>
+                                <div id="expense-payment-date-container" style="display:none;">
+                                    <label for="expense-start-date">Fecha de Gasto/Pago:</label>
+                                    <input type="date" id="expense-start-date" disabled required>
+                                </div>
 
-                            <div class="checkbox-container">
-                                <input type="checkbox" id="expense-is-real" checked>
-                                <label for="expense-is-real">Es un gasto real (ya ocurrido)</label>
-                            </div>
+                                <label for="expense-end-date">Fecha Fin (si aplica):</label>
+                                <input type="date" id="expense-end-date">
+                                <div class="checkbox-container">
+                                    <input type="checkbox" id="expense-ongoing">
+                                    <label for="expense-ongoing">Gasto recurrente sin fin</label>
+                                </div>
 
-                            <label for="expense-payment-method">Método de Pago:</label>
-                            <select id="expense-payment-method">
-                                <option value="Efectivo / Debito" selected>Efectivo / Debito</option>
-                                <option value="Credito">Tarjeta de Crédito</option>
-                            </select>
-                            <div id="expense-credit-card-container" style="display:none;">
-                                <label for="expense-credit-card">Tarjeta:</label>
-                                <select id="expense-credit-card"></select>
-                            </div>
-                            <div id="expense-installments-container" style="display:none;">
-                                <label for="expense-installments">Cuotas:</label>
-                                <input type="number" id="expense-installments" min="1" value="1">
-                            </div>
+                                <div class="checkbox-container">
+                                    <input type="checkbox" id="expense-is-real" checked>
+                                    <label for="expense-is-real">Es un gasto real (ya ocurrido)</label>
+                                </div>
 
-                            <button type="submit" id="add-expense-button">Agregar Gasto</button>
-                            <button type="button" id="cancel-edit-expense-button" style="display:none;" class="danger">Cancelar Edición</button>
-                        </form>
-                    </div>
-                    <div class="table-container-dynamic">
-                        <h3>Gastos Registrados</h3>
-                        <label for="search-expense-input">Buscar Gasto:</label>
-                        <input type="text" id="search-expense-input" placeholder="Escribe para filtrar...">
-                        <button type="button" class="open-import-expenses small-button accent desktop-only">Importar Gastos</button>
-                        <div class="table-responsive dynamic-table-scroll">
-                            <table id="expenses-table-view">
-                                <thead>
-                                    <tr>
-                                        <th>Nombre</th>
-                                        <th>Monto</th>
-                                        <th>Categoría</th>
-                                        <th>Frecuencia</th>
-                                        <th>Movimiento</th>
-                                        <th>Gasto/Pago</th>
-                                        <th>Fin</th>
-                                        <th>Método</th>
-                                        <th>Real</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    </tbody>
-                            </table>
+                                <label for="expense-payment-method">Método de Pago:</label>
+                                <select id="expense-payment-method">
+                                    <option value="Efectivo / Debito" selected>Efectivo / Debito</option>
+                                    <option value="Credito">Tarjeta de Crédito</option>
+                                </select>
+                                <div id="expense-credit-card-container" style="display:none;">
+                                    <label for="expense-credit-card">Tarjeta:</label>
+                                    <select id="expense-credit-card"></select>
+                                </div>
+                                <div id="expense-installments-container" style="display:none;">
+                                    <label for="expense-installments">Cuotas:</label>
+                                    <input type="number" id="expense-installments" min="1" value="1">
+                                </div>
+
+                                <button type="submit" id="add-expense-button">Agregar Gasto</button>
+                                <button type="button" id="cancel-edit-expense-button" style="display:none;" class="danger">Cancelar Edición</button>
+                            </form>
                         </div>
+                        <div class="table-container-dynamic">
+                            <h3>Gastos Registrados</h3>
+                            <label for="search-expense-input">Buscar Gasto:</label>
+                            <input type="text" id="search-expense-input" placeholder="Escribe para filtrar...">
+                            <button type="button" class="open-import-expenses small-button accent desktop-only">Importar Gastos</button>
+                            <div class="table-responsive dynamic-table-scroll">
+                                <table id="expenses-table-view">
+                                    <thead>
+                                        <tr>
+                                            <th>Nombre</th>
+                                            <th>Monto</th>
+                                            <th>Categoría</th>
+                                            <th>Frecuencia</th>
+                                            <th>Movimiento</th>
+                                            <th>Gasto/Pago</th>
+                                            <th>Fin</th>
+                                            <th>Método</th>
+                                            <th>Real</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="credit-card-expenses-subtab" class="expense-subtab-content" data-expense-subtab="credit">
+                    <div class="credit-card-visualizer">
+                        <div class="credit-card-period-selector">
+                            <button id="credit-card-prev-period-button" class="small-button" title="Periodo anterior">&lt;</button>
+                            <select id="credit-card-year-select"></select>
+                            <select id="credit-card-month-select"></select>
+                            <button id="credit-card-next-period-button" class="small-button" title="Periodo siguiente">&gt;</button>
+                        </div>
+                        <p id="credit-card-period-summary" class="small-text credit-card-period-summary"></p>
+                        <div id="credit-card-statements-container" class="credit-card-statements"></div>
                     </div>
                 </div>
             </div>

@@ -149,6 +149,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const expensesSubtabs = document.getElementById('expenses-subtabs');
+    const expenseSubtabContents = document.querySelectorAll('.expense-subtab-content');
+    const creditCardPeriodSummary = document.getElementById('credit-card-period-summary');
+    const creditCardStatementsContainer = document.getElementById('credit-card-statements-container');
+    const creditCardYearSelect = document.getElementById('credit-card-year-select');
+    const creditCardMonthSelect = document.getElementById('credit-card-month-select');
+    const creditCardPrevPeriodButton = document.getElementById('credit-card-prev-period-button');
+    const creditCardNextPeriodButton = document.getElementById('credit-card-next-period-button');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
@@ -284,6 +292,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let changeLogEntries = [];
     const FIREBASE_FORBIDDEN_KEY_CHARS = ['.', '$', '#', '[', ']', '/'];
     const FIREBASE_FORBIDDEN_CHARS_DISPLAY = FIREBASE_FORBIDDEN_KEY_CHARS.join(" ");
+    let creditCardOccurrences = [];
+    let creditCardStatementPeriods = [];
+    let activeCreditCardPeriodKey = null;
 
     const BABY_STEPS_DATA_JS = [
         {
@@ -745,6 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
         populateIncomeReimbursementCategoriesDropdown();
         renderIncomesTable();
         renderExpensesTable();
+        rebuildCreditCardStatements();
         renderBudgetsTable();
         renderBabySteps();
         renderReminders();
@@ -1418,6 +1430,24 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPaymentsTableForCurrentPeriod();
     }
 
+    function setActiveExpensesSubtab(targetId) {
+        if (!expensesSubtabs || !expenseSubtabContents || !targetId) return;
+        expensesSubtabs.querySelectorAll('.subtab-button').forEach(btn => {
+            if (btn.dataset.target === targetId) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        expenseSubtabContents.forEach(section => {
+            if (section.id === targetId) {
+                section.classList.add('active');
+            } else {
+                section.classList.remove('active');
+            }
+        });
+    }
+
     if (cashflowSubtabs) {
         cashflowSubtabs.addEventListener('click', (e) => {
             if (e.target.classList.contains('subtab-button')) setPeriodicity(e.target.dataset.period, 'cashflow');
@@ -1431,6 +1461,49 @@ document.addEventListener('DOMContentLoaded', () => {
     if (paymentsSubtabs) {
         paymentsSubtabs.addEventListener('click', (e) => {
             if (e.target.classList.contains('subtab-button')) setPaymentPeriodicity(e.target.dataset.period);
+        });
+    }
+    if (expensesSubtabs) {
+        expensesSubtabs.addEventListener('click', (e) => {
+            if (e.target.classList.contains('subtab-button') && e.target.dataset.target) {
+                setActiveExpensesSubtab(e.target.dataset.target);
+            }
+        });
+    }
+    if (creditCardPrevPeriodButton) {
+        creditCardPrevPeriodButton.addEventListener('click', () => shiftCreditCardPeriod(-1));
+    }
+    if (creditCardNextPeriodButton) {
+        creditCardNextPeriodButton.addEventListener('click', () => shiftCreditCardPeriod(1));
+    }
+    if (creditCardYearSelect) {
+        creditCardYearSelect.addEventListener('change', () => {
+            const year = parseInt(creditCardYearSelect.value, 10);
+            if (!Number.isFinite(year)) return;
+            updateCreditCardMonthOptions(year);
+            const monthsForYear = creditCardStatementPeriods
+                .filter(period => period.year === year)
+                .sort((a, b) => a.month - b.month);
+            const monthValue = creditCardMonthSelect && creditCardMonthSelect.value !== ''
+                ? parseInt(creditCardMonthSelect.value, 10)
+                : null;
+            const target = monthsForYear.find(period => period.month === monthValue)
+                || monthsForYear[monthsForYear.length - 1]
+                || null;
+            if (target) {
+                setActiveCreditCardPeriodByKey(target.key, true);
+            } else {
+                renderCreditCardStatements();
+            }
+        });
+    }
+    if (creditCardMonthSelect) {
+        creditCardMonthSelect.addEventListener('change', () => {
+            const year = parseInt(creditCardYearSelect ? creditCardYearSelect.value : '', 10);
+            const month = parseInt(creditCardMonthSelect.value, 10);
+            if (!Number.isFinite(year) || !Number.isFinite(month)) return;
+            const key = `${year}-${month}`;
+            setActiveCreditCardPeriodByKey(key, true);
         });
     }
 
@@ -1748,6 +1821,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         populateExpenseCreditCardDropdown();
         updateExpensePaymentDate();
+        rebuildCreditCardStatements();
     }
 
     function populateExpenseCreditCardDropdown() {
@@ -1780,6 +1854,346 @@ document.addEventListener('DOMContentLoaded', () => {
         const daysInPayMonth = getDaysInMonth(paymentMonth.getUTCFullYear(), paymentMonth.getUTCMonth());
         paymentMonth.setUTCDate(Math.min(payDay, daysInPayMonth));
         return paymentMonth;
+    }
+
+    function getYearMonthKeyFromDate(date) {
+        if (!(date instanceof Date) || isNaN(date.getTime())) return null;
+        return `${date.getUTCFullYear()}-${date.getUTCMonth()}`;
+    }
+
+    function formatVerboseDate(date) {
+        if (!(date instanceof Date) || isNaN(date.getTime())) return 'N/D';
+        const day = ('0' + date.getUTCDate()).slice(-2);
+        const monthName = MONTH_NAMES_ES[date.getUTCMonth()] || '';
+        return `${day} ${monthName} ${date.getUTCFullYear()}`;
+    }
+
+    function calculateCreditCardStatementPeriod(card, paymentMonthDate) {
+        if (!card || !(paymentMonthDate instanceof Date) || isNaN(paymentMonthDate.getTime())) return null;
+        const rawCutoff = parseInt(card.cutoff_day, 10);
+        const rawPayDay = parseInt(card.payment_day, 10);
+        const cutoff = (Number.isFinite(rawCutoff) ? Math.min(Math.max(rawCutoff, 1), 31) : 1);
+        const payDay = (Number.isFinite(rawPayDay) ? Math.min(Math.max(rawPayDay, 1), 31) : 1);
+        const payYear = paymentMonthDate.getUTCFullYear();
+        const payMonth = paymentMonthDate.getUTCMonth();
+        const paymentDays = getDaysInMonth(payYear, payMonth);
+        const paymentDate = new Date(Date.UTC(payYear, payMonth, Math.min(payDay, paymentDays)));
+
+        const cycleEndMonth = new Date(Date.UTC(payYear, payMonth, 1));
+        cycleEndMonth.setUTCMonth(cycleEndMonth.getUTCMonth() - 1);
+        const cycleEndDays = getDaysInMonth(cycleEndMonth.getUTCFullYear(), cycleEndMonth.getUTCMonth());
+        const cycleEndDay = Math.min(cutoff, cycleEndDays);
+        const cycleEnd = new Date(Date.UTC(cycleEndMonth.getUTCFullYear(), cycleEndMonth.getUTCMonth(), cycleEndDay));
+
+        let cycleStartMonth;
+        if (cycleEndDay >= cycleEndDays) {
+            cycleStartMonth = new Date(Date.UTC(cycleEndMonth.getUTCFullYear(), cycleEndMonth.getUTCMonth(), 1));
+        } else {
+            cycleStartMonth = new Date(Date.UTC(cycleEndMonth.getUTCFullYear(), cycleEndMonth.getUTCMonth(), 1));
+            cycleStartMonth.setUTCMonth(cycleStartMonth.getUTCMonth() - 1);
+        }
+        let startDay = cycleEndDay >= cycleEndDays ? 1 : (cycleEndDay + 1);
+        const cycleStartDays = getDaysInMonth(cycleStartMonth.getUTCFullYear(), cycleStartMonth.getUTCMonth());
+        if (startDay > cycleStartDays) startDay = cycleStartDays;
+        const cycleStart = new Date(Date.UTC(cycleStartMonth.getUTCFullYear(), cycleStartMonth.getUTCMonth(), startDay));
+        return { cycleStart, cycleEnd, paymentDate };
+    }
+
+    function collectCreditCardOccurrencesFromExpenses() {
+        if (!currentBackupData) return [];
+        const expenses = currentBackupData.expenses || [];
+        const cards = currentBackupData.credit_cards || [];
+        const cardMap = {};
+        cards.forEach(card => {
+            if (card && card.name) {
+                cardMap[card.name] = card;
+            }
+        });
+        const occurrences = [];
+        expenses.forEach(expense => {
+            if (!expense || expense.payment_method !== 'Credito' || !expense.credit_card) return;
+            const card = cardMap[expense.credit_card] || null;
+            const movementDate = expense.movement_date ? toUTCDate(expense.movement_date) : (expense.start_date ? new Date(expense.start_date) : null);
+            if (!(movementDate instanceof Date) || isNaN(movementDate.getTime())) return;
+            const totalAmount = parseFloat(expense.amount || 0);
+            if (!Number.isFinite(totalAmount)) return;
+            const installments = Math.max(parseInt(expense.installments || 1, 10), 1);
+            const amountPerInstallment = totalAmount / installments;
+            let firstPaymentDate = null;
+            if (card) {
+                firstPaymentDate = calculateCreditCardPaymentDate(new Date(movementDate.getTime()), card.cutoff_day, card.payment_day);
+            } else if (expense.start_date) {
+                firstPaymentDate = new Date(expense.start_date);
+            }
+            if (!(firstPaymentDate instanceof Date) || isNaN(firstPaymentDate.getTime())) {
+                firstPaymentDate = new Date(movementDate.getTime());
+            }
+            for (let installmentIndex = 0; installmentIndex < installments; installmentIndex++) {
+                const paymentDate = addMonths(new Date(firstPaymentDate.getTime()), installmentIndex);
+                occurrences.push({
+                    cardName: expense.credit_card,
+                    expenseName: expense.name,
+                    category: expense.category || '',
+                    movementDate: new Date(movementDate.getTime()),
+                    paymentDate,
+                    amount: amountPerInstallment,
+                    currency: expense.currency || null,
+                    installmentsTotal: installments,
+                    installmentNumber: installments > 1 ? installmentIndex + 1 : 1
+                });
+            }
+        });
+        return occurrences;
+    }
+
+    function buildCreditCardStatementPeriods(occurrences) {
+        const periodMap = new Map();
+        occurrences.forEach(occ => {
+            if (!occ || !(occ.paymentDate instanceof Date) || isNaN(occ.paymentDate.getTime())) return;
+            const key = getYearMonthKeyFromDate(occ.paymentDate);
+            if (!key || periodMap.has(key)) return;
+            periodMap.set(key, {
+                key,
+                year: occ.paymentDate.getUTCFullYear(),
+                month: occ.paymentDate.getUTCMonth(),
+                date: new Date(Date.UTC(occ.paymentDate.getUTCFullYear(), occ.paymentDate.getUTCMonth(), 1))
+            });
+        });
+        if (periodMap.size === 0) {
+            const today = new Date();
+            const todayKey = getYearMonthKeyFromDate(today);
+            if (todayKey) {
+                periodMap.set(todayKey, {
+                    key: todayKey,
+                    year: today.getUTCFullYear(),
+                    month: today.getUTCMonth(),
+                    date: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))
+                });
+            }
+        }
+        return Array.from(periodMap.values()).sort((a, b) => a.date - b.date);
+    }
+
+    function updateCreditCardMonthOptions(year, selectedMonth = null) {
+        if (!creditCardMonthSelect) return;
+        creditCardMonthSelect.innerHTML = '';
+        const monthsForYear = creditCardStatementPeriods
+            .filter(period => period.year === year)
+            .sort((a, b) => a.month - b.month);
+        if (monthsForYear.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '--';
+            creditCardMonthSelect.appendChild(option);
+            creditCardMonthSelect.disabled = true;
+            return;
+        }
+        creditCardMonthSelect.disabled = false;
+        monthsForYear.forEach(period => {
+            const option = document.createElement('option');
+            option.value = String(period.month);
+            option.textContent = MONTH_NAMES_FULL_ES[period.month] || `Mes ${period.month + 1}`;
+            creditCardMonthSelect.appendChild(option);
+        });
+        let monthToSelect = selectedMonth;
+        if (!Number.isFinite(monthToSelect) || !monthsForYear.some(period => period.month === monthToSelect)) {
+            monthToSelect = monthsForYear[monthsForYear.length - 1].month;
+        }
+        creditCardMonthSelect.value = String(monthToSelect);
+    }
+
+    function updateCreditCardPeriodSelectors() {
+        if (!creditCardYearSelect || !creditCardMonthSelect) return;
+        creditCardYearSelect.innerHTML = '';
+        if (creditCardStatementPeriods.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '--';
+            creditCardYearSelect.appendChild(option);
+            creditCardYearSelect.disabled = true;
+            creditCardMonthSelect.innerHTML = '';
+            creditCardMonthSelect.disabled = true;
+            return;
+        }
+        const years = Array.from(new Set(creditCardStatementPeriods.map(period => period.year))).sort((a, b) => a - b);
+        years.forEach(year => {
+            const option = document.createElement('option');
+            option.value = String(year);
+            option.textContent = year;
+            creditCardYearSelect.appendChild(option);
+        });
+        creditCardYearSelect.disabled = false;
+        const active = creditCardStatementPeriods.find(period => period.key === activeCreditCardPeriodKey)
+            || creditCardStatementPeriods[creditCardStatementPeriods.length - 1];
+        creditCardYearSelect.value = String(active.year);
+        updateCreditCardMonthOptions(active.year, active.month);
+    }
+
+    function setActiveCreditCardPeriodByKey(key, skipSelectorUpdate = false) {
+        if (!key || !creditCardStatementPeriods.some(period => period.key === key)) return;
+        activeCreditCardPeriodKey = key;
+        if (!skipSelectorUpdate) {
+            const active = creditCardStatementPeriods.find(period => period.key === key);
+            if (active && creditCardYearSelect) {
+                creditCardYearSelect.value = String(active.year);
+                updateCreditCardMonthOptions(active.year, active.month);
+            }
+        }
+        renderCreditCardStatements();
+    }
+
+    function renderCreditCardStatements() {
+        if (!creditCardStatementsContainer) return;
+        creditCardStatementsContainer.innerHTML = '';
+        const cards = currentBackupData && currentBackupData.credit_cards ? currentBackupData.credit_cards : [];
+        if (creditCardPeriodSummary) {
+            if (activeCreditCardPeriodKey) {
+                const active = creditCardStatementPeriods.find(period => period.key === activeCreditCardPeriodKey);
+                creditCardPeriodSummary.textContent = active ?
+                    `Pagos programados para ${MONTH_NAMES_FULL_ES[active.month]} ${active.year}` :
+                    'No hay períodos disponibles.';
+            } else {
+                creditCardPeriodSummary.textContent = 'No hay períodos disponibles.';
+            }
+        }
+        if (!cards || cards.length === 0) {
+            const message = document.createElement('p');
+            message.textContent = 'No hay tarjetas de crédito configuradas.';
+            message.classList.add('credit-card-empty-message');
+            creditCardStatementsContainer.appendChild(message);
+            return;
+        }
+        if (!activeCreditCardPeriodKey) {
+            const message = document.createElement('p');
+            message.textContent = 'No hay períodos con movimientos para mostrar.';
+            message.classList.add('credit-card-empty-message');
+            creditCardStatementsContainer.appendChild(message);
+            return;
+        }
+        const activePeriod = creditCardStatementPeriods.find(period => period.key === activeCreditCardPeriodKey);
+        if (!activePeriod) {
+            const message = document.createElement('p');
+            message.textContent = 'No hay períodos con movimientos para mostrar.';
+            message.classList.add('credit-card-empty-message');
+            creditCardStatementsContainer.appendChild(message);
+            return;
+        }
+        const paymentMonthDate = activePeriod.date;
+        cards.forEach(card => {
+            const cardSection = document.createElement('div');
+            cardSection.classList.add('credit-card-statement');
+            const header = document.createElement('div');
+            header.classList.add('credit-card-statement-header');
+            const title = document.createElement('h3');
+            title.textContent = card.name;
+            header.appendChild(title);
+            const periodInfo = calculateCreditCardStatementPeriod(card, paymentMonthDate);
+            const periodText = document.createElement('p');
+            periodText.classList.add('small-text');
+            if (periodInfo) {
+                periodText.textContent = `Periodo estimado: ${formatVerboseDate(periodInfo.cycleStart)} - ${formatVerboseDate(periodInfo.cycleEnd)} · Pago estimado: ${formatVerboseDate(periodInfo.paymentDate)}`;
+            } else {
+                periodText.textContent = 'Periodo de facturación no disponible.';
+            }
+            header.appendChild(periodText);
+            const cardOccurrences = creditCardOccurrences.filter(occ => occ.cardName === card.name && getYearMonthKeyFromDate(occ.paymentDate) === activeCreditCardPeriodKey);
+            if (cardOccurrences.length === 0) {
+                const emptyMessage = document.createElement('p');
+                emptyMessage.textContent = 'Sin gastos registrados para este periodo.';
+                emptyMessage.classList.add('credit-card-empty-message');
+                header.appendChild(emptyMessage);
+                cardSection.appendChild(header);
+                creditCardStatementsContainer.appendChild(cardSection);
+                return;
+            }
+            cardSection.appendChild(header);
+            cardOccurrences.sort((a, b) => {
+                if (a.movementDate && b.movementDate) {
+                    const diff = a.movementDate.getTime() - b.movementDate.getTime();
+                    if (diff !== 0) return diff;
+                }
+                if (a.installmentsTotal > 1 || b.installmentsTotal > 1) {
+                    return (a.installmentNumber || 0) - (b.installmentNumber || 0);
+                }
+                return 0;
+            });
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const headRow = document.createElement('tr');
+            ['Movimiento', 'Pago', 'Descripción', 'Categoría', 'Cuota', 'Monto'].forEach(label => {
+                const th = document.createElement('th');
+                th.textContent = label;
+                headRow.appendChild(th);
+            });
+            thead.appendChild(headRow);
+            table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            const totalsByCurrency = {};
+            cardOccurrences.forEach(occ => {
+                const row = document.createElement('tr');
+                const movementCell = document.createElement('td');
+                movementCell.textContent = occ.movementDate ? getISODateString(occ.movementDate) : 'N/D';
+                row.appendChild(movementCell);
+                const paymentCell = document.createElement('td');
+                paymentCell.textContent = occ.paymentDate ? getISODateString(occ.paymentDate) : 'N/D';
+                row.appendChild(paymentCell);
+                const descCell = document.createElement('td');
+                descCell.textContent = occ.expenseName || '';
+                row.appendChild(descCell);
+                const categoryCell = document.createElement('td');
+                categoryCell.textContent = occ.category || '-';
+                row.appendChild(categoryCell);
+                const installmentCell = document.createElement('td');
+                if (occ.installmentsTotal > 1) {
+                    installmentCell.textContent = `${occ.installmentNumber}/${occ.installmentsTotal}`;
+                } else {
+                    installmentCell.textContent = '-';
+                }
+                row.appendChild(installmentCell);
+                const amountCell = document.createElement('td');
+                amountCell.textContent = formatAmountWithCurrency(occ.amount, occ.currency);
+                row.appendChild(amountCell);
+                tbody.appendChild(row);
+                const currencyKey = occ.currency || '';
+                totalsByCurrency[currencyKey] = (totalsByCurrency[currencyKey] || 0) + occ.amount;
+            });
+            table.appendChild(tbody);
+            cardSection.appendChild(table);
+            const totalsEntries = Object.entries(totalsByCurrency);
+            if (totalsEntries.length > 0) {
+                const totalsEl = document.createElement('p');
+                totalsEl.classList.add('credit-card-totals');
+                const totalsText = totalsEntries.map(([currency, total]) => {
+                    const code = currency || null;
+                    return formatAmountWithCurrency(total, code);
+                }).join(' | ');
+                totalsEl.textContent = `Totales estimados: ${totalsText}`;
+                cardSection.appendChild(totalsEl);
+            }
+            creditCardStatementsContainer.appendChild(cardSection);
+        });
+    }
+
+    function rebuildCreditCardStatements() {
+        if (!creditCardStatementsContainer) return;
+        creditCardOccurrences = collectCreditCardOccurrencesFromExpenses();
+        creditCardStatementPeriods = buildCreditCardStatementPeriods(creditCardOccurrences);
+        if (creditCardStatementPeriods.length === 0) {
+            activeCreditCardPeriodKey = null;
+        } else if (!activeCreditCardPeriodKey || !creditCardStatementPeriods.some(period => period.key === activeCreditCardPeriodKey)) {
+            activeCreditCardPeriodKey = creditCardStatementPeriods[creditCardStatementPeriods.length - 1].key;
+        }
+        updateCreditCardPeriodSelectors();
+        renderCreditCardStatements();
+    }
+
+    function shiftCreditCardPeriod(delta) {
+        if (!creditCardStatementPeriods.length || !activeCreditCardPeriodKey) return;
+        const currentIndex = creditCardStatementPeriods.findIndex(period => period.key === activeCreditCardPeriodKey);
+        if (currentIndex === -1) return;
+        const newIndex = currentIndex + delta;
+        if (newIndex < 0 || newIndex >= creditCardStatementPeriods.length) return;
+        setActiveCreditCardPeriodByKey(creditCardStatementPeriods[newIndex].key);
     }
 
     function updateExpensePaymentDate() {
@@ -2261,7 +2675,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!currentBackupData.expenses) currentBackupData.expenses = [];
             currentBackupData.expenses.push(expenseEntry);
         }
-        renderExpensesTable(); renderCashflowTable(); resetExpenseForm();
+        renderExpensesTable();
+        renderCashflowTable();
+        rebuildCreditCardStatements();
+        resetExpenseForm();
     });
     function resetExpenseForm() {
         expenseForm.reset(); // This might trigger a change event on expenseFrequencySelect if its value changes
@@ -2372,7 +2789,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function deleteExpense(index) {
         if (confirm(`¿Eliminar gasto "${currentBackupData.expenses[index].name}"?`)) {
             currentBackupData.expenses.splice(index, 1);
-            renderExpensesTable(); renderCashflowTable();
+            renderExpensesTable();
+            renderCashflowTable();
+            rebuildCreditCardStatements();
             if (editingExpenseIndex === index) resetExpenseForm();
             else if (editingExpenseIndex !== null && editingExpenseIndex > index) editingExpenseIndex--;
         }
@@ -2559,6 +2978,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         renderExpensesTable();
         renderCashflowTable();
+        rebuildCreditCardStatements();
         closeImportExpensesModal();
     });
 
