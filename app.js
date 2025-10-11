@@ -670,7 +670,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (exp.end_date) exp.end_date = toUTCDate(exp.end_date);
             if (exp.movement_date) exp.movement_date = toUTCDate(exp.movement_date);
             else exp.movement_date = exp.start_date ? toUTCDate(exp.start_date) : null;
-            if (!exp.payment_method) exp.payment_method = 'Efectivo';
+            if (!exp.payment_method || (typeof exp.payment_method === 'string' && exp.payment_method.toLowerCase() === 'efectivo')) {
+                exp.payment_method = 'Efectivo / Debito';
+            }
             exp.currency = exp.currency || 'USD';
         });
 
@@ -2275,7 +2277,7 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseIsRealCheckbox.checked = true;
         if (expenseCurrencySelect) expenseCurrencySelect.value = 'USD';
         populateExpenseCreditCardDropdown();
-        expensePaymentMethodSelect.value = 'Credito';
+        expensePaymentMethodSelect.value = 'Efectivo / Debito';
         expensePaymentMethodSelect.dispatchEvent(new Event('change'));
         if (expenseInstallmentsInput) expenseInstallmentsInput.value = '1';
 
@@ -2307,7 +2309,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     amountStr,
                     expense.category,
                     expense.frequency,
-                    expense.payment_method === 'Credito' ? 'tarjeta' : 'efectivo',
+                    expense.payment_method === 'Credito' ? 'tarjeta' : 'efectivo / debito',
                     expense.currency
                 ],
                 numeric: [amountStr.replace(/[^0-9]/g, '')]
@@ -2327,7 +2329,7 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A');
             row.insertCell().textContent = expense.start_date ? getISODateString(new Date(expense.start_date)) : 'N/A';
             row.insertCell().textContent = expense.end_date ? getISODateString(new Date(expense.end_date)) : (expense.frequency === 'Único' ? 'N/A (Único)' : 'Recurrente');
-            row.insertCell().textContent = expense.payment_method === 'Credito' ? 'Tarjeta' : 'Efectivo';
+            row.insertCell().textContent = expense.payment_method === 'Credito' ? 'Tarjeta' : 'Efectivo / Debito';
             row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
             appendActionButtons(row, () => loadExpenseForEdit(index), () => deleteExpense(index));
         });
@@ -2341,7 +2343,7 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseMovementDateInput.value = expense.movement_date ? getISODateString(new Date(expense.movement_date)) : (expense.start_date ? getISODateString(new Date(expense.start_date)) : '');
         expenseStartDateInput.value = expense.start_date ? getISODateString(new Date(expense.start_date)) : '';
         expenseIsRealCheckbox.checked = expense.is_real !== undefined ? expense.is_real : true;
-        expensePaymentMethodSelect.value = expense.payment_method || 'Credito';
+        expensePaymentMethodSelect.value = expense.payment_method || 'Efectivo / Debito';
         const isCreditEdit = expensePaymentMethodSelect.value === 'Credito';
         setElementDisplay(expenseCreditCardContainer, isCreditEdit ? 'block' : 'none');
         setElementDisplay(expensePaymentDateContainer, isCreditEdit ? 'block' : 'none');
@@ -2550,7 +2552,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const amt = parseFloat(row[amountCol] || 0);
                 const catSel = importTableContainer.querySelector(`select[data-index="${idx}"]`);
                 const cat = catSel ? catSel.value : '';
-                const entry = { name: desc, amount: amt, category: cat, type: currentBackupData.expense_categories[cat] || 'Variable', frequency: 'Único', start_date: dateObj, end_date: null, is_real: true, movement_date: dateObj, payment_method: 'Efectivo', credit_card: null, installments: 1 };
+                const entry = { name: desc, amount: amt, category: cat, type: currentBackupData.expense_categories[cat] || 'Variable', frequency: 'Único', start_date: dateObj, end_date: null, is_real: true, movement_date: dateObj, payment_method: 'Efectivo / Debito', credit_card: null, installments: 1 };
                 if (!currentBackupData.expenses) currentBackupData.expenses = [];
                 currentBackupData.expenses.push(entry);
             }
@@ -3444,10 +3446,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!totals[exp.category]) {
                 totals[exp.category] = 0;
-                methodTotals[exp.category] = { Efectivo: 0, Credito: 0 };
+                methodTotals[exp.category] = { 'Efectivo / Debito': 0, Credito: 0 };
             }
             totals[exp.category] += totalUsd;
-            const methodKey = exp.payment_method === 'Credito' ? 'Credito' : 'Efectivo';
+            const methodKey = exp.payment_method === 'Credito' ? 'Credito' : 'Efectivo / Debito';
             methodTotals[exp.category][methodKey] += totalUsd;
         });
         return { totals, methodTotals };
@@ -3475,11 +3477,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             label: function(ctx) {
                                 const cat = ctx.label;
                                 const total = totals[cat] || 0;
-                                const cash = methodTotals[cat].Efectivo || 0;
+                                const cash = methodTotals[cat]['Efectivo / Debito'] || 0;
                                 const credit = methodTotals[cat].Credito || 0;
                                 const pcash = total ? ((cash/total)*100).toFixed(1) : '0';
                                 const pcred = total ? ((credit/total)*100).toFixed(1) : '0';
-                                return `${cat}: ${formatCurrencyJS(total, currentBackupData.display_currency_symbol || '$')} (Efec: ${pcash}%, Cred: ${pcred}%)`;
+                                return `${cat}: ${formatCurrencyJS(total, currentBackupData.display_currency_symbol || '$')} (Ef/Deb: ${pcash}%, Cred: ${pcred}%)`;
                             }
                         }
                     },
