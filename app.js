@@ -3160,6 +3160,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
         });
+        const currentPeriodIndex = findCurrentPeriodIndex(periodDates, activeCashflowPeriodicity);
+        const xScaleOptions = { type: 'category' };
+        if (currentPeriodIndex !== -1) {
+            const lookaheadByPeriod = { Mensual: 6, Semanal: 16, Diario: 30 };
+            const lookaheadCount = lookaheadByPeriod[activeCashflowPeriodicity] || 0;
+            const minIndex = Math.max(0, currentPeriodIndex - 4);
+            const maxIndex = Math.min(periodDates.length - 1, currentPeriodIndex + lookaheadCount);
+            if (minIndex <= maxIndex) {
+                xScaleOptions.min = labels[minIndex];
+                xScaleOptions.max = labels[maxIndex];
+            }
+        }
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
             type: 'line',
             data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
@@ -3167,6 +3179,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
+                    x: xScaleOptions,
                     y: {
                         type: 'linear',
                         display: true,
@@ -3799,16 +3812,24 @@ function getMondayOfWeek(year, week) {
         return periodEnd;
     }
 
-    function highlightCurrentPeriodColumn(periodicity, headEl, bodyEl, periodDates) {
+    function findCurrentPeriodIndex(periodDates, periodicity) {
+        if (!Array.isArray(periodDates) || periodDates.length === 0) return -1;
         const today = new Date();
-        let idx = -1;
         for (let i = 0; i < periodDates.length; i++) {
             const start = periodDates[i];
+            if (!(start instanceof Date)) continue;
             const end = getPeriodEndDate(start, periodicity);
             const inclusiveEnd = new Date(end.getTime());
             inclusiveEnd.setUTCHours(23, 59, 59, 999);
-            if (today >= start && today <= inclusiveEnd) { idx = i; break; }
+            if (today >= start && today <= inclusiveEnd) {
+                return i;
+            }
         }
+        return -1;
+    }
+
+    function highlightCurrentPeriodColumn(periodicity, headEl, bodyEl, periodDates) {
+        const idx = findCurrentPeriodIndex(periodDates, periodicity);
         if (idx === -1) return;
         const headerCells = headEl.querySelectorAll('th');
         if (headerCells[idx + 1]) headerCells[idx + 1].classList.add('current-period');
