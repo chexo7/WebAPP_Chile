@@ -1,7 +1,63 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Ensure Chart.js zoom plugin is registered
-    if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
-        Chart.register(ChartZoom);
+    const currentPeriodHighlightPlugin = {
+        id: 'currentPeriodHighlight',
+        afterDatasetsDraw(chart, args, pluginOptions) {
+            const options = pluginOptions || {};
+            const currentIndex = typeof options.currentIndex === 'number' ? options.currentIndex : -1;
+            if (currentIndex < 0) return;
+            const meta = chart.getDatasetMeta(0);
+            if (!meta || !meta.data || !meta.data[currentIndex]) return;
+            const activePoint = meta.data[currentIndex];
+            const chartArea = chart.chartArea;
+            if (!activePoint || !chartArea) return;
+
+            const previousPoint = meta.data[currentIndex - 1];
+            const nextPoint = meta.data[currentIndex + 1];
+
+            let left = previousPoint ? (previousPoint.x + activePoint.x) / 2 : activePoint.x;
+            let right = nextPoint ? (nextPoint.x + activePoint.x) / 2 : activePoint.x;
+
+            if (!previousPoint && nextPoint) {
+                left = activePoint.x - (right - activePoint.x);
+            }
+            if (!nextPoint && previousPoint) {
+                right = activePoint.x + (activePoint.x - left);
+            }
+            if (!previousPoint && !nextPoint) {
+                left = chartArea.left;
+                right = chartArea.right;
+            }
+
+            left = Math.max(chartArea.left, left);
+            right = Math.min(chartArea.right, right);
+            const width = right - left;
+            if (!isFinite(width) || width <= 0) return;
+
+            const fillColor = options.fillColor || 'rgba(0, 122, 255, 0.08)';
+            const borderColor = options.borderColor || 'rgba(0, 122, 255, 0.6)';
+            const borderWidth = options.borderWidth || 1.5;
+
+            const ctx = chart.ctx;
+            ctx.save();
+            ctx.fillStyle = fillColor;
+            ctx.fillRect(left, chartArea.top, width, chartArea.bottom - chartArea.top);
+
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = borderWidth;
+            ctx.beginPath();
+            ctx.moveTo(activePoint.x, chartArea.top);
+            ctx.lineTo(activePoint.x, chartArea.bottom);
+            ctx.stroke();
+            ctx.restore();
+        }
+    };
+
+    // Ensure Chart.js plugins are registered
+    if (typeof Chart !== 'undefined') {
+        Chart.register(currentPeriodHighlightPlugin);
+        if (typeof ChartZoom !== 'undefined') {
+            Chart.register(ChartZoom);
+        }
     }
     const CATEGORY_COLORS = [
         '#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
@@ -3160,13 +3216,96 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
         });
+        const currentPeriodIndex = findCurrentPeriodIndex(periodDates, activeCashflowPeriodicity);
+        const hasCurrentHighlight = currentPeriodIndex !== -1;
+        const xScaleOptions = { type: 'category' };
+        if (currentPeriodIndex !== -1) {
+            const lookaheadByPeriod = { Mensual: 6, Semanal: 16, Diario: 30 };
+            const lookaheadCount = lookaheadByPeriod[activeCashflowPeriodicity] || 0;
+            const minIndex = Math.max(0, currentPeriodIndex - 4);
+            const maxIndex = Math.min(periodDates.length - 1, currentPeriodIndex + lookaheadCount);
+            if (minIndex <= maxIndex) {
+                xScaleOptions.min = labels[minIndex];
+                xScaleOptions.max = labels[maxIndex];
+            }
+        }
+        const highlightStroke = '#007aff';
+        const highlightFill = '#ffffff';
+        const highlightableValue = (defaultValue, highlightValue) => {
+            if (!hasCurrentHighlight) return defaultValue;
+            const arr = new Array(periodDates.length).fill(defaultValue);
+            arr[currentPeriodIndex] = highlightValue;
+            return arr;
+        };
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
             type: 'line',
-            data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Saldo Final Estimado',
+                        data: endBalances,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        tension: 0.1,
+                        fill: false,
+                        borderWidth: 2,
+                        pointRadius: highlightableValue(4, 8),
+                        pointHoverRadius: highlightableValue(6, 11),
+                        pointBackgroundColor: highlightableValue('rgba(54, 162, 235, 1)', highlightFill),
+                        pointBorderColor: highlightableValue('rgba(54, 162, 235, 1)', highlightStroke),
+                        pointBorderWidth: highlightableValue(1, 3),
+                        order: 1
+                    },
+                    {
+                        label: 'Ingreso Total Neto',
+                        data: incomes,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 1)',
+                        type: 'scatter',
+                        showLine: false,
+                        pointStyle: 'circle',
+                        pointRadius: highlightableValue(6, 9),
+                        pointHoverRadius: highlightableValue(8, 12),
+                        pointBorderColor: highlightableValue('rgba(0, 0, 0, 0)', highlightStroke),
+                        pointBorderWidth: highlightableValue(0, 3),
+                        order: 2
+                    },
+                    {
+                        label: 'Gasto Total',
+                        data: totalExpenses.map(e => -e),
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 1)',
+                        type: 'scatter',
+                        showLine: false,
+                        pointStyle: 'rectRot',
+                        pointRadius: highlightableValue(6, 9),
+                        pointHoverRadius: highlightableValue(8, 12),
+                        pointBorderColor: highlightableValue('rgba(0, 0, 0, 0)', highlightStroke),
+                        pointBorderWidth: highlightableValue(0, 3),
+                        order: 2
+                    },
+                    {
+                        label: 'Flujo Neto del Período',
+                        data: netFlows,
+                        borderColor: 'rgba(255, 206, 86, 1)',
+                        backgroundColor: 'rgba(255, 206, 86, 1)',
+                        type: 'scatter',
+                        showLine: false,
+                        pointStyle: 'triangle',
+                        pointRadius: highlightableValue(6, 9),
+                        pointHoverRadius: highlightableValue(8, 12),
+                        pointBorderColor: highlightableValue('rgba(0, 0, 0, 0)', highlightStroke),
+                        pointBorderWidth: highlightableValue(0, 3),
+                        order: 2
+                    }
+                ]
+            },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
+                    x: xScaleOptions,
                     y: {
                         type: 'linear',
                         display: true,
@@ -3205,6 +3344,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             },
                             mode: 'xy',
                         }
+                    },
+                    currentPeriodHighlight: {
+                        currentIndex: hasCurrentHighlight ? currentPeriodIndex : -1,
+                        fillColor: 'rgba(0, 122, 255, 0.08)',
+                        borderColor: highlightStroke,
+                        borderWidth: 2
                     }
                 }
             }
@@ -3799,16 +3944,24 @@ function getMondayOfWeek(year, week) {
         return periodEnd;
     }
 
-    function highlightCurrentPeriodColumn(periodicity, headEl, bodyEl, periodDates) {
+    function findCurrentPeriodIndex(periodDates, periodicity) {
+        if (!Array.isArray(periodDates) || periodDates.length === 0) return -1;
         const today = new Date();
-        let idx = -1;
         for (let i = 0; i < periodDates.length; i++) {
             const start = periodDates[i];
+            if (!(start instanceof Date)) continue;
             const end = getPeriodEndDate(start, periodicity);
             const inclusiveEnd = new Date(end.getTime());
             inclusiveEnd.setUTCHours(23, 59, 59, 999);
-            if (today >= start && today <= inclusiveEnd) { idx = i; break; }
+            if (today >= start && today <= inclusiveEnd) {
+                return i;
+            }
         }
+        return -1;
+    }
+
+    function highlightCurrentPeriodColumn(periodicity, headEl, bodyEl, periodDates) {
+        const idx = findCurrentPeriodIndex(periodDates, periodicity);
         if (idx === -1) return;
         const headerCells = headEl.querySelectorAll('th');
         if (headerCells[idx + 1]) headerCells[idx + 1].classList.add('current-period');
