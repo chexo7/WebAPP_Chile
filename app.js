@@ -3160,6 +3160,51 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
         });
+        const currentPeriodIndex = findCurrentPeriodIndex(periodDates, activeCashflowPeriodicity);
+        const xScaleOptions = { type: 'category' };
+        if (currentPeriodIndex !== -1) {
+            const lookaheadByPeriod = { Mensual: 6, Semanal: 16, Diario: 30 };
+            const lookaheadCount = lookaheadByPeriod[activeCashflowPeriodicity] || 0;
+            const minIndex = Math.max(0, currentPeriodIndex - 4);
+            const maxIndex = Math.min(periodDates.length - 1, currentPeriodIndex + lookaheadCount);
+            if (minIndex <= maxIndex) {
+                xScaleOptions.min = labels[minIndex];
+                xScaleOptions.max = labels[maxIndex];
+            }
+        }
+        const currentPeriodHighlight = currentPeriodIndex !== -1 ? {
+            linePointRadius: labels.map((_, idx) => idx === currentPeriodIndex ? 8 : 4),
+            linePointHoverRadius: labels.map((_, idx) => idx === currentPeriodIndex ? 10 : 6),
+            linePointBackground: labels.map((_, idx) => idx === currentPeriodIndex ? '#0d6efd' : 'rgba(54, 162, 235, 1)'),
+            linePointBorder: labels.map((_, idx) => idx === currentPeriodIndex ? '#083b92' : 'rgba(54, 162, 235, 1)'),
+            linePointBorderWidth: labels.map((_, idx) => idx === currentPeriodIndex ? 3 : 1.5),
+            scatterRadius: labels.map((_, idx) => idx === currentPeriodIndex ? 8 : 6),
+            scatterHoverRadius: labels.map((_, idx) => idx === currentPeriodIndex ? 10 : 8)
+        } : null;
+        const highlightCurrentPeriodPlugin = currentPeriodIndex !== -1 ? [{
+            id: 'highlightCurrentPeriod',
+            afterDatasetsDraw(chart, args, pluginOptions) {
+                const { ctx, chartArea, scales } = chart;
+                if (!chartArea || !scales || !scales.x) return;
+                const index = pluginOptions?.currentIndex ?? -1;
+                if (index < 0 || index >= chart.data.labels.length) return;
+                const xScale = scales.x;
+                const label = chart.data.labels[index];
+                const xPos = typeof xScale.getPixelForValue === 'function'
+                    ? xScale.getPixelForValue(label, index)
+                    : xScale.getPixelForTick(index);
+                if (!isFinite(xPos)) return;
+                ctx.save();
+                ctx.setLineDash([6, 4]);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = pluginOptions?.color || 'rgba(13, 110, 253, 0.7)';
+                ctx.beginPath();
+                ctx.moveTo(xPos, chartArea.top);
+                ctx.lineTo(xPos, chartArea.bottom);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }] : [];
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
             type: 'line',
             data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
@@ -3167,6 +3212,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
+                    x: xScaleOptions,
                     y: {
                         type: 'linear',
                         display: true,
@@ -3205,10 +3251,28 @@ document.addEventListener('DOMContentLoaded', () => {
                             },
                             mode: 'xy',
                         }
-                    }
+                    },
+                    highlightCurrentPeriod: currentPeriodIndex !== -1 ? { currentIndex: currentPeriodIndex } : undefined
                 }
-            }
+            },
+            plugins: highlightCurrentPeriodPlugin
         });
+        if (currentPeriodHighlight) {
+            const [saldoDataset, ingresosDataset, gastosDataset, flujoDataset] = cashflowChartInstance.data.datasets;
+            if (saldoDataset) {
+                saldoDataset.pointRadius = currentPeriodHighlight.linePointRadius;
+                saldoDataset.pointHoverRadius = currentPeriodHighlight.linePointHoverRadius;
+                saldoDataset.pointBackgroundColor = currentPeriodHighlight.linePointBackground;
+                saldoDataset.pointBorderColor = currentPeriodHighlight.linePointBorder;
+                saldoDataset.pointBorderWidth = currentPeriodHighlight.linePointBorderWidth;
+            }
+            [ingresosDataset, gastosDataset, flujoDataset].forEach(dataset => {
+                if (!dataset) return;
+                dataset.pointRadius = currentPeriodHighlight.scatterRadius;
+                dataset.pointHoverRadius = currentPeriodHighlight.scatterHoverRadius;
+            });
+            cashflowChartInstance.update();
+        }
         cashflowChartCanvas.onclick = async (evt) => {
             if (!cashflowChartInstance) return;
             const points = cashflowChartInstance.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
@@ -3799,16 +3863,24 @@ function getMondayOfWeek(year, week) {
         return periodEnd;
     }
 
-    function highlightCurrentPeriodColumn(periodicity, headEl, bodyEl, periodDates) {
+    function findCurrentPeriodIndex(periodDates, periodicity) {
+        if (!Array.isArray(periodDates) || periodDates.length === 0) return -1;
         const today = new Date();
-        let idx = -1;
         for (let i = 0; i < periodDates.length; i++) {
             const start = periodDates[i];
+            if (!(start instanceof Date)) continue;
             const end = getPeriodEndDate(start, periodicity);
             const inclusiveEnd = new Date(end.getTime());
             inclusiveEnd.setUTCHours(23, 59, 59, 999);
-            if (today >= start && today <= inclusiveEnd) { idx = i; break; }
+            if (today >= start && today <= inclusiveEnd) {
+                return i;
+            }
         }
+        return -1;
+    }
+
+    function highlightCurrentPeriodColumn(periodicity, headEl, bodyEl, periodDates) {
+        const idx = findCurrentPeriodIndex(periodDates, periodicity);
         if (idx === -1) return;
         const headerCells = headEl.querySelectorAll('th');
         if (headerCells[idx + 1]) headerCells[idx + 1].classList.add('current-period');
