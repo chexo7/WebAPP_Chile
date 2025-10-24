@@ -3161,6 +3161,24 @@ document.addEventListener('DOMContentLoaded', () => {
             return `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
         });
         const currentPeriodIndex = findCurrentPeriodIndex(periodDates, activeCashflowPeriodicity);
+        const getPerPointSetting = (defaultValue, highlightValue) => labels.map((_, idx) => {
+            if (currentPeriodIndex === -1) return defaultValue;
+            return idx === currentPeriodIndex ? highlightValue : defaultValue;
+        });
+        const highlightColor = '#ff9f40';
+        const highlightBorderColor = '#c25700';
+        const endBalancePointRadius = getPerPointSetting(4, 8);
+        const endBalancePointBorderWidth = getPerPointSetting(1.5, 3);
+        const endBalancePointBackground = getPerPointSetting('rgba(54, 162, 235, 1)', highlightColor);
+        const endBalancePointBorder = getPerPointSetting('rgba(54, 162, 235, 1)', highlightBorderColor);
+        const scatterPointRadius = getPerPointSetting(6, 10);
+        const incomePointBackground = getPerPointSetting('rgba(75, 192, 192, 1)', highlightColor);
+        const incomePointBorder = getPerPointSetting('rgba(75, 192, 192, 1)', highlightBorderColor);
+        const expensePointBackground = getPerPointSetting('rgba(255, 99, 132, 1)', highlightColor);
+        const expensePointBorder = getPerPointSetting('rgba(255, 99, 132, 1)', highlightBorderColor);
+        const netFlowPointBackground = getPerPointSetting('rgba(255, 206, 86, 1)', highlightColor);
+        const netFlowPointBorder = getPerPointSetting('rgba(255, 206, 86, 1)', highlightBorderColor);
+        const scatterPointBorderWidth = getPerPointSetting(1, 3);
         const xScaleOptions = { type: 'category' };
         if (currentPeriodIndex !== -1) {
             const lookaheadByPeriod = { Mensual: 6, Semanal: 16, Diario: 30 };
@@ -3172,9 +3190,90 @@ document.addEventListener('DOMContentLoaded', () => {
                 xScaleOptions.max = labels[maxIndex];
             }
         }
+        const chartPlugins = [];
+        if (currentPeriodIndex !== -1) {
+            chartPlugins.push({
+                id: 'currentPeriodHighlight',
+                afterDatasetsDraw(chart) {
+                    const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+                    if (!x || !Number.isFinite(currentPeriodIndex)) return;
+                    const centerX = x.getPixelForValue(currentPeriodIndex);
+                    if (!Number.isFinite(centerX)) return;
+                    ctx.save();
+                    ctx.strokeStyle = highlightBorderColor;
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([6, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, top);
+                    ctx.lineTo(centerX, bottom);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            });
+        }
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
             type: 'line',
-            data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Saldo Final Estimado',
+                        data: endBalances,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        tension: 0.1,
+                        fill: false,
+                        pointRadius: endBalancePointRadius,
+                        pointBackgroundColor: endBalancePointBackground,
+                        pointBorderColor: endBalancePointBorder,
+                        pointBorderWidth: endBalancePointBorderWidth,
+                        borderWidth: 2,
+                        order: 1,
+                    },
+                    {
+                        label: 'Ingreso Total Neto',
+                        data: incomes,
+                        borderColor: incomePointBorder,
+                        backgroundColor: incomePointBackground,
+                        type: 'scatter',
+                        showLine: false,
+                        pointRadius: scatterPointRadius,
+                        pointBackgroundColor: incomePointBackground,
+                        pointBorderColor: incomePointBorder,
+                        pointBorderWidth: scatterPointBorderWidth,
+                        pointStyle: 'circle',
+                        order: 2,
+                    },
+                    {
+                        label: 'Gasto Total',
+                        data: totalExpenses.map(e => -e),
+                        borderColor: expensePointBorder,
+                        backgroundColor: expensePointBackground,
+                        type: 'scatter',
+                        showLine: false,
+                        pointRadius: scatterPointRadius,
+                        pointBackgroundColor: expensePointBackground,
+                        pointBorderColor: expensePointBorder,
+                        pointBorderWidth: scatterPointBorderWidth,
+                        pointStyle: 'rectRot',
+                        order: 2,
+                    },
+                    {
+                        label: 'Flujo Neto del Período',
+                        data: netFlows,
+                        borderColor: netFlowPointBorder,
+                        backgroundColor: netFlowPointBackground,
+                        type: 'scatter',
+                        showLine: false,
+                        pointRadius: scatterPointRadius,
+                        pointBackgroundColor: netFlowPointBackground,
+                        pointBorderColor: netFlowPointBorder,
+                        pointBorderWidth: scatterPointBorderWidth,
+                        pointStyle: 'triangle',
+                        order: 2,
+                    }
+                ]
+            },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -3220,7 +3319,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 }
-            }
+            },
+            plugins: chartPlugins
         });
         cashflowChartCanvas.onclick = async (evt) => {
             if (!cashflowChartInstance) return;
