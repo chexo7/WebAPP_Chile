@@ -149,6 +149,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const expensesSubtabs = document.getElementById('expenses-subtabs');
+    const gastosIngresarContainer = document.getElementById('gastos-ingresar-container');
+    const gastosTcContainer = document.getElementById('gastos-tc-container');
+    const creditCardStatementsContainer = document.getElementById('credit-card-statements-container');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
@@ -158,6 +162,8 @@ document.addEventListener('DOMContentLoaded', () => {
             columns: { date: 'FECHA', desc: 'DESCRIPCION', amount: 'MONTO' }
         }
     };
+    let activeExpensesSubsection = 'ingresar-gastos';
+    const creditCardStatementSelections = {};
 
     const usdClpRateCache = {};
     const usdClpRatePending = {};
@@ -1418,6 +1424,20 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPaymentsTableForCurrentPeriod();
     }
 
+    function setExpensesSubsection(viewKey) {
+        activeExpensesSubsection = viewKey;
+        if (expensesSubtabs) {
+            expensesSubtabs.querySelectorAll('.subtab-button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === viewKey);
+            });
+        }
+        if (gastosIngresarContainer) setElementDisplay(gastosIngresarContainer, viewKey === 'ingresar-gastos' ? 'block' : 'none');
+        if (gastosTcContainer) setElementDisplay(gastosTcContainer, viewKey === 'gastos-tc' ? 'block' : 'none');
+        if (viewKey === 'gastos-tc') {
+            renderCreditCardStatements();
+        }
+    }
+
     if (cashflowSubtabs) {
         cashflowSubtabs.addEventListener('click', (e) => {
             if (e.target.classList.contains('subtab-button')) setPeriodicity(e.target.dataset.period, 'cashflow');
@@ -1433,6 +1453,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target.classList.contains('subtab-button')) setPaymentPeriodicity(e.target.dataset.period);
         });
     }
+    if (expensesSubtabs) {
+        expensesSubtabs.addEventListener('click', (e) => {
+            if (e.target.classList.contains('subtab-button')) {
+                setExpensesSubsection(e.target.dataset.view);
+            }
+        });
+    }
+
+    setExpensesSubsection(activeExpensesSubsection);
 
     // --- LÓGICA PESTAÑA AJUSTES ---
     function getDateKey(date) {
@@ -1748,6 +1777,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         populateExpenseCreditCardDropdown();
         updateExpensePaymentDate();
+        if (activeExpensesSubsection === 'gastos-tc') {
+            renderCreditCardStatements();
+        }
     }
 
     function populateExpenseCreditCardDropdown() {
@@ -2333,6 +2365,9 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = expense.is_real ? 'Sí' : 'No';
             appendActionButtons(row, () => loadExpenseForEdit(index), () => deleteExpense(index));
         });
+        if (activeExpensesSubsection === 'gastos-tc') {
+            renderCreditCardStatements();
+        }
     }
     searchExpenseInput.addEventListener('input', renderExpensesTable);
     function loadExpenseForEdit(index) {
@@ -2376,6 +2411,250 @@ document.addEventListener('DOMContentLoaded', () => {
             if (editingExpenseIndex === index) resetExpenseForm();
             else if (editingExpenseIndex !== null && editingExpenseIndex > index) editingExpenseIndex--;
         }
+    }
+
+    // --- VISUALIZADOR DE GASTOS EN TARJETA DE CRÉDITO ---
+    function getCreditCardStatementKey(date) {
+        if (!(date instanceof Date) || isNaN(date.getTime())) return null;
+        return `${date.getUTCFullYear()}-${('0' + (date.getUTCMonth() + 1)).slice(-2)}`;
+    }
+
+    function formatFullMonthYear(date) {
+        if (!(date instanceof Date) || isNaN(date.getTime())) return 'Periodo N/D';
+        return `${MONTH_NAMES_FULL_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+    }
+
+    function formatFullDateEs(date) {
+        if (!(date instanceof Date) || isNaN(date.getTime())) return 'N/D';
+        const day = ('0' + date.getUTCDate()).slice(-2);
+        const month = MONTH_NAMES_ES[date.getUTCMonth()];
+        const year = date.getUTCFullYear();
+        return `${day} ${month} ${year}`;
+    }
+
+    function computeCreditCardCycleRange(card, dueDate) {
+        if (!card || !(dueDate instanceof Date) || isNaN(dueDate.getTime())) {
+            return { cycleStart: null, cycleEnd: null };
+        }
+        const cutoffDay = parseInt(card.cutoff_day, 10) || 1;
+        const dueYear = dueDate.getUTCFullYear();
+        const dueMonth = dueDate.getUTCMonth();
+        const cycleEndMonthDate = new Date(Date.UTC(dueYear, dueMonth - 1, 1));
+        const cycleEndDays = getDaysInMonth(cycleEndMonthDate.getUTCFullYear(), cycleEndMonthDate.getUTCMonth());
+        const cycleEndDay = Math.min(cutoffDay, cycleEndDays);
+        const cycleEnd = new Date(Date.UTC(cycleEndMonthDate.getUTCFullYear(), cycleEndMonthDate.getUTCMonth(), cycleEndDay));
+
+        const prevMonthDate = new Date(Date.UTC(cycleEnd.getUTCFullYear(), cycleEnd.getUTCMonth(), 1));
+        prevMonthDate.setUTCMonth(prevMonthDate.getUTCMonth() - 1);
+        const prevDays = getDaysInMonth(prevMonthDate.getUTCFullYear(), prevMonthDate.getUTCMonth());
+        const prevCycleEndDay = Math.min(cutoffDay, prevDays);
+        const previousCycleEnd = new Date(Date.UTC(prevMonthDate.getUTCFullYear(), prevMonthDate.getUTCMonth(), prevCycleEndDay));
+        const cycleStart = addDays(previousCycleEnd, 1);
+
+        return { cycleStart, cycleEnd };
+    }
+
+    function buildCreditCardStatementsForCard(card) {
+        if (!card || !currentBackupData) return [];
+        const expenses = (currentBackupData.expenses || []).filter(exp => exp.payment_method === 'Credito' && exp.credit_card === card.name);
+        if (expenses.length === 0) return [];
+
+        const statementsMap = new Map();
+        const analysisStart = currentBackupData.analysis_start_date instanceof Date ? new Date(currentBackupData.analysis_start_date) : new Date();
+        const analysisDurationMonths = parseInt(currentBackupData.analysis_duration, 10) || 12;
+        const windowStart = addMonths(new Date(analysisStart), -24);
+        const windowEnd = addMonths(new Date(analysisStart), analysisDurationMonths + 24);
+
+        expenses.forEach(expense => {
+            const { normalizedExpense, amountPerOccurrence } = buildExpenseOccurrenceContext(expense, false);
+            if (!normalizedExpense || !normalizedExpense.start_date) return;
+            const occurrenceDates = getExpenseOccurrenceDatesInPeriod({ ...normalizedExpense }, windowStart, windowEnd, false);
+            if (!occurrenceDates || occurrenceDates.length === 0) return;
+            const totalInstallments = parseInt(expense.installments || 1, 10);
+            const hasInstallments = totalInstallments > 1;
+            occurrenceDates.forEach((dueDate, index) => {
+                if (!(dueDate instanceof Date) || isNaN(dueDate.getTime())) return;
+                const statementKey = getCreditCardStatementKey(dueDate);
+                if (!statementKey) return;
+                if (!statementsMap.has(statementKey)) {
+                    const { cycleStart, cycleEnd } = computeCreditCardCycleRange(card, dueDate);
+                    statementsMap.set(statementKey, {
+                        key: statementKey,
+                        dueDate,
+                        label: formatFullMonthYear(dueDate),
+                        cycleStart,
+                        cycleEnd,
+                        totalsByCurrency: new Map(),
+                        charges: []
+                    });
+                }
+                const statement = statementsMap.get(statementKey);
+                const safeAmount = isNaN(amountPerOccurrence) ? 0 : amountPerOccurrence;
+                const charge = {
+                    name: expense.name,
+                    amount: safeAmount,
+                    currency: expense.currency || 'USD',
+                    installmentNumber: hasInstallments ? Math.min(index + 1, totalInstallments) : null,
+                    totalInstallments: hasInstallments ? totalInstallments : null,
+                    purchaseDate: expense.movement_date ? new Date(expense.movement_date) : null,
+                    dueDate,
+                    category: expense.category || '',
+                    isReal: expense.is_real !== false
+                };
+                statement.charges.push(charge);
+                const currencyKey = charge.currency;
+                statement.totalsByCurrency.set(currencyKey, (statement.totalsByCurrency.get(currencyKey) || 0) + safeAmount);
+            });
+        });
+
+        const statements = Array.from(statementsMap.values()).sort((a, b) => b.dueDate - a.dueDate);
+        statements.forEach(statement => {
+            statement.charges.sort((a, b) => {
+                if (a.purchaseDate && b.purchaseDate) return a.purchaseDate - b.purchaseDate;
+                if (a.purchaseDate) return -1;
+                if (b.purchaseDate) return 1;
+                return a.name.localeCompare(b.name, 'es');
+            });
+            statement.totals = Array.from(statement.totalsByCurrency.entries()).map(([currency, amount]) => ({ currency, amount }));
+        });
+        return statements;
+    }
+
+    function renderCreditCardStatements() {
+        if (!creditCardStatementsContainer) return;
+        creditCardStatementsContainer.innerHTML = '';
+        if (!currentBackupData) {
+            const info = document.createElement('p');
+            info.className = 'credit-card-statement-empty';
+            info.textContent = 'Carga datos para visualizar los gastos en tarjetas de crédito.';
+            creditCardStatementsContainer.appendChild(info);
+            return;
+        }
+        const cards = currentBackupData.credit_cards || [];
+        if (cards.length === 0) {
+            const info = document.createElement('p');
+            info.className = 'credit-card-statement-empty';
+            info.textContent = 'Aún no registras tarjetas de crédito. Agrega tus tarjetas desde Ajustes.';
+            creditCardStatementsContainer.appendChild(info);
+            return;
+        }
+
+        cards.forEach(card => {
+            const statements = buildCreditCardStatementsForCard(card);
+            const block = document.createElement('div');
+            block.classList.add('credit-card-statement-block');
+
+            const header = document.createElement('div');
+            header.classList.add('credit-card-statement-header');
+
+            const headerInfo = document.createElement('div');
+            headerInfo.classList.add('credit-card-statement-header-info');
+
+            const title = document.createElement('h3');
+            title.textContent = card.name;
+            headerInfo.appendChild(title);
+
+            const meta = document.createElement('span');
+            meta.classList.add('credit-card-statement-meta');
+            meta.textContent = `Corte día ${card.cutoff_day}, pago día ${card.payment_day || 1}`;
+            headerInfo.appendChild(meta);
+
+            header.appendChild(headerInfo);
+
+            const controls = document.createElement('div');
+            controls.classList.add('credit-card-statement-controls');
+
+            const detailContainer = document.createElement('div');
+            detailContainer.classList.add('credit-card-statement-detail');
+
+            if (statements.length > 0) {
+                const select = document.createElement('select');
+                select.classList.add('credit-card-statement-select');
+                statements.forEach(statement => {
+                    const option = document.createElement('option');
+                    option.value = statement.key;
+                    option.textContent = statement.label;
+                    select.appendChild(option);
+                });
+                const storedSelection = creditCardStatementSelections[card.name];
+                const defaultKey = statements.find(stmt => stmt.key === storedSelection) ? storedSelection : statements[0].key;
+                select.value = defaultKey;
+                creditCardStatementSelections[card.name] = defaultKey;
+
+                const renderDetail = () => {
+                    const selected = statements.find(stmt => stmt.key === select.value);
+                    detailContainer.innerHTML = '';
+                    if (!selected) {
+                        const empty = document.createElement('p');
+                        empty.className = 'credit-card-statement-empty';
+                        empty.textContent = 'No hay movimientos para el período seleccionado.';
+                        detailContainer.appendChild(empty);
+                        return;
+                    }
+                    const cycleInfo = document.createElement('p');
+                    cycleInfo.classList.add('statement-cycle');
+                    const cycleStart = selected.cycleStart ? formatFullDateEs(selected.cycleStart) : 'N/D';
+                    const cycleEnd = selected.cycleEnd ? formatFullDateEs(selected.cycleEnd) : 'N/D';
+                    const due = selected.dueDate ? formatFullDateEs(selected.dueDate) : 'N/D';
+                    cycleInfo.textContent = `Ciclo ${cycleStart} - ${cycleEnd} · Pago ${due}`;
+                    detailContainer.appendChild(cycleInfo);
+
+                    if (!selected.charges.length) {
+                        const empty = document.createElement('p');
+                        empty.className = 'credit-card-statement-empty';
+                        empty.textContent = 'No hay gastos registrados para este ciclo.';
+                        detailContainer.appendChild(empty);
+                        return;
+                    }
+
+                    const table = document.createElement('table');
+                    table.classList.add('credit-card-statement-table');
+                    const thead = document.createElement('thead');
+                    thead.innerHTML = '<tr><th>Gasto</th><th>Cuota</th><th>Monto</th><th>Fecha Compra</th><th>Fecha Pago</th><th>Categoría</th><th>Real</th></tr>';
+                    table.appendChild(thead);
+                    const tbody = document.createElement('tbody');
+                    selected.charges.forEach(charge => {
+                        const row = document.createElement('tr');
+                        row.insertCell().textContent = charge.name;
+                        row.insertCell().textContent = charge.totalInstallments ? `${charge.installmentNumber}/${charge.totalInstallments}` : '—';
+                        row.insertCell().textContent = formatAmountWithCurrency(charge.amount, charge.currency);
+                        row.insertCell().textContent = charge.purchaseDate ? formatFullDateEs(charge.purchaseDate) : 'N/D';
+                        row.insertCell().textContent = charge.dueDate ? formatFullDateEs(charge.dueDate) : 'N/D';
+                        row.insertCell().textContent = charge.category || 'Sin categoría';
+                        row.insertCell().textContent = charge.isReal ? 'Sí' : 'No';
+                        tbody.appendChild(row);
+                    });
+                    table.appendChild(tbody);
+                    detailContainer.appendChild(table);
+
+                    if (selected.totals && selected.totals.length > 0) {
+                        const totals = document.createElement('div');
+                        totals.classList.add('credit-card-statement-totals');
+                        totals.textContent = 'Totales: ' + selected.totals.map(total => formatAmountWithCurrency(total.amount, total.currency)).join(' · ');
+                        detailContainer.appendChild(totals);
+                    }
+                };
+
+                select.addEventListener('change', () => {
+                    creditCardStatementSelections[card.name] = select.value;
+                    renderDetail();
+                });
+
+                controls.appendChild(select);
+                header.appendChild(controls);
+                renderDetail();
+            } else {
+                delete creditCardStatementSelections[card.name];
+                const empty = document.createElement('p');
+                empty.className = 'credit-card-statement-empty';
+                empty.textContent = 'No hay gastos asociados a esta tarjeta en el período visible.';
+                detailContainer.appendChild(empty);
+            }
+
+            block.appendChild(header);
+            block.appendChild(detailContainer);
+            creditCardStatementsContainer.appendChild(block);
+        });
     }
 
     // --- IMPORTACIÓN MASIVA DE GASTOS ---
