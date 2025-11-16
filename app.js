@@ -149,9 +149,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const openJsonExpensesButton = document.getElementById('open-json-expenses-button');
+    const jsonExpensesModal = document.getElementById('json-expenses-modal');
+    const jsonExpensesModalClose = document.getElementById('json-expenses-modal-close');
+    const jsonExpensesInput = document.getElementById('json-expenses-input');
+    const jsonExpensesPreview = document.getElementById('json-expenses-preview');
+    const parseJsonExpensesButton = document.getElementById('parse-json-expenses-button');
+    const addJsonExpensesButton = document.getElementById('add-json-expenses-button');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
+    let parsedJsonExpenses = [];
     const bankProfiles = {
         falabella: {
             matchFileName: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.xlsx$/i,
@@ -2422,6 +2430,159 @@ document.addEventListener('DOMContentLoaded', () => {
             return expDate === dateStr && exp.name === name && parseFloat(exp.amount) === parseFloat(amount);
         });
     }
+    function normalizeBankAmount(val) {
+        if (val === undefined || val === null || val === '') return null;
+        if (typeof val === 'number') return val;
+        const cleaned = String(val).replace(/[^0-9,.-]/g, '').replace(/,(?=\d{3}(\D|$))/g, '');
+        const normalized = cleaned.replace(',', '.');
+        const num = parseFloat(normalized);
+        return isNaN(num) ? null : num;
+    }
+    function parseBankJsonDate(val) {
+        if (!val) return null;
+        const parts = String(val).split(/[\/\-]/).map(p => p.trim());
+        if (parts.length === 3) {
+            let [month, day, year] = parts.map(p => parseInt(p, 10));
+            if (isNaN(month) || isNaN(day) || isNaN(year)) return null;
+            if (year < 100) year += 2000;
+            return new Date(Date.UTC(year, month - 1, day));
+        }
+        const fallback = new Date(val);
+        return isNaN(fallback) ? null : fallback;
+    }
+    function mapBankJsonPayload(payload) {
+        const entries = [];
+        const seenKeys = new Set();
+        const addFrom = (list) => {
+            (list || []).forEach(tx => {
+                const desc = (tx.Description || tx.description || '').trim();
+                const rawDate = tx.Date || tx.date;
+                const rawAmount = tx.Withdrawal ?? tx.withdrawal ?? tx.Deposit ?? tx.deposit ?? tx.Amount ?? tx.amount;
+                const amount = normalizeBankAmount(rawAmount);
+                const dateObj = parseBankJsonDate(rawDate);
+                if (!desc || !dateObj || amount === null) return;
+                const dateStr = getISODateString(dateObj);
+                const key = `${dateStr}__${desc}__${amount}`;
+                if (seenKeys.has(key)) return;
+                seenKeys.add(key);
+                entries.push({ name: desc, amount, date: dateObj, duplicate: checkExpenseDuplicate(desc, dateStr, amount) });
+            });
+        };
+        if (payload && typeof payload === 'object') {
+            addFrom(payload.PendingTransactions);
+            addFrom(payload.PostedTransactions);
+        }
+        return entries;
+    }
+    function ensureImportExpenseCategory() {
+        if (!currentBackupData.expense_categories) currentBackupData.expense_categories = {};
+        const selected = expenseCategorySelect && isFirebaseKeySafe(expenseCategorySelect.value) ? expenseCategorySelect.value : '';
+        const existing = selected || Object.keys(currentBackupData.expense_categories).find(isFirebaseKeySafe);
+        if (existing) return existing;
+        const fallback = 'Importado JSON';
+        if (!currentBackupData.expense_categories[fallback]) {
+            currentBackupData.expense_categories[fallback] = 'Variable';
+            if (!currentBackupData.budgets) currentBackupData.budgets = {};
+            if (currentBackupData.budgets[fallback] === undefined) currentBackupData.budgets[fallback] = 0;
+            populateExpenseCategoriesDropdowns();
+            renderBudgetsTable();
+        }
+        return fallback;
+    }
+    function renderJsonExpensesPreview(entries = []) {
+        parsedJsonExpenses = entries;
+        if (!jsonExpensesPreview) return;
+        jsonExpensesPreview.innerHTML = '';
+        if (!entries.length) {
+            jsonExpensesPreview.textContent = 'Sin movimientos listos para importar.';
+            return;
+        }
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th>Importar</th><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Duplicado?</th></tr>';
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        entries.forEach((item, idx) => {
+            const tr = document.createElement('tr');
+            if (item.duplicate) tr.classList.add('duplicate-row');
+            const chkCell = tr.insertCell();
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.dataset.index = idx;
+            chk.checked = !item.duplicate;
+            if (item.duplicate) chk.disabled = true;
+            chkCell.appendChild(chk);
+            tr.insertCell().textContent = getISODateString(item.date);
+            tr.insertCell().textContent = item.name;
+            tr.insertCell().textContent = item.amount;
+            tr.insertCell().textContent = item.duplicate ? 'Sí' : 'No';
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        jsonExpensesPreview.appendChild(table);
+    }
+    function closeJsonExpensesModal() {
+        if (jsonExpensesModal) hideElement(jsonExpensesModal);
+        parsedJsonExpenses = [];
+        if (jsonExpensesPreview) jsonExpensesPreview.innerHTML = '';
+        if (jsonExpensesInput) jsonExpensesInput.value = '';
+    }
+    function showJsonExpensesModal() {
+        if (jsonExpensesModal) showElement(jsonExpensesModal, 'flex');
+        parsedJsonExpenses = [];
+        if (jsonExpensesInput) jsonExpensesInput.value = '';
+        renderJsonExpensesPreview([]);
+    }
+    function parseJsonExpenses() {
+        if (!jsonExpensesInput) return;
+        try {
+            const payload = JSON.parse(jsonExpensesInput.value);
+            const entries = mapBankJsonPayload(payload);
+            if (!entries.length) { alert('No se encontraron movimientos válidos en el JSON.'); }
+            renderJsonExpensesPreview(entries);
+        } catch (err) {
+            alert('JSON inválido. Verifica el formato.');
+        }
+    }
+    function addMappedJsonExpenses() {
+        if (!parsedJsonExpenses.length) { alert('Procesa un JSON válido primero.'); return; }
+        if (!currentBackupData.expenses) currentBackupData.expenses = [];
+        const category = ensureImportExpenseCategory();
+        const expenseType = currentBackupData.expense_categories[category] || 'Variable';
+        const currency = expenseCurrencySelect ? (expenseCurrencySelect.value || 'USD') : 'USD';
+        const paymentMethod = expensePaymentMethodSelect ? (expensePaymentMethodSelect.value || 'Efectivo / Debito') : 'Efectivo / Debito';
+        const creditCard = paymentMethod === 'Credito' ? (expenseCreditCardSelect ? expenseCreditCardSelect.value : null) : null;
+        let addedCount = 0;
+        const checkboxes = jsonExpensesPreview ? jsonExpensesPreview.querySelectorAll('input[type="checkbox"][data-index]') : [];
+        checkboxes.forEach(chk => {
+            if (!chk.checked) return;
+            const idx = parseInt(chk.dataset.index, 10);
+            const item = parsedJsonExpenses[idx];
+            if (!item || item.duplicate) return;
+            const expenseEntry = {
+                name: item.name,
+                amount: item.amount,
+                category,
+                type: expenseType,
+                frequency: 'Único',
+                start_date: item.date,
+                end_date: null,
+                is_real: true,
+                movement_date: item.date,
+                payment_method: paymentMethod,
+                credit_card: creditCard,
+                installments: 1,
+                currency
+            };
+            currentBackupData.expenses.push(expenseEntry);
+            addedCount++;
+        });
+        if (addedCount === 0) { alert('No se agregaron nuevos gastos (todos eran duplicados u omitidos).'); return; }
+        renderExpensesTable();
+        renderCashflowTable();
+        closeJsonExpensesModal();
+        alert(`${addedCount} gasto(s) importado(s) desde JSON.`);
+    }
     function createCategorySelect() {
         const sel = document.createElement('select');
         if (currentBackupData && currentBackupData.expense_categories) {
@@ -2526,6 +2687,11 @@ document.addEventListener('DOMContentLoaded', () => {
     openImportExpensesButtons.forEach(btn => btn.addEventListener("click", showImportExpensesModal));
     if (importExpensesModalClose) importExpensesModalClose.addEventListener('click', closeImportExpensesModal);
     if (importExpensesModal) importExpensesModal.addEventListener('click', (e)=>{ if(e.target===importExpensesModal) closeImportExpensesModal(); });
+    if (openJsonExpensesButton) openJsonExpensesButton.addEventListener('click', showJsonExpensesModal);
+    if (jsonExpensesModalClose) jsonExpensesModalClose.addEventListener('click', closeJsonExpensesModal);
+    if (jsonExpensesModal) jsonExpensesModal.addEventListener('click', (e)=>{ if(e.target===jsonExpensesModal) closeJsonExpensesModal(); });
+    if (parseJsonExpensesButton) parseJsonExpensesButton.addEventListener('click', parseJsonExpenses);
+    if (addJsonExpensesButton) addJsonExpensesButton.addEventListener('click', addMappedJsonExpenses);
     if (expenseDropZone) {
         expenseDropZone.addEventListener('click', () => { if(expenseFileInput) expenseFileInput.click(); });
         expenseDropZone.addEventListener('dragover', e => { e.preventDefault(); expenseDropZone.classList.add('dragover'); });

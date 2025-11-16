@@ -253,7 +253,10 @@
                         <h3>Gastos Registrados</h3>
                         <label for="search-expense-input">Buscar Gasto:</label>
                         <input type="text" id="search-expense-input" placeholder="Escribe para filtrar...">
-                        <button type="button" class="open-import-expenses small-button accent desktop-only">Importar Gastos</button>
+                        <div class="import-actions">
+                            <button type="button" class="open-import-expenses small-button accent desktop-only">Importar Gastos</button>
+                            <button type="button" id="open-json-expenses-button" class="small-button">Importar JSON</button>
+                        </div>
                         <div class="table-responsive dynamic-table-scroll">
                             <table id="expenses-table-view">
                                 <thead>
@@ -543,6 +546,20 @@
                     </div>
                     <div id="import-table-container"></div>
                     <button type="button" id="merge-expenses-button" class="accent">Unir</button>
+                </div>
+            </div>
+
+            <div id="json-expenses-modal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <span id="json-expenses-modal-close" class="modal-close">&times;</span>
+                    <h3>Importar Gastos desde JSON</h3>
+                    <p>Pega el JSON tal como lo entrega el banco. Se extraerá al menos la descripción, fecha y monto.</p>
+                    <textarea id="json-expenses-input" rows="10" placeholder="Pega aquí el JSON"></textarea>
+                    <div class="json-actions">
+                        <button type="button" id="parse-json-expenses-button" class="accent">Procesar JSON</button>
+                        <button type="button" id="add-json-expenses-button">Agregar gastos válidos</button>
+                    </div>
+                    <div id="json-expenses-preview"></div>
                 </div>
             </div>
         </div>
