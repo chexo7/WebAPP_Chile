@@ -165,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     let parsedJsonExpenses = [];
+    let lastImportedJsonRange = null;
 
     const usdClpRateCache = {};
     const usdClpRatePending = {};
@@ -2444,10 +2445,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const amount = parseFloat(cleaned);
         return isNaN(amount) ? 0 : amount;
     }
+    function parseAmountOrNull(val) {
+        if (val === undefined || val === null) return null;
+        const trimmed = String(val).trim();
+        if (!trimmed) return null;
+        const parsed = parseAmountString(trimmed);
+        return isNaN(parsed) ? null : parsed;
+    }
     function checkExpenseDuplicate(name, dateStr, amount) {
         return (currentBackupData.expenses || []).some(exp => {
             const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
-            return expDate === dateStr && exp.name === name && parseFloat(exp.amount) === parseFloat(amount);
+            const existingAmount = exp.amount === undefined || exp.amount === null ? null : parseFloat(exp.amount);
+            const incomingAmount = amount === undefined || amount === null ? null : parseFloat(amount);
+            if (incomingAmount === null || isNaN(incomingAmount)) {
+                return expDate === dateStr && exp.name === name && (existingAmount === null || isNaN(existingAmount));
+            }
+            return expDate === dateStr && exp.name === name && parseFloat(existingAmount) === incomingAmount;
         });
     }
     function createCategorySelect() {
@@ -2577,23 +2590,58 @@ document.addEventListener('DOMContentLoaded', () => {
         const results = [];
         if (!obj || typeof obj !== 'object') return results;
         const seen = new Set();
-        const pushTx = (tx) => {
-            if (!tx) return;
+        const fromDate = toUTCDate(obj.FromDate || obj.fromDate, null);
+        const toDate = toUTCDate(obj.ToDate || obj.toDate, null);
+        lastImportedJsonRange = (fromDate || toDate) ? { from: fromDate, to: toDate } : null;
+        const buildTransaction = (tx, isPending) => {
+            if (!tx) return null;
             const description = (tx.Description || tx.description || '').trim();
             const dateVal = tx.Date || tx.date;
             const dateObj = toUTCDate(dateVal, null);
-            const amountVal = tx.Withdrawal ?? tx.withdrawal ?? tx.Deposit ?? tx.deposit;
-            const amount = parseAmountString(amountVal);
-            if (!description || !dateObj || amount === 0) return;
+            if (!description || !dateObj) return null;
+            const withdrawal = parseAmountOrNull(tx.Withdrawal ?? tx.withdrawal);
+            const deposit = parseAmountOrNull(tx.Deposit ?? tx.deposit);
+            let amount = null;
+            if (withdrawal !== null && !isNaN(withdrawal) && withdrawal !== 0) {
+                amount = -Math.abs(withdrawal);
+            } else if (deposit !== null && !isNaN(deposit) && deposit !== 0) {
+                amount = Math.abs(deposit);
+            }
+            if (amount === null && isPending) {
+                amount = null;
+            }
+            const balanceAfterRaw = tx.RunningBalance ?? tx.runningBalance ?? tx.running_balance;
+            const balanceAfter = parseAmountOrNull(balanceAfterRaw);
+            const sourceType = isPending ? 'PENDING' : (tx.Type || tx.type || 'OTRO');
             const dateStr = getISODateString(dateObj);
-            const key = `${description}|${dateStr}|${amount}`;
-            if (seen.has(key)) return;
+            const key = `${description}|${dateStr}|${amount === null ? 'null' : amount}`;
+            if (seen.has(key)) return null;
             seen.add(key);
-            results.push({ name: description, amount, date: dateObj });
+            return {
+                id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `tx-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                date: dateObj,
+                description,
+                amount,
+                currency: 'USD',
+                sourceType,
+                isPending: !!isPending,
+                checkNumber: tx.CheckNumber ?? tx.checkNumber ?? undefined,
+                balanceAfter: balanceAfter === null ? undefined : balanceAfter,
+                raw: tx
+            };
         };
-        (obj.PendingTransactions || []).forEach(pushTx);
-        (obj.PostedTransactions || []).forEach(pushTx);
-        if (Array.isArray(obj.transactions)) obj.transactions.forEach(pushTx);
+        (obj.PendingTransactions || []).forEach(tx => {
+            const mapped = buildTransaction(tx, true);
+            if (mapped) results.push(mapped);
+        });
+        (obj.PostedTransactions || []).forEach(tx => {
+            const mapped = buildTransaction(tx, false);
+            if (mapped) results.push(mapped);
+        });
+        if (Array.isArray(obj.transactions)) obj.transactions.forEach(tx => {
+            const mapped = buildTransaction(tx, false);
+            if (mapped) results.push(mapped);
+        });
         return results;
     }
 
@@ -2607,19 +2655,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const categories = currentBackupData.expense_categories
             ? Object.keys(currentBackupData.expense_categories).filter(isFirebaseKeySafe).sort()
             : [];
+        if (lastImportedJsonRange && (lastImportedJsonRange.from || lastImportedJsonRange.to)) {
+            const rangeNotice = document.createElement('p');
+            const fromStr = lastImportedJsonRange.from ? getISODateString(lastImportedJsonRange.from) : '¿?';
+            const toStr = lastImportedJsonRange.to ? getISODateString(lastImportedJsonRange.to) : '¿?';
+            rangeNotice.classList.add('json-range-notice');
+            rangeNotice.textContent = `Rango sincronizado: ${fromStr} a ${toStr}`;
+            jsonExpensesPreview.appendChild(rangeNotice);
+        }
         const table = document.createElement('table');
         const thead = document.createElement('thead');
-        thead.innerHTML = '<tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Categoría</th><th>Duplicado</th></tr>';
+        thead.innerHTML = '<tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Categoría</th><th>Estado / Tipo</th><th>Duplicado</th></tr>';
         table.appendChild(thead);
         const tbody = document.createElement('tbody');
         parsedJsonExpenses.forEach((item, idx) => {
             const dateStr = getISODateString(item.date);
-            const isDup = checkExpenseDuplicate(item.name, dateStr, item.amount);
+            const isDup = checkExpenseDuplicate(item.description, dateStr, item.amount);
             const row = document.createElement('tr');
             if (isDup) row.classList.add('duplicate-row');
             row.insertCell().textContent = dateStr;
-            row.insertCell().textContent = item.name;
-            row.insertCell().textContent = item.amount;
+            row.insertCell().textContent = item.description;
+            const amountCell = row.insertCell();
+            amountCell.textContent = item.amount === null ? 'Pendiente sin monto' : formatAmountWithCurrency(item.amount, item.currency || 'USD');
             const catCell = row.insertCell();
             const select = document.createElement('select');
             select.dataset.index = idx;
@@ -2634,6 +2691,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 select.appendChild(opt);
             });
             catCell.appendChild(select);
+            const statusCell = row.insertCell();
+            statusCell.textContent = item.isPending ? 'Pendiente' : (item.sourceType || '');
             row.insertCell().textContent = isDup ? 'Sí' : 'No';
             tbody.appendChild(row);
         });
@@ -2665,34 +2724,51 @@ document.addEventListener('DOMContentLoaded', () => {
     function addJsonExpenses() {
         if (!parsedJsonExpenses.length) { alert('Primero arrastra un JSON válido en la pestaña Gastos.'); return; }
         if (!currentBackupData.expenses) currentBackupData.expenses = [];
-        let added = 0, skipped = 0, missingCategory = 0;
+        let added = 0, skipped = 0, missingCategory = 0, missingAmount = 0;
         parsedJsonExpenses.forEach((item, idx) => {
+            if (item.amount === null || isNaN(item.amount)) { missingAmount++; return; }
             const select = jsonExpensesPreview ? jsonExpensesPreview.querySelector(`select[data-index="${idx}"]`) : null;
             const category = select ? select.value : '';
             if (!category) { missingCategory++; return; }
             const dateStr = getISODateString(item.date);
-            const isDup = checkExpenseDuplicate(item.name, dateStr, item.amount);
+            const isDup = checkExpenseDuplicate(item.description, dateStr, item.amount);
             if (isDup) { skipped++; return; }
             const expense = {
-                name: item.name,
+                name: item.description,
                 amount: item.amount,
                 category,
                 type: currentBackupData.expense_categories ? currentBackupData.expense_categories[category] || 'Variable' : 'Variable',
                 frequency: 'Único',
                 start_date: item.date,
                 end_date: null,
-                is_real: true,
+                is_real: !item.isPending,
                 movement_date: item.date,
                 payment_method: 'Efectivo / Debito',
                 credit_card: null,
-                installments: 1
+                installments: 1,
+                bank_source_type: item.sourceType,
+                bank_check_number: item.checkNumber,
+                bank_balance_after: item.balanceAfter,
+                bank_transaction_id: item.id,
+                bank_raw: item.raw
             };
             currentBackupData.expenses.push(expense);
             added++;
         });
+        if (lastImportedJsonRange) {
+            currentBackupData.bank_import_ranges = currentBackupData.bank_import_ranges || [];
+            const rangeKey = `${lastImportedJsonRange.from ? getISODateString(lastImportedJsonRange.from) : ''}|${lastImportedJsonRange.to ? getISODateString(lastImportedJsonRange.to) : ''}`;
+            if (!currentBackupData.bank_import_ranges.some(r => `${r.from}|${r.to}` === rangeKey)) {
+                currentBackupData.bank_import_ranges.push({
+                    from: lastImportedJsonRange.from ? getISODateString(lastImportedJsonRange.from) : '',
+                    to: lastImportedJsonRange.to ? getISODateString(lastImportedJsonRange.to) : '',
+                    imported_at: new Date().toISOString()
+                });
+            }
+        }
         renderExpensesTable();
         renderCashflowTable();
-        alert(`Gastos agregados: ${added}. Duplicados omitidos: ${skipped}. Sin categoría: ${missingCategory}.`);
+        alert(`Gastos agregados: ${added}. Duplicados omitidos: ${skipped}. Sin categoría: ${missingCategory}. Pendientes sin monto: ${missingAmount}.`);
         closeJsonExpensesModal();
     }
 
