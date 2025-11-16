@@ -1375,6 +1375,21 @@ td.reimbursement-income {
 #expense-drop-zone.dragover {
     background-color: var(--alt-row-bg);
 }
+.json-drop-zone {
+    border: 2px dashed var(--border-color);
+    padding: 12px;
+    text-align: center;
+    margin: 8px 0 14px;
+    border-radius: var(--radius);
+    color: #555;
+    background: #fafafa;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.json-drop-zone.dragover {
+    border-color: #1e88e5;
+    color: #1e88e5;
+    background: #e8f3ff;
+}
 #column-mapping {
     display: flex;
     gap: 10px;
@@ -1410,6 +1425,33 @@ td.reimbursement-income {
     max-width: none;
     max-height: none;
     border-radius: 0;
+}
+#import-json-expenses-modal .modal-content {
+    max-width: 800px;
+    width: 90%;
+}
+#json-expenses-input {
+    width: 100%;
+    margin: 10px 0;
+    font-family: var(--font-family);
+}
+.json-expenses-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+#json-expenses-preview table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+#json-expenses-preview th, #json-expenses-preview td {
+    border: 1px solid var(--border-color);
+    padding: 6px;
+}
+#json-expenses-preview .duplicate-row {
+    background-color: var(--alt-row-bg);
 }
 
 .desktop-only { display: none; }
