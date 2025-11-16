@@ -138,6 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const expensesTableView = document.querySelector('#expenses-table-view tbody');
     const searchExpenseInput = document.getElementById("search-expense-input");
     const openImportExpensesButtons = document.querySelectorAll(".open-import-expenses");
+    const openJsonExpensesButtons = document.querySelectorAll('.open-json-expenses');
     const importExpensesModal = document.getElementById("import-expenses-modal");
     const importExpensesModalClose = document.getElementById("import-expenses-modal-close");
     const expenseDropZone = document.getElementById("expense-drop-zone");
@@ -149,6 +150,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const importJsonExpensesModal = document.getElementById('import-json-expenses-modal');
+    const importJsonExpensesClose = document.getElementById('import-json-expenses-close');
+    const jsonExpensesInput = document.getElementById('json-expenses-input');
+    const jsonExpensesPreview = document.getElementById('json-expenses-preview');
+    const previewJsonExpensesButton = document.getElementById('preview-json-expenses');
+    const addJsonExpensesButton = document.getElementById('add-json-expenses');
+    const jsonExpensesCategorySelect = document.getElementById('json-expenses-category');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
@@ -158,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
             columns: { date: 'FECHA', desc: 'DESCRIPCION', amount: 'MONTO' }
         }
     };
+    let parsedJsonExpenses = [];
 
     const usdClpRateCache = {};
     const usdClpRatePending = {};
@@ -2416,6 +2425,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return null;
     }
+    function parseAmountString(val) {
+        if (val === undefined || val === null || val === '') return 0;
+        if (typeof val === 'number') return val;
+        const raw = String(val).trim();
+        if (!raw) return 0;
+        let cleaned = raw.replace(/[^0-9,.-]/g, '');
+        const hasComma = cleaned.includes(',');
+        const hasDot = cleaned.includes('.');
+        if (hasComma && hasDot) {
+            cleaned = cleaned.replace(/,/g, '');
+        } else if (hasComma && !hasDot) {
+            cleaned = cleaned.replace(/,/g, '.');
+        }
+        const dotParts = cleaned.split('.');
+        if (dotParts.length > 2) {
+            const decimal = dotParts.pop();
+            cleaned = dotParts.join('') + '.' + decimal;
+        }
+        const amount = parseFloat(cleaned);
+        return isNaN(amount) ? 0 : amount;
+    }
     function checkExpenseDuplicate(name, dateStr, amount) {
         return (currentBackupData.expenses || []).some(exp => {
             const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
@@ -2523,9 +2553,152 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsArrayBuffer(file);
     }
 
+    function populateJsonCategorySelect() {
+        if (!jsonExpensesCategorySelect) return;
+        jsonExpensesCategorySelect.innerHTML = '';
+        const categories = currentBackupData && currentBackupData.expense_categories
+            ? Object.keys(currentBackupData.expense_categories).sort()
+            : [];
+        if (!categories.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Sin categorías disponibles';
+            jsonExpensesCategorySelect.appendChild(opt);
+            return;
+        }
+        categories.forEach(cat => {
+            if (isFirebaseKeySafe(cat)) {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                jsonExpensesCategorySelect.appendChild(opt);
+            }
+        });
+    }
+
+    function showJsonExpensesModal() {
+        populateJsonCategorySelect();
+        parsedJsonExpenses = [];
+        if (jsonExpensesInput) jsonExpensesInput.value = '';
+        if (jsonExpensesPreview) jsonExpensesPreview.innerHTML = '';
+        if (importJsonExpensesModal) showElement(importJsonExpensesModal, 'flex');
+    }
+
+    function closeJsonExpensesModal() {
+        if (importJsonExpensesModal) hideElement(importJsonExpensesModal);
+        parsedJsonExpenses = [];
+    }
+
+    function mapJsonTransactionsToExpenses(obj) {
+        const results = [];
+        if (!obj || typeof obj !== 'object') return results;
+        const seen = new Set();
+        const pushTx = (tx) => {
+            if (!tx) return;
+            const description = (tx.Description || tx.description || '').trim();
+            const dateVal = tx.Date || tx.date;
+            const dateObj = toUTCDate(dateVal, null);
+            const amountVal = tx.Withdrawal ?? tx.withdrawal ?? tx.Deposit ?? tx.deposit;
+            const amount = parseAmountString(amountVal);
+            if (!description || !dateObj || amount === 0) return;
+            const dateStr = getISODateString(dateObj);
+            const key = `${description}|${dateStr}|${amount}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            results.push({ name: description, amount, date: dateObj });
+        };
+        (obj.PendingTransactions || []).forEach(pushTx);
+        (obj.PostedTransactions || []).forEach(pushTx);
+        if (Array.isArray(obj.transactions)) obj.transactions.forEach(pushTx);
+        return results;
+    }
+
+    function renderJsonExpensesPreview() {
+        if (!jsonExpensesPreview) return;
+        jsonExpensesPreview.innerHTML = '';
+        if (!parsedJsonExpenses.length) {
+            jsonExpensesPreview.textContent = 'Sin datos para previsualizar.';
+            return;
+        }
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Duplicado</th></tr>';
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        parsedJsonExpenses.forEach(item => {
+            const dateStr = getISODateString(item.date);
+            const isDup = checkExpenseDuplicate(item.name, dateStr, item.amount);
+            const row = document.createElement('tr');
+            if (isDup) row.classList.add('duplicate-row');
+            row.insertCell().textContent = dateStr;
+            row.insertCell().textContent = item.name;
+            row.insertCell().textContent = item.amount;
+            row.insertCell().textContent = isDup ? 'Sí' : 'No';
+            tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        jsonExpensesPreview.appendChild(table);
+    }
+
+    function previewJsonExpenses() {
+        if (!jsonExpensesInput) return;
+        let parsed;
+        try {
+            parsed = JSON.parse(jsonExpensesInput.value);
+        } catch (err) {
+            jsonExpensesPreview.textContent = 'JSON inválido: ' + err.message;
+            parsedJsonExpenses = [];
+            return;
+        }
+        parsedJsonExpenses = mapJsonTransactionsToExpenses(parsed);
+        if (!parsedJsonExpenses.length) {
+            jsonExpensesPreview.textContent = 'No se encontraron movimientos con descripción, fecha y monto.';
+            return;
+        }
+        renderJsonExpensesPreview();
+    }
+
+    function addJsonExpenses() {
+        if (!parsedJsonExpenses.length) { alert('Primero previsualiza los datos.'); return; }
+        const category = jsonExpensesCategorySelect ? jsonExpensesCategorySelect.value : '';
+        if (!category) { alert('Selecciona una categoría para los nuevos gastos.'); return; }
+        if (!currentBackupData.expenses) currentBackupData.expenses = [];
+        let added = 0, skipped = 0;
+        parsedJsonExpenses.forEach(item => {
+            const dateStr = getISODateString(item.date);
+            const isDup = checkExpenseDuplicate(item.name, dateStr, item.amount);
+            if (isDup) { skipped++; return; }
+            const expense = {
+                name: item.name,
+                amount: item.amount,
+                category,
+                type: currentBackupData.expense_categories ? currentBackupData.expense_categories[category] || 'Variable' : 'Variable',
+                frequency: 'Único',
+                start_date: item.date,
+                end_date: null,
+                is_real: true,
+                movement_date: item.date,
+                payment_method: 'Efectivo / Debito',
+                credit_card: null,
+                installments: 1
+            };
+            currentBackupData.expenses.push(expense);
+            added++;
+        });
+        renderExpensesTable();
+        renderCashflowTable();
+        alert(`Gastos agregados: ${added}. Duplicados omitidos: ${skipped}.`);
+        closeJsonExpensesModal();
+    }
+
     openImportExpensesButtons.forEach(btn => btn.addEventListener("click", showImportExpensesModal));
     if (importExpensesModalClose) importExpensesModalClose.addEventListener('click', closeImportExpensesModal);
     if (importExpensesModal) importExpensesModal.addEventListener('click', (e)=>{ if(e.target===importExpensesModal) closeImportExpensesModal(); });
+    openJsonExpensesButtons.forEach(btn => btn.addEventListener('click', showJsonExpensesModal));
+    if (importJsonExpensesClose) importJsonExpensesClose.addEventListener('click', closeJsonExpensesModal);
+    if (importJsonExpensesModal) importJsonExpensesModal.addEventListener('click', (e)=>{ if (e.target === importJsonExpensesModal) closeJsonExpensesModal(); });
+    if (previewJsonExpensesButton) previewJsonExpensesButton.addEventListener('click', previewJsonExpenses);
+    if (addJsonExpensesButton) addJsonExpensesButton.addEventListener('click', addJsonExpenses);
     if (expenseDropZone) {
         expenseDropZone.addEventListener('click', () => { if(expenseFileInput) expenseFileInput.click(); });
         expenseDropZone.addEventListener('dragover', e => { e.preventDefault(); expenseDropZone.classList.add('dragover'); });
