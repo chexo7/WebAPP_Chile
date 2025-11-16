@@ -149,9 +149,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const openJsonImportExpensesButton = document.getElementById('open-json-import-expenses');
+    const jsonExpensesModal = document.getElementById('json-expenses-modal');
+    const jsonExpensesModalClose = document.getElementById('json-expenses-modal-close');
+    const jsonExpensesTextarea = document.getElementById('json-expenses-input');
+    const jsonExpenseCategorySelect = document.getElementById('json-expense-category');
+    const processJsonExpensesButton = document.getElementById('process-json-expenses-button');
+    const importJsonExpensesButton = document.getElementById('import-json-expenses-button');
+    const jsonExpensesPreview = document.getElementById('json-expenses-preview');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
+    let parsedJsonExpenses = [];
     const bankProfiles = {
         falabella: {
             matchFileName: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.xlsx$/i,
@@ -2162,7 +2171,7 @@ document.addEventListener('DOMContentLoaded', () => {
     expenseMovementDateInput.addEventListener('change', updateExpensePaymentDate);
     expenseCreditCardSelect.addEventListener('change', updateExpensePaymentDate);
     function populateExpenseCategoriesDropdowns() {
-        const selects = [expenseCategorySelect, budgetCategorySelect];
+        const selects = [expenseCategorySelect, budgetCategorySelect, jsonExpenseCategorySelect];
         selects.forEach(select => {
             if (!select || !currentBackupData || !currentBackupData.expense_categories) {
                 if (select) select.innerHTML = '<option value="">No hay categorías</option>'; return;
@@ -2177,7 +2186,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             if (sortedCategories.includes(currentValue)) select.value = currentValue;
-            else if (sortedCategories.length > 0 && select.id === 'expense-category') select.value = sortedCategories[0];
+            else if (sortedCategories.length > 0 && (select.id === 'expense-category' || select.id === 'json-expense-category')) select.value = sortedCategories[0];
         });
         updateRemoveCategoryButtonState();
         populateIncomeReimbursementCategoriesDropdown();
@@ -2436,6 +2445,87 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return sel;
     }
+    function getDefaultExpenseCategory() {
+        if (currentBackupData && currentBackupData.expense_categories) {
+            const cats = Object.keys(currentBackupData.expense_categories).sort();
+            if (cats.length) return cats[0];
+        }
+        return '';
+    }
+    function parseCurrencyValue(val) {
+        if (val === null || val === undefined) return 0;
+        if (typeof val === 'number') return val;
+        const cleaned = String(val).replace(/[^0-9,.-]/g, '').replace(/,/g, '');
+        const parsed = parseFloat(cleaned);
+        return isNaN(parsed) ? 0 : parsed;
+    }
+    function parseTransactionDate(val) {
+        return parseExcelDate(val) || toUTCDate(val, null);
+    }
+    function mapJsonTransactions(jsonText) {
+        if (!jsonText || !jsonText.trim()) return [];
+        let data;
+        try {
+            data = JSON.parse(jsonText);
+        } catch (err) {
+            alert('JSON inválido. Revisa el formato.');
+            return [];
+        }
+        const items = [];
+        const seen = new Set();
+        const addFromList = (list) => {
+            if (!Array.isArray(list)) return;
+            list.forEach(tx => {
+                const rawAmount = tx.Withdrawal || tx.Deposit || tx.Amount || tx.Monto;
+                const amount = Math.abs(parseCurrencyValue(rawAmount));
+                const dateObj = parseTransactionDate(tx.Date || tx.date);
+                const desc = (tx.Description || tx.name || 'Gasto').trim();
+                if (!amount || !dateObj || !desc) return;
+                const key = `${desc}|${getISODateString(dateObj)}|${amount}`;
+                if (seen.has(key)) return;
+                seen.add(key);
+                items.push({ name: desc, amount, date: dateObj });
+            });
+        };
+        addFromList(data.PendingTransactions);
+        addFromList(data.PostedTransactions);
+        return items;
+    }
+    function renderJsonExpensesPreview() {
+        if (!jsonExpensesPreview) return;
+        jsonExpensesPreview.innerHTML = '';
+        if (!parsedJsonExpenses.length) {
+            const p = document.createElement('p');
+            p.className = 'empty-preview';
+            p.textContent = 'Sin datos para importar.';
+            jsonExpensesPreview.appendChild(p);
+            return;
+        }
+        const table = document.createElement('table');
+        table.classList.add('import-preview-table');
+        table.innerHTML = '<thead><tr><th>Importar</th><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Duplicado?</th></tr></thead>';
+        const tbody = document.createElement('tbody');
+        parsedJsonExpenses.forEach((item, idx) => {
+            const isDup = checkExpenseDuplicate(item.name, getISODateString(item.date), item.amount);
+            const tr = document.createElement('tr');
+            if (isDup) tr.classList.add('duplicate-row');
+            const chkCell = document.createElement('td');
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.dataset.index = idx;
+            chk.checked = !isDup;
+            chk.disabled = isDup;
+            chkCell.appendChild(chk);
+            tr.appendChild(chkCell);
+            const dateCell = document.createElement('td'); dateCell.textContent = getISODateString(item.date); tr.appendChild(dateCell);
+            const descCell = document.createElement('td'); descCell.textContent = item.name; tr.appendChild(descCell);
+            const amtCell = document.createElement('td'); amtCell.textContent = formatCurrencyJS(item.amount, currentBackupData.display_currency_symbol || '$'); tr.appendChild(amtCell);
+            const dupCell = document.createElement('td'); dupCell.textContent = isDup ? 'Sí' : 'No'; tr.appendChild(dupCell);
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        jsonExpensesPreview.appendChild(table);
+    }
     function applyBankProfile(profileKey) {
         const profile = bankProfiles[profileKey];
         if (profile && profile.columns) {
@@ -2560,6 +2650,70 @@ document.addEventListener('DOMContentLoaded', () => {
         renderExpensesTable();
         renderCashflowTable();
         closeImportExpensesModal();
+    });
+
+    function openJsonExpensesModal() {
+        if (!jsonExpensesModal) return;
+        showElement(jsonExpensesModal, 'flex');
+        parsedJsonExpenses = [];
+        if (jsonExpensesTextarea) jsonExpensesTextarea.value = '';
+        renderJsonExpensesPreview();
+        populateExpenseCategoriesDropdowns();
+    }
+    function closeJsonExpensesModal() {
+        if (!jsonExpensesModal) return;
+        hideElement(jsonExpensesModal);
+        parsedJsonExpenses = [];
+        if (jsonExpensesTextarea) jsonExpensesTextarea.value = '';
+        if (jsonExpensesPreview) jsonExpensesPreview.innerHTML = '';
+    }
+    if (openJsonImportExpensesButton) openJsonImportExpensesButton.addEventListener('click', openJsonExpensesModal);
+    if (jsonExpensesModalClose) jsonExpensesModalClose.addEventListener('click', closeJsonExpensesModal);
+    if (jsonExpensesModal) jsonExpensesModal.addEventListener('click', (e) => { if (e.target === jsonExpensesModal) closeJsonExpensesModal(); });
+    if (processJsonExpensesButton) processJsonExpensesButton.addEventListener('click', () => {
+        parsedJsonExpenses = mapJsonTransactions(jsonExpensesTextarea ? jsonExpensesTextarea.value : '');
+        renderJsonExpensesPreview();
+    });
+    if (importJsonExpensesButton) importJsonExpensesButton.addEventListener('click', () => {
+        if (!parsedJsonExpenses.length) { alert('No hay gastos para importar.'); return; }
+        const chosenCategory = (jsonExpenseCategorySelect && jsonExpenseCategorySelect.value) ? jsonExpenseCategorySelect.value : getDefaultExpenseCategory();
+        const checkboxes = jsonExpensesPreview ? jsonExpensesPreview.querySelectorAll('input[type="checkbox"][data-index]') : [];
+        let added = 0;
+        checkboxes.forEach(chk => {
+            if (chk.checked) {
+                const idx = parseInt(chk.dataset.index, 10);
+                const item = parsedJsonExpenses[idx];
+                if (!item) return;
+                const dateStr = getISODateString(item.date);
+                if (checkExpenseDuplicate(item.name, dateStr, item.amount)) return;
+                const categoryToUse = chosenCategory || getDefaultExpenseCategory();
+                const entry = {
+                    name: item.name,
+                    amount: item.amount,
+                    category: categoryToUse,
+                    type: currentBackupData.expense_categories[categoryToUse] || 'Variable',
+                    frequency: 'Único',
+                    start_date: item.date,
+                    end_date: null,
+                    is_real: true,
+                    movement_date: item.date,
+                    payment_method: 'Efectivo / Debito',
+                    credit_card: null,
+                    installments: 1
+                };
+                if (!currentBackupData.expenses) currentBackupData.expenses = [];
+                currentBackupData.expenses.push(entry);
+                added++;
+            }
+        });
+        if (added > 0) {
+            renderExpensesTable();
+            renderCashflowTable();
+            alert(`Se importaron ${added} gasto(s).`);
+        } else {
+            alert('No se importaron gastos (posibles duplicados o ninguno seleccionado).');
+        }
+        closeJsonExpensesModal();
     });
 
     // --- LÓGICA PESTAÑA PRESUPUESTOS ---

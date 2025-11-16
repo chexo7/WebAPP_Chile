@@ -1411,6 +1411,25 @@ td.reimbursement-income {
     max-height: none;
     border-radius: 0;
 }
+#json-expenses-input {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 10px 0;
+    font-family: monospace;
+}
+.json-import-controls {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+#json-expenses-preview {
+    margin-top: 10px;
+}
+#json-expenses-preview .empty-preview {
+    color: var(--text-muted);
+}
 
 .desktop-only { display: none; }
 @media (min-width: 769px) {
