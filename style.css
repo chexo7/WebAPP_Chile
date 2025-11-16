@@ -1375,6 +1375,18 @@ td.reimbursement-income {
 #expense-drop-zone.dragover {
     background-color: var(--alt-row-bg);
 }
+#expense-json-drop-zone {
+    border: 2px dashed var(--border-color);
+    padding: 10px;
+    text-align: center;
+    margin: 10px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+#expense-json-drop-zone.dragover {
+    background-color: var(--alt-row-bg);
+}
 #column-mapping {
     display: flex;
     gap: 10px;

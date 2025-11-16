@@ -138,7 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const expensesTableView = document.querySelector('#expenses-table-view tbody');
     const searchExpenseInput = document.getElementById("search-expense-input");
     const openImportExpensesButtons = document.querySelectorAll(".open-import-expenses");
-    const openJsonExpensesButtons = document.querySelectorAll('.open-json-expenses');
+    const expenseJsonDropZone = document.getElementById('expense-json-drop-zone');
+    const expenseJsonFileInput = document.getElementById('expense-json-file-input');
     const importExpensesModal = document.getElementById("import-expenses-modal");
     const importExpensesModalClose = document.getElementById("import-expenses-modal-close");
     const expenseDropZone = document.getElementById("expense-drop-zone");
@@ -152,11 +153,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
     const importJsonExpensesModal = document.getElementById('import-json-expenses-modal');
     const importJsonExpensesClose = document.getElementById('import-json-expenses-close');
-    const jsonExpensesInput = document.getElementById('json-expenses-input');
     const jsonExpensesPreview = document.getElementById('json-expenses-preview');
-    const previewJsonExpensesButton = document.getElementById('preview-json-expenses');
     const addJsonExpensesButton = document.getElementById('add-json-expenses');
-    const jsonExpensesCategorySelect = document.getElementById('json-expenses-category');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
@@ -2553,40 +2551,26 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsArrayBuffer(file);
     }
 
-    function populateJsonCategorySelect() {
-        if (!jsonExpensesCategorySelect) return;
-        jsonExpensesCategorySelect.innerHTML = '';
-        const categories = currentBackupData && currentBackupData.expense_categories
-            ? Object.keys(currentBackupData.expense_categories).sort()
-            : [];
-        if (!categories.length) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = 'Sin categorías disponibles';
-            jsonExpensesCategorySelect.appendChild(opt);
+    function handleJsonExpenseFile(file) {
+        if (!file || file.type !== 'application/json' && !file.name.endsWith('.json')) {
+            alert('Selecciona un archivo JSON válido.');
             return;
         }
-        categories.forEach(cat => {
-            if (isFirebaseKeySafe(cat)) {
-                const opt = document.createElement('option');
-                opt.value = cat;
-                opt.textContent = cat;
-                jsonExpensesCategorySelect.appendChild(opt);
-            }
-        });
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            handleJsonExpensesText(e.target.result);
+        };
+        reader.readAsText(file);
     }
 
     function showJsonExpensesModal() {
-        populateJsonCategorySelect();
-        parsedJsonExpenses = [];
-        if (jsonExpensesInput) jsonExpensesInput.value = '';
-        if (jsonExpensesPreview) jsonExpensesPreview.innerHTML = '';
         if (importJsonExpensesModal) showElement(importJsonExpensesModal, 'flex');
     }
 
     function closeJsonExpensesModal() {
         if (importJsonExpensesModal) hideElement(importJsonExpensesModal);
         parsedJsonExpenses = [];
+        if (jsonExpensesPreview) jsonExpensesPreview.innerHTML = '';
     }
 
     function mapJsonTransactionsToExpenses(obj) {
@@ -2620,12 +2604,15 @@ document.addEventListener('DOMContentLoaded', () => {
             jsonExpensesPreview.textContent = 'Sin datos para previsualizar.';
             return;
         }
+        const categories = currentBackupData.expense_categories
+            ? Object.keys(currentBackupData.expense_categories).filter(isFirebaseKeySafe).sort()
+            : [];
         const table = document.createElement('table');
         const thead = document.createElement('thead');
-        thead.innerHTML = '<tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Duplicado</th></tr>';
+        thead.innerHTML = '<tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Categoría</th><th>Duplicado</th></tr>';
         table.appendChild(thead);
         const tbody = document.createElement('tbody');
-        parsedJsonExpenses.forEach(item => {
+        parsedJsonExpenses.forEach((item, idx) => {
             const dateStr = getISODateString(item.date);
             const isDup = checkExpenseDuplicate(item.name, dateStr, item.amount);
             const row = document.createElement('tr');
@@ -2633,6 +2620,20 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = dateStr;
             row.insertCell().textContent = item.name;
             row.insertCell().textContent = item.amount;
+            const catCell = row.insertCell();
+            const select = document.createElement('select');
+            select.dataset.index = idx;
+            const emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = 'Seleccionar categoría';
+            select.appendChild(emptyOpt);
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                select.appendChild(opt);
+            });
+            catCell.appendChild(select);
             row.insertCell().textContent = isDup ? 'Sí' : 'No';
             tbody.appendChild(row);
         });
@@ -2640,31 +2641,35 @@ document.addEventListener('DOMContentLoaded', () => {
         jsonExpensesPreview.appendChild(table);
     }
 
-    function previewJsonExpenses() {
-        if (!jsonExpensesInput) return;
+    function handleJsonExpensesText(text) {
+        if (jsonExpensesPreview) jsonExpensesPreview.innerHTML = '';
         let parsed;
         try {
-            parsed = JSON.parse(jsonExpensesInput.value);
+            parsed = JSON.parse(text);
         } catch (err) {
             jsonExpensesPreview.textContent = 'JSON inválido: ' + err.message;
             parsedJsonExpenses = [];
+            showJsonExpensesModal();
             return;
         }
         parsedJsonExpenses = mapJsonTransactionsToExpenses(parsed);
         if (!parsedJsonExpenses.length) {
             jsonExpensesPreview.textContent = 'No se encontraron movimientos con descripción, fecha y monto.';
+            showJsonExpensesModal();
             return;
         }
         renderJsonExpensesPreview();
+        showJsonExpensesModal();
     }
 
     function addJsonExpenses() {
-        if (!parsedJsonExpenses.length) { alert('Primero previsualiza los datos.'); return; }
-        const category = jsonExpensesCategorySelect ? jsonExpensesCategorySelect.value : '';
-        if (!category) { alert('Selecciona una categoría para los nuevos gastos.'); return; }
+        if (!parsedJsonExpenses.length) { alert('Primero arrastra un JSON válido en la pestaña Gastos.'); return; }
         if (!currentBackupData.expenses) currentBackupData.expenses = [];
-        let added = 0, skipped = 0;
-        parsedJsonExpenses.forEach(item => {
+        let added = 0, skipped = 0, missingCategory = 0;
+        parsedJsonExpenses.forEach((item, idx) => {
+            const select = jsonExpensesPreview ? jsonExpensesPreview.querySelector(`select[data-index="${idx}"]`) : null;
+            const category = select ? select.value : '';
+            if (!category) { missingCategory++; return; }
             const dateStr = getISODateString(item.date);
             const isDup = checkExpenseDuplicate(item.name, dateStr, item.amount);
             if (isDup) { skipped++; return; }
@@ -2687,17 +2692,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         renderExpensesTable();
         renderCashflowTable();
-        alert(`Gastos agregados: ${added}. Duplicados omitidos: ${skipped}.`);
+        alert(`Gastos agregados: ${added}. Duplicados omitidos: ${skipped}. Sin categoría: ${missingCategory}.`);
         closeJsonExpensesModal();
     }
 
     openImportExpensesButtons.forEach(btn => btn.addEventListener("click", showImportExpensesModal));
     if (importExpensesModalClose) importExpensesModalClose.addEventListener('click', closeImportExpensesModal);
     if (importExpensesModal) importExpensesModal.addEventListener('click', (e)=>{ if(e.target===importExpensesModal) closeImportExpensesModal(); });
-    openJsonExpensesButtons.forEach(btn => btn.addEventListener('click', showJsonExpensesModal));
     if (importJsonExpensesClose) importJsonExpensesClose.addEventListener('click', closeJsonExpensesModal);
     if (importJsonExpensesModal) importJsonExpensesModal.addEventListener('click', (e)=>{ if (e.target === importJsonExpensesModal) closeJsonExpensesModal(); });
-    if (previewJsonExpensesButton) previewJsonExpensesButton.addEventListener('click', previewJsonExpenses);
     if (addJsonExpensesButton) addJsonExpensesButton.addEventListener('click', addJsonExpenses);
     if (expenseDropZone) {
         expenseDropZone.addEventListener('click', () => { if(expenseFileInput) expenseFileInput.click(); });
@@ -2706,6 +2709,17 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseDropZone.addEventListener('drop', e => { e.preventDefault(); expenseDropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleExpenseFile(e.dataTransfer.files[0]); });
     }
     if (expenseFileInput) expenseFileInput.addEventListener('change', e => { if (e.target.files[0]) handleExpenseFile(e.target.files[0]); });
+    if (expenseJsonDropZone) {
+        expenseJsonDropZone.addEventListener('click', () => { if (expenseJsonFileInput) expenseJsonFileInput.click(); });
+        expenseJsonDropZone.addEventListener('dragover', e => { e.preventDefault(); expenseJsonDropZone.classList.add('dragover'); });
+        expenseJsonDropZone.addEventListener('dragleave', () => expenseJsonDropZone.classList.remove('dragover'));
+        expenseJsonDropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            expenseJsonDropZone.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) handleJsonExpenseFile(e.dataTransfer.files[0]);
+        });
+    }
+    if (expenseJsonFileInput) expenseJsonFileInput.addEventListener('change', e => { if (e.target.files[0]) handleJsonExpenseFile(e.target.files[0]); });
     if (mapDateSelect) mapDateSelect.addEventListener('change', renderImportTable);
     if (mapDescSelect) mapDescSelect.addEventListener('change', renderImportTable);
     if (mapAmountSelect) mapAmountSelect.addEventListener('change', renderImportTable);
