@@ -138,6 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const expensesTableView = document.querySelector('#expenses-table-view tbody');
     const searchExpenseInput = document.getElementById("search-expense-input");
     const openImportExpensesButtons = document.querySelectorAll(".open-import-expenses");
+    const expenseJsonDropZone = document.getElementById('expense-json-drop-zone');
+    const expenseJsonFileInput = document.getElementById('expense-json-file-input');
     const importExpensesModal = document.getElementById("import-expenses-modal");
     const importExpensesModalClose = document.getElementById("import-expenses-modal-close");
     const expenseDropZone = document.getElementById("expense-drop-zone");
@@ -149,6 +151,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const importJsonExpensesModal = document.getElementById('import-json-expenses-modal');
+    const importJsonExpensesClose = document.getElementById('import-json-expenses-close');
+    const jsonExpensesPreview = document.getElementById('json-expenses-preview');
+    const addJsonExpensesButton = document.getElementById('add-json-expenses');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
@@ -158,6 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
             columns: { date: 'FECHA', desc: 'DESCRIPCION', amount: 'MONTO' }
         }
     };
+    let parsedJsonExpenses = [];
+    let parsedJsonRange = null;
 
     const usdClpRateCache = {};
     const usdClpRatePending = {};
@@ -633,6 +641,8 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
             use_instant_expenses: false,
+            bank_import_ranges: [],
+            bank_transactions: [],
             incomes: [],
             expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
             expenses: [],
@@ -654,6 +664,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const hydrated = JSON.parse(JSON.stringify(rawData));
+
+        if (!Array.isArray(hydrated.bank_import_ranges)) hydrated.bank_import_ranges = [];
+        if (!Array.isArray(hydrated.bank_transactions)) hydrated.bank_transactions = [];
+        hydrated.bank_import_ranges = hydrated.bank_import_ranges.map(r => ({
+            from: r && r.from ? toUTCDate(r.from, null) : null,
+            to: r && r.to ? toUTCDate(r.to, null) : null,
+            importedAt: r && r.importedAt ? toUTCDate(r.importedAt, null) : null
+        }));
+        hydrated.bank_transactions = hydrated.bank_transactions.map(tx => ({
+            ...tx,
+            date: tx && tx.date ? toUTCDate(tx.date, null) : null,
+            amount: typeof tx.amount === 'number' || tx.amount === null ? tx.amount : parseAmountString(tx.amount, true),
+            balanceAfter: tx && tx.balanceAfter !== undefined ? parseAmountString(tx.balanceAfter, true) : null
+        }));
 
         if (!Array.isArray(hydrated.incomes)) hydrated.incomes = [];
         hydrated.incomes.forEach(inc => {
@@ -2416,10 +2440,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return null;
     }
+    function parseAmountString(val, allowNull = false) {
+        if (val === undefined || val === null || val === '') return allowNull ? null : 0;
+        if (typeof val === 'number') return val;
+        const raw = String(val).trim();
+        if (!raw) return allowNull ? null : 0;
+        let cleaned = raw.replace(/[^0-9,.-]/g, '');
+        const hasComma = cleaned.includes(',');
+        const hasDot = cleaned.includes('.');
+        if (hasComma && hasDot) {
+            cleaned = cleaned.replace(/,/g, '');
+        } else if (hasComma && !hasDot) {
+            cleaned = cleaned.replace(/,/g, '.');
+        }
+        const dotParts = cleaned.split('.');
+        if (dotParts.length > 2) {
+            const decimal = dotParts.pop();
+            cleaned = dotParts.join('') + '.' + decimal;
+        }
+        const amount = parseFloat(cleaned);
+        return isNaN(amount) ? (allowNull ? null : 0) : amount;
+    }
     function checkExpenseDuplicate(name, dateStr, amount) {
         return (currentBackupData.expenses || []).some(exp => {
             const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
-            return expDate === dateStr && exp.name === name && parseFloat(exp.amount) === parseFloat(amount);
+            const expAmount = exp.amount === null ? null : parseFloat(exp.amount);
+            const targetAmount = amount === null ? null : parseFloat(amount);
+            return expDate === dateStr && exp.name === name && expAmount === targetAmount;
         });
     }
     function createCategorySelect() {
@@ -2523,9 +2570,216 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsArrayBuffer(file);
     }
 
+    function handleJsonExpenseFile(file) {
+        if (!file || file.type !== 'application/json' && !file.name.endsWith('.json')) {
+            alert('Selecciona un archivo JSON válido.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            handleJsonExpensesText(e.target.result);
+        };
+        reader.readAsText(file);
+    }
+
+    function showJsonExpensesModal() {
+        if (importJsonExpensesModal) showElement(importJsonExpensesModal, 'flex');
+    }
+
+    function closeJsonExpensesModal() {
+        if (importJsonExpensesModal) hideElement(importJsonExpensesModal);
+        parsedJsonExpenses = [];
+        parsedJsonRange = null;
+        if (jsonExpensesPreview) jsonExpensesPreview.innerHTML = '';
+    }
+
+    function generateTransactionId() {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+        return `tx-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function mapJsonTransactionsToExpenses(obj) {
+        const results = [];
+        if (!obj || typeof obj !== 'object') return results;
+        const seen = new Set();
+        const pushTx = (tx, isPending = false) => {
+            if (!tx) return;
+            const description = (tx.Description || tx.description || '').trim();
+            const dateVal = tx.Date || tx.date;
+            const dateObj = toUTCDate(dateVal, null);
+            const withdrawalVal = tx.Withdrawal ?? tx.withdrawal ?? '';
+            const depositVal = tx.Deposit ?? tx.deposit ?? '';
+            const withdrawal = parseAmountString(withdrawalVal, true);
+            const deposit = parseAmountString(depositVal, true);
+            let amount = null;
+            if (withdrawal !== null) {
+                amount = -Math.abs(withdrawal);
+            } else if (deposit !== null) {
+                amount = Math.abs(deposit);
+            }
+            const amountKey = amount === null ? 'null' : amount;
+            if (!description || !dateObj) return;
+            const dateStr = getISODateString(dateObj);
+            const key = `${description}|${dateStr}|${amountKey}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            const balanceAfter = parseAmountString(tx.RunningBalance ?? tx.runningBalance ?? null, true);
+            const sourceType = (tx.Type || tx.type || (isPending ? 'PENDING' : 'POSTED')) || 'PENDING';
+            const transaction = {
+                id: generateTransactionId(),
+                date: dateObj,
+                name: description,
+                description,
+                amount,
+                currency: 'USD',
+                sourceType,
+                isPending: isPending || String(sourceType).toUpperCase() === 'PENDING',
+                checkNumber: tx.CheckNumber ?? tx.checkNumber ?? undefined,
+                balanceAfter: balanceAfter,
+                raw: tx
+            };
+            results.push(transaction);
+        };
+        (obj.PendingTransactions || []).forEach(tx => pushTx(tx, true));
+        (obj.PostedTransactions || []).forEach(tx => pushTx(tx, false));
+        if (Array.isArray(obj.transactions)) obj.transactions.forEach(tx => pushTx(tx, false));
+        return results;
+    }
+
+    function renderJsonExpensesPreview() {
+        if (!jsonExpensesPreview) return;
+        jsonExpensesPreview.innerHTML = '';
+        if (!parsedJsonExpenses.length) {
+            jsonExpensesPreview.textContent = 'Sin datos para previsualizar.';
+            return;
+        }
+        if (parsedJsonRange && parsedJsonRange.from && parsedJsonRange.to) {
+            const rangeInfo = document.createElement('div');
+            rangeInfo.className = 'json-range-info';
+            rangeInfo.textContent = `Rango sincronizado: ${getISODateString(parsedJsonRange.from)} a ${getISODateString(parsedJsonRange.to)}`;
+            jsonExpensesPreview.appendChild(rangeInfo);
+        }
+        const categories = currentBackupData.expense_categories
+            ? Object.keys(currentBackupData.expense_categories).filter(isFirebaseKeySafe).sort()
+            : [];
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Tipo</th><th>Estado</th><th>Categoría</th><th>Duplicado</th></tr>';
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        parsedJsonExpenses.forEach((item, idx) => {
+            const dateStr = getISODateString(item.date);
+            const isDup = checkExpenseDuplicate(item.description || item.name, dateStr, item.amount);
+            const row = document.createElement('tr');
+            if (isDup) row.classList.add('duplicate-row');
+            row.insertCell().textContent = dateStr;
+            row.insertCell().textContent = item.description || item.name;
+            row.insertCell().textContent = item.amount === null ? 'Pendiente' : formatCurrencyJS(item.amount, '$');
+            row.insertCell().textContent = item.sourceType || '';
+            row.insertCell().textContent = item.isPending ? 'Pendiente' : 'Publicado';
+            const catCell = row.insertCell();
+            const select = document.createElement('select');
+            select.dataset.index = idx;
+            const emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = 'Seleccionar categoría';
+            select.appendChild(emptyOpt);
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                select.appendChild(opt);
+            });
+            catCell.appendChild(select);
+            row.insertCell().textContent = isDup ? 'Sí' : 'No';
+            tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        jsonExpensesPreview.appendChild(table);
+    }
+
+    function handleJsonExpensesText(text) {
+        if (jsonExpensesPreview) jsonExpensesPreview.innerHTML = '';
+        let parsed;
+        try {
+            parsed = JSON.parse(text);
+        } catch (err) {
+            jsonExpensesPreview.textContent = 'JSON inválido: ' + err.message;
+            parsedJsonExpenses = [];
+            parsedJsonRange = null;
+            showJsonExpensesModal();
+            return;
+        }
+        parsedJsonRange = {
+            from: toUTCDate(parsed.FromDate || parsed.fromDate || parsed.from_date, null),
+            to: toUTCDate(parsed.ToDate || parsed.toDate || parsed.to_date, null)
+        };
+        parsedJsonExpenses = mapJsonTransactionsToExpenses(parsed);
+        if (currentBackupData) {
+            currentBackupData.bank_transactions = parsedJsonExpenses.map(tx => ({ ...tx }));
+            if (parsedJsonRange.from && parsedJsonRange.to) {
+                currentBackupData.bank_import_ranges.unshift({
+                    from: parsedJsonRange.from,
+                    to: parsedJsonRange.to,
+                    importedAt: new Date()
+                });
+                currentBackupData.bank_import_ranges = currentBackupData.bank_import_ranges.slice(0, 10);
+            }
+        }
+        if (!parsedJsonExpenses.length) {
+            jsonExpensesPreview.textContent = 'No se encontraron movimientos con descripción y fecha válidas.';
+            showJsonExpensesModal();
+            return;
+        }
+        renderJsonExpensesPreview();
+        showJsonExpensesModal();
+    }
+
+    function addJsonExpenses() {
+        if (!parsedJsonExpenses.length) { alert('Primero arrastra un JSON válido en la pestaña Gastos.'); return; }
+        if (!currentBackupData.expenses) currentBackupData.expenses = [];
+        let added = 0, skipped = 0, missingCategory = 0, missingAmount = 0;
+        parsedJsonExpenses.forEach((item, idx) => {
+            const select = jsonExpensesPreview ? jsonExpensesPreview.querySelector(`select[data-index="${idx}"]`) : null;
+            const category = select ? select.value : '';
+            if (!category) { missingCategory++; return; }
+            if (item.amount === null) { missingAmount++; return; }
+            const dateStr = getISODateString(item.date);
+            const isDup = checkExpenseDuplicate(item.description || item.name, dateStr, item.amount);
+            if (isDup) { skipped++; return; }
+            const expense = {
+                name: item.description || item.name,
+                amount: item.amount,
+                category,
+                type: currentBackupData.expense_categories ? currentBackupData.expense_categories[category] || 'Variable' : 'Variable',
+                frequency: 'Único',
+                start_date: item.date,
+                end_date: null,
+                is_real: true,
+                movement_date: item.date,
+                payment_method: 'Efectivo / Debito',
+                credit_card: null,
+                installments: 1,
+                bank_source_type: item.sourceType || null,
+                bank_check_number: item.checkNumber || null,
+                bank_balance_after: item.balanceAfter || null,
+                bank_transaction_id: item.id || null
+            };
+            currentBackupData.expenses.push(expense);
+            added++;
+        });
+        renderExpensesTable();
+        renderCashflowTable();
+        alert(`Gastos agregados: ${added}. Duplicados omitidos: ${skipped}. Sin categoría: ${missingCategory}. Sin monto: ${missingAmount}.`);
+        closeJsonExpensesModal();
+    }
+
     openImportExpensesButtons.forEach(btn => btn.addEventListener("click", showImportExpensesModal));
     if (importExpensesModalClose) importExpensesModalClose.addEventListener('click', closeImportExpensesModal);
     if (importExpensesModal) importExpensesModal.addEventListener('click', (e)=>{ if(e.target===importExpensesModal) closeImportExpensesModal(); });
+    if (importJsonExpensesClose) importJsonExpensesClose.addEventListener('click', closeJsonExpensesModal);
+    if (importJsonExpensesModal) importJsonExpensesModal.addEventListener('click', (e)=>{ if (e.target === importJsonExpensesModal) closeJsonExpensesModal(); });
+    if (addJsonExpensesButton) addJsonExpensesButton.addEventListener('click', addJsonExpenses);
     if (expenseDropZone) {
         expenseDropZone.addEventListener('click', () => { if(expenseFileInput) expenseFileInput.click(); });
         expenseDropZone.addEventListener('dragover', e => { e.preventDefault(); expenseDropZone.classList.add('dragover'); });
@@ -2533,6 +2787,17 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseDropZone.addEventListener('drop', e => { e.preventDefault(); expenseDropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleExpenseFile(e.dataTransfer.files[0]); });
     }
     if (expenseFileInput) expenseFileInput.addEventListener('change', e => { if (e.target.files[0]) handleExpenseFile(e.target.files[0]); });
+    if (expenseJsonDropZone) {
+        expenseJsonDropZone.addEventListener('click', () => { if (expenseJsonFileInput) expenseJsonFileInput.click(); });
+        expenseJsonDropZone.addEventListener('dragover', e => { e.preventDefault(); expenseJsonDropZone.classList.add('dragover'); });
+        expenseJsonDropZone.addEventListener('dragleave', () => expenseJsonDropZone.classList.remove('dragover'));
+        expenseJsonDropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            expenseJsonDropZone.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) handleJsonExpenseFile(e.dataTransfer.files[0]);
+        });
+    }
+    if (expenseJsonFileInput) expenseJsonFileInput.addEventListener('change', e => { if (e.target.files[0]) handleJsonExpenseFile(e.target.files[0]); });
     if (mapDateSelect) mapDateSelect.addEventListener('change', renderImportTable);
     if (mapDescSelect) mapDescSelect.addEventListener('change', renderImportTable);
     if (mapAmountSelect) mapAmountSelect.addEventListener('change', renderImportTable);
