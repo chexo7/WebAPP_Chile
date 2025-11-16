@@ -2593,53 +2593,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const fromDate = toUTCDate(obj.FromDate || obj.fromDate, null);
         const toDate = toUTCDate(obj.ToDate || obj.toDate, null);
         lastImportedJsonRange = (fromDate || toDate) ? { from: fromDate, to: toDate } : null;
-        const buildTransaction = (tx, isPending) => {
+        const buildTransaction = (tx) => {
             if (!tx) return null;
             const description = (tx.Description || tx.description || '').trim();
             const dateVal = tx.Date || tx.date;
             const dateObj = toUTCDate(dateVal, null);
-            if (!description || !dateObj) return null;
             const withdrawal = parseAmountOrNull(tx.Withdrawal ?? tx.withdrawal);
-            const deposit = parseAmountOrNull(tx.Deposit ?? tx.deposit);
-            let amount = null;
-            if (withdrawal !== null && !isNaN(withdrawal) && withdrawal !== 0) {
-                amount = -Math.abs(withdrawal);
-            } else if (deposit !== null && !isNaN(deposit) && deposit !== 0) {
-                amount = Math.abs(deposit);
-            }
-            if (amount === null && isPending) {
-                amount = null;
-            }
+            if (!description || !dateObj || withdrawal === null || isNaN(withdrawal) || withdrawal === 0) return null;
             const balanceAfterRaw = tx.RunningBalance ?? tx.runningBalance ?? tx.running_balance;
             const balanceAfter = parseAmountOrNull(balanceAfterRaw);
-            const sourceType = isPending ? 'PENDING' : (tx.Type || tx.type || 'OTRO');
+            const sourceType = tx.Type || tx.type || 'POSTED';
             const dateStr = getISODateString(dateObj);
-            const key = `${description}|${dateStr}|${amount === null ? 'null' : amount}`;
+            const normalizedAmount = Math.abs(withdrawal);
+            const key = `${description}|${dateStr}|${normalizedAmount}`;
             if (seen.has(key)) return null;
             seen.add(key);
             return {
                 id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `tx-${Date.now()}-${Math.random().toString(16).slice(2)}`,
                 date: dateObj,
                 description,
-                amount,
+                amount: normalizedAmount,
                 currency: 'USD',
                 sourceType,
-                isPending: !!isPending,
+                isPending: false,
                 checkNumber: tx.CheckNumber ?? tx.checkNumber ?? undefined,
                 balanceAfter: balanceAfter === null ? undefined : balanceAfter,
                 raw: tx
             };
         };
-        (obj.PendingTransactions || []).forEach(tx => {
-            const mapped = buildTransaction(tx, true);
-            if (mapped) results.push(mapped);
-        });
         (obj.PostedTransactions || []).forEach(tx => {
-            const mapped = buildTransaction(tx, false);
-            if (mapped) results.push(mapped);
-        });
-        if (Array.isArray(obj.transactions)) obj.transactions.forEach(tx => {
-            const mapped = buildTransaction(tx, false);
+            const mapped = buildTransaction(tx);
             if (mapped) results.push(mapped);
         });
         return results;
@@ -2724,12 +2707,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function addJsonExpenses() {
         if (!parsedJsonExpenses.length) { alert('Primero arrastra un JSON válido en la pestaña Gastos.'); return; }
         if (!currentBackupData.expenses) currentBackupData.expenses = [];
-        let added = 0, skipped = 0, missingCategory = 0, missingAmount = 0;
+        let added = 0, skipped = 0, missingAmount = 0;
         parsedJsonExpenses.forEach((item, idx) => {
             if (item.amount === null || isNaN(item.amount)) { missingAmount++; return; }
             const select = jsonExpensesPreview ? jsonExpensesPreview.querySelector(`select[data-index="${idx}"]`) : null;
             const category = select ? select.value : '';
-            if (!category) { missingCategory++; return; }
             const dateStr = getISODateString(item.date);
             const isDup = checkExpenseDuplicate(item.description, dateStr, item.amount);
             if (isDup) { skipped++; return; }
@@ -2739,9 +2721,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 category,
                 type: currentBackupData.expense_categories ? currentBackupData.expense_categories[category] || 'Variable' : 'Variable',
                 frequency: 'Único',
-                start_date: item.date,
+                start_date: null,
                 end_date: null,
-                is_real: !item.isPending,
+                is_real: true,
                 movement_date: item.date,
                 payment_method: 'Efectivo / Debito',
                 credit_card: null,
@@ -2768,7 +2750,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         renderExpensesTable();
         renderCashflowTable();
-        alert(`Gastos agregados: ${added}. Duplicados omitidos: ${skipped}. Sin categoría: ${missingCategory}. Pendientes sin monto: ${missingAmount}.`);
+        alert(`Gastos agregados: ${added}. Duplicados omitidos: ${skipped}. Pendientes sin monto: ${missingAmount}.`);
         closeJsonExpensesModal();
     }
 
