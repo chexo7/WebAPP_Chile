@@ -1412,6 +1412,46 @@ td.reimbursement-income {
     border-radius: 0;
 }
 
+.import-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin: 8px 0;
+}
+
+#json-expenses-input {
+    width: 100%;
+    padding: 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-color);
+    font-family: monospace;
+    resize: vertical;
+    background: var(--card-bg);
+    color: var(--text-color);
+}
+
+.json-actions {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+}
+
+#json-expenses-preview table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#json-expenses-preview th,
+#json-expenses-preview td {
+    border: 1px solid var(--border-color);
+    padding: 6px;
+    font-size: 0.9em;
+}
+
+#json-expenses-preview tr.duplicate-row {
+    background-color: var(--alt-row-bg);
+}
+
 .desktop-only { display: none; }
 @media (min-width: 769px) {
     .desktop-only { display: inline-block; }
