@@ -254,6 +254,7 @@
                         <label for="search-expense-input">Buscar Gasto:</label>
                         <input type="text" id="search-expense-input" placeholder="Escribe para filtrar...">
                         <button type="button" class="open-import-expenses small-button accent desktop-only">Importar Gastos</button>
+                        <button type="button" id="open-json-import" class="small-button">Importar JSON</button>
                         <div class="table-responsive dynamic-table-scroll">
                             <table id="expenses-table-view">
                                 <thead>
@@ -543,6 +544,20 @@
                     </div>
                     <div id="import-table-container"></div>
                     <button type="button" id="merge-expenses-button" class="accent">Unir</button>
+                </div>
+            </div>
+            <div id="json-import-modal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <span id="json-import-close" class="modal-close">&times;</span>
+                    <h3>Importar Gastos desde JSON</h3>
+                    <p>Pega el JSON con las transacciones y procesa para agregarlas como gastos únicos.</p>
+                    <textarea id="json-import-textarea" rows="10" placeholder="Pega aquí el JSON de transacciones"></textarea>
+                    <div class="json-import-actions">
+                        <button type="button" id="process-json-button" class="accent">Procesar JSON</button>
+                    </div>
+                    <p id="json-import-error" class="error-message" style="display:none;"></p>
+                    <div id="json-import-preview"></div>
+                    <button type="button" id="confirm-json-import-button" class="accent" style="display:none;">Agregar Gastos</button>
                 </div>
             </div>
         </div>

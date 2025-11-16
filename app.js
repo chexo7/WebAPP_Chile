@@ -149,9 +149,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const openJsonImportButton = document.getElementById('open-json-import');
+    const jsonImportModal = document.getElementById('json-import-modal');
+    const jsonImportClose = document.getElementById('json-import-close');
+    const jsonImportTextarea = document.getElementById('json-import-textarea');
+    const processJsonButton = document.getElementById('process-json-button');
+    const jsonImportPreview = document.getElementById('json-import-preview');
+    const confirmJsonImportButton = document.getElementById('confirm-json-import-button');
+    const jsonImportError = document.getElementById('json-import-error');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
+    let parsedJsonImportData = [];
     const bankProfiles = {
         falabella: {
             matchFileName: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.xlsx$/i,
@@ -2416,6 +2425,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return null;
     }
+    function parseMoneyString(val) {
+        if (val === undefined || val === null || val === '') return NaN;
+        if (typeof val === 'number') return val;
+        const cleaned = String(val).replace(/[^0-9,.-]/g, '').replace(/,/g, '');
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? NaN : num;
+    }
     function checkExpenseDuplicate(name, dateStr, amount) {
         return (currentBackupData.expenses || []).some(exp => {
             const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
@@ -2522,6 +2538,111 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         reader.readAsArrayBuffer(file);
     }
+    function mapJsonTransaction(tx) {
+        if (!tx || typeof tx !== 'object') return null;
+        const desc = (tx.Description || tx.description || tx.name || '').trim();
+        const dateVal = tx.Date || tx.date;
+        const amountVal = tx.Withdrawal || tx.Deposit || tx.Amount || tx.amount;
+        const amount = parseMoneyString(amountVal);
+        const dateObj = parseExcelDate(dateVal);
+        if (!desc || !dateObj || !isFinite(amount)) return null;
+        return { name: desc, date: dateObj, amount };
+    }
+    function mapBankJsonToExpenses(data) {
+        const results = [];
+        if (!data) return results;
+        const pushFromArray = (arr) => {
+            if (!Array.isArray(arr)) return;
+            arr.forEach(tx => {
+                const mapped = mapJsonTransaction(tx);
+                if (mapped) results.push(mapped);
+            });
+        };
+        pushFromArray(data.PendingTransactions || data.pendingTransactions);
+        pushFromArray(data.PostedTransactions || data.postedTransactions);
+        if (Array.isArray(data)) pushFromArray(data);
+        return results;
+    }
+    function resetJsonImportModal() {
+        parsedJsonImportData = [];
+        if (jsonImportTextarea) jsonImportTextarea.value = '';
+        if (jsonImportPreview) jsonImportPreview.innerHTML = '';
+        if (jsonImportError) hideElement(jsonImportError);
+        if (confirmJsonImportButton) hideElement(confirmJsonImportButton);
+    }
+    function closeJsonImportModal() {
+        if (jsonImportModal) hideElement(jsonImportModal);
+        resetJsonImportModal();
+    }
+    function showJsonImportModal() {
+        resetJsonImportModal();
+        if (jsonImportModal) showElement(jsonImportModal, 'flex');
+    }
+    function renderJsonImportPreview() {
+        if (!jsonImportPreview) return;
+        jsonImportPreview.innerHTML = '';
+        const existingKeys = new Set((currentBackupData.expenses || []).map(exp => {
+            const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
+            return `${expDate}__${exp.name}__${parseFloat(exp.amount)}`;
+        }));
+        const seenKeys = new Set(existingKeys);
+        if (!parsedJsonImportData.length) {
+            const msg = document.createElement('p');
+            msg.textContent = 'No se encontraron transacciones válidas en el JSON.';
+            jsonImportPreview.appendChild(msg);
+            hideElement(confirmJsonImportButton);
+            return;
+        }
+        const table = document.createElement('table');
+        table.classList.add('import-preview-table');
+        const thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th>Importar</th><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Categoría</th><th>Duplicado?</th></tr>';
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        const defaultCategory = expenseCategorySelect && expenseCategorySelect.value ? expenseCategorySelect.value : (currentBackupData.expense_categories ? Object.keys(currentBackupData.expense_categories)[0] : '');
+        parsedJsonImportData.forEach((row, idx) => {
+            const dateStr = getISODateString(row.date);
+            const key = `${dateStr}__${row.name}__${row.amount}`;
+            const isDup = seenKeys.has(key);
+            seenKeys.add(key);
+            const tr = document.createElement('tr');
+            if (isDup) tr.classList.add('duplicate-row');
+            const chkCell = tr.insertCell();
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.dataset.index = idx;
+            chk.checked = !isDup;
+            if (isDup) chk.disabled = true;
+            chkCell.appendChild(chk);
+            tr.insertCell().textContent = dateStr;
+            tr.insertCell().textContent = row.name;
+            tr.insertCell().textContent = row.amount;
+            const catCell = tr.insertCell();
+            const sel = createCategorySelect();
+            sel.dataset.index = idx;
+            if (defaultCategory) sel.value = defaultCategory;
+            catCell.appendChild(sel);
+            tr.insertCell().textContent = isDup ? 'Sí' : 'No';
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        jsonImportPreview.appendChild(table);
+        showElement(confirmJsonImportButton, 'inline-block');
+    }
+    function processJsonImport() {
+        if (!jsonImportTextarea) return;
+        try {
+            const data = JSON.parse(jsonImportTextarea.value || '{}');
+            parsedJsonImportData = mapBankJsonToExpenses(data);
+            if (jsonImportError) hideElement(jsonImportError);
+            renderJsonImportPreview();
+        } catch (err) {
+            parsedJsonImportData = [];
+            if (jsonImportError) { jsonImportError.textContent = `Error al leer JSON: ${err.message}`; showElement(jsonImportError); }
+            if (jsonImportPreview) jsonImportPreview.innerHTML = '';
+            hideElement(confirmJsonImportButton);
+        }
+    }
 
     openImportExpensesButtons.forEach(btn => btn.addEventListener("click", showImportExpensesModal));
     if (importExpensesModalClose) importExpensesModalClose.addEventListener('click', closeImportExpensesModal);
@@ -2560,6 +2681,49 @@ document.addEventListener('DOMContentLoaded', () => {
         renderExpensesTable();
         renderCashflowTable();
         closeImportExpensesModal();
+    });
+
+    if (openJsonImportButton) openJsonImportButton.addEventListener('click', showJsonImportModal);
+    if (jsonImportClose) jsonImportClose.addEventListener('click', closeJsonImportModal);
+    if (jsonImportModal) jsonImportModal.addEventListener('click', (e)=>{ if(e.target===jsonImportModal) closeJsonImportModal(); });
+    if (processJsonButton) processJsonButton.addEventListener('click', processJsonImport);
+    if (confirmJsonImportButton) confirmJsonImportButton.addEventListener('click', () => {
+        if (!parsedJsonImportData.length) { alert('Primero procesa el JSON.'); return; }
+        const checkboxes = jsonImportPreview ? jsonImportPreview.querySelectorAll('input[type="checkbox"][data-index]') : [];
+        const existingKeys = new Set((currentBackupData.expenses || []).map(exp => {
+            const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
+            return `${expDate}__${exp.name}__${parseFloat(exp.amount)}`;
+        }));
+        if (!currentBackupData.expense_categories) currentBackupData.expense_categories = {};
+        let defaultCategory = expenseCategorySelect && expenseCategorySelect.value ? expenseCategorySelect.value : '';
+        if (!defaultCategory) {
+            const catKeys = Object.keys(currentBackupData.expense_categories);
+            defaultCategory = catKeys.length ? catKeys[0] : 'Importados';
+        }
+        if (defaultCategory && !currentBackupData.expense_categories[defaultCategory]) {
+            currentBackupData.expense_categories[defaultCategory] = 'Variable';
+            if (typeof populateExpenseCategoriesDropdowns === 'function') populateExpenseCategoriesDropdowns();
+        }
+        checkboxes.forEach(chk => {
+            if (chk.checked) {
+                const idx = parseInt(chk.dataset.index, 10);
+                const row = parsedJsonImportData[idx];
+                const dateObj = row.date;
+                const catSel = jsonImportPreview.querySelector(`select[data-index="${idx}"]`);
+                let cat = catSel ? catSel.value : defaultCategory;
+                if (!cat) cat = defaultCategory;
+                if (cat && !currentBackupData.expense_categories[cat]) currentBackupData.expense_categories[cat] = 'Variable';
+                const key = `${getISODateString(dateObj)}__${row.name}__${row.amount}`;
+                if (existingKeys.has(key)) return;
+                existingKeys.add(key);
+                const entry = { name: row.name, amount: row.amount, category: cat, type: currentBackupData.expense_categories[cat] || 'Variable', frequency: 'Único', start_date: dateObj, end_date: null, is_real: true, movement_date: dateObj, payment_method: 'Efectivo / Debito', credit_card: null, installments: 1, currency: 'USD' };
+                if (!currentBackupData.expenses) currentBackupData.expenses = [];
+                currentBackupData.expenses.push(entry);
+            }
+        });
+        renderExpensesTable();
+        renderCashflowTable();
+        closeJsonImportModal();
     });
 
     // --- LÓGICA PESTAÑA PRESUPUESTOS ---
