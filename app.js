@@ -138,6 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const expensesTableView = document.querySelector('#expenses-table-view tbody');
     const searchExpenseInput = document.getElementById("search-expense-input");
     const openImportExpensesButtons = document.querySelectorAll(".open-import-expenses");
+    const expenseJsonDropZone = document.getElementById('expense-json-drop-zone');
+    const expenseJsonFileInput = document.getElementById('expense-json-file-input');
     const importExpensesModal = document.getElementById("import-expenses-modal");
     const importExpensesModalClose = document.getElementById("import-expenses-modal-close");
     const expenseDropZone = document.getElementById("expense-drop-zone");
@@ -149,6 +151,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const importTableContainer = document.getElementById('import-table-container');
     const bankProfileSelect = document.getElementById('import-bank-profile');
     const mergeExpensesButton = document.getElementById('merge-expenses-button');
+    const importJsonExpensesModal = document.getElementById('import-json-expenses-modal');
+    const importJsonExpensesClose = document.getElementById('import-json-expenses-close');
+    const jsonExpensesPreview = document.getElementById('json-expenses-preview');
+    const addJsonExpensesButton = document.getElementById('add-json-expenses');
     let editingExpenseIndex = null;
     let parsedImportData = [];
     let importHeaders = [];
@@ -158,6 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
             columns: { date: 'FECHA', desc: 'DESCRIPCION', amount: 'MONTO' }
         }
     };
+    let parsedJsonExpenses = [];
+    let lastImportedJsonRange = null;
 
     const usdClpRateCache = {};
     const usdClpRatePending = {};
@@ -2416,10 +2424,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return null;
     }
+    function parseAmountString(val) {
+        if (val === undefined || val === null || val === '') return 0;
+        if (typeof val === 'number') return val;
+        const raw = String(val).trim();
+        if (!raw) return 0;
+        let cleaned = raw.replace(/[^0-9,.-]/g, '');
+        const hasComma = cleaned.includes(',');
+        const hasDot = cleaned.includes('.');
+        if (hasComma && hasDot) {
+            cleaned = cleaned.replace(/,/g, '');
+        } else if (hasComma && !hasDot) {
+            cleaned = cleaned.replace(/,/g, '.');
+        }
+        const dotParts = cleaned.split('.');
+        if (dotParts.length > 2) {
+            const decimal = dotParts.pop();
+            cleaned = dotParts.join('') + '.' + decimal;
+        }
+        const amount = parseFloat(cleaned);
+        return isNaN(amount) ? 0 : amount;
+    }
+    function parseAmountOrNull(val) {
+        if (val === undefined || val === null) return null;
+        const trimmed = String(val).trim();
+        if (!trimmed) return null;
+        const parsed = parseAmountString(trimmed);
+        return isNaN(parsed) ? null : parsed;
+    }
     function checkExpenseDuplicate(name, dateStr, amount) {
         return (currentBackupData.expenses || []).some(exp => {
             const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
-            return expDate === dateStr && exp.name === name && parseFloat(exp.amount) === parseFloat(amount);
+            const existingAmount = exp.amount === undefined || exp.amount === null ? null : parseFloat(exp.amount);
+            const incomingAmount = amount === undefined || amount === null ? null : parseFloat(amount);
+            if (incomingAmount === null || isNaN(incomingAmount)) {
+                return expDate === dateStr && exp.name === name && (existingAmount === null || isNaN(existingAmount));
+            }
+            return expDate === dateStr && exp.name === name && parseFloat(existingAmount) === incomingAmount;
         });
     }
     function createCategorySelect() {
@@ -2523,9 +2564,208 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsArrayBuffer(file);
     }
 
+    function handleJsonExpenseFile(file) {
+        if (!file || file.type !== 'application/json' && !file.name.endsWith('.json')) {
+            alert('Selecciona un archivo JSON válido.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            handleJsonExpensesText(e.target.result);
+        };
+        reader.readAsText(file);
+    }
+
+    function showJsonExpensesModal() {
+        if (importJsonExpensesModal) showElement(importJsonExpensesModal, 'flex');
+    }
+
+    function closeJsonExpensesModal() {
+        if (importJsonExpensesModal) hideElement(importJsonExpensesModal);
+        parsedJsonExpenses = [];
+        if (jsonExpensesPreview) jsonExpensesPreview.innerHTML = '';
+    }
+
+    function parseBankJsonDate(val) {
+        if (!val || typeof val !== 'string') return null;
+        const [mm, dd, yyyy] = val.split('/').map(part => parseInt(part, 10));
+        if (!mm || !dd || !yyyy) return null;
+        return new Date(Date.UTC(yyyy, mm - 1, dd));
+    }
+
+    function mapJsonTransactionsToExpenses(obj) {
+        const results = [];
+        if (!obj || typeof obj !== 'object') return results;
+        const seen = new Set();
+        const fromDate = parseBankJsonDate(obj.FromDate || obj.fromDate) || toUTCDate(obj.FromDate || obj.fromDate, null);
+        const toDate = parseBankJsonDate(obj.ToDate || obj.toDate) || toUTCDate(obj.ToDate || obj.toDate, null);
+        lastImportedJsonRange = (fromDate || toDate) ? { from: fromDate, to: toDate } : null;
+        const buildExpenseFromPosted = (tx) => {
+            if (!tx) return null;
+            const description = (tx.Description || tx.description || '').trim();
+            const dateVal = tx.Date || tx.date;
+            const dateObj = parseBankJsonDate(dateVal) || toUTCDate(dateVal, null);
+            if (!description || !dateObj) return null;
+            const withdrawal = parseAmountOrNull(tx.Withdrawal ?? tx.withdrawal);
+            if (withdrawal === null || isNaN(withdrawal) || withdrawal === 0) return null;
+            const amount = Math.abs(withdrawal);
+            const dateStr = getISODateString(dateObj);
+            const key = `${description}|${dateStr}|${amount}`;
+            if (seen.has(key)) return null;
+            seen.add(key);
+            return {
+                id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `tx-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                date: dateObj,
+                description,
+                amount,
+                currency: 'USD',
+                sourceType: tx.Type || tx.type || 'POSTED',
+                isPending: false,
+                checkNumber: tx.CheckNumber ?? tx.checkNumber ?? undefined,
+                balanceAfter: undefined,
+                raw: tx
+            };
+        };
+        (obj.PostedTransactions || []).forEach(tx => {
+            const mapped = buildExpenseFromPosted(tx);
+            if (mapped) results.push(mapped);
+        });
+        return results;
+    }
+
+    function renderJsonExpensesPreview() {
+        if (!jsonExpensesPreview) return;
+        jsonExpensesPreview.innerHTML = '';
+        if (!parsedJsonExpenses.length) {
+            jsonExpensesPreview.textContent = 'Sin datos para previsualizar.';
+            return;
+        }
+        const categories = currentBackupData.expense_categories
+            ? Object.keys(currentBackupData.expense_categories).filter(isFirebaseKeySafe).sort()
+            : [];
+        if (lastImportedJsonRange && (lastImportedJsonRange.from || lastImportedJsonRange.to)) {
+            const rangeNotice = document.createElement('p');
+            const fromStr = lastImportedJsonRange.from ? getISODateString(lastImportedJsonRange.from) : '¿?';
+            const toStr = lastImportedJsonRange.to ? getISODateString(lastImportedJsonRange.to) : '¿?';
+            rangeNotice.classList.add('json-range-notice');
+            rangeNotice.textContent = `Rango sincronizado: ${fromStr} a ${toStr}`;
+            jsonExpensesPreview.appendChild(rangeNotice);
+        }
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Categoría</th><th>Tipo</th><th>Duplicado</th></tr>';
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        parsedJsonExpenses.forEach((item, idx) => {
+            const dateStr = getISODateString(item.date);
+            const isDup = checkExpenseDuplicate(item.description, dateStr, item.amount);
+            const row = document.createElement('tr');
+            if (isDup) row.classList.add('duplicate-row');
+            row.insertCell().textContent = dateStr;
+            row.insertCell().textContent = item.description;
+            const amountCell = row.insertCell();
+            amountCell.textContent = item.amount === null ? 'Pendiente sin monto' : formatAmountWithCurrency(item.amount, item.currency || 'USD');
+            const catCell = row.insertCell();
+            const select = document.createElement('select');
+            select.dataset.index = idx;
+            const emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = 'Seleccionar categoría';
+            select.appendChild(emptyOpt);
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                select.appendChild(opt);
+            });
+            catCell.appendChild(select);
+            row.insertCell().textContent = item.sourceType || '';
+            row.insertCell().textContent = isDup ? 'Sí' : 'No';
+            tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        jsonExpensesPreview.appendChild(table);
+    }
+
+    function handleJsonExpensesText(text) {
+        if (jsonExpensesPreview) jsonExpensesPreview.innerHTML = '';
+        let parsed;
+        try {
+            parsed = JSON.parse(text);
+        } catch (err) {
+            jsonExpensesPreview.textContent = 'JSON inválido: ' + err.message;
+            parsedJsonExpenses = [];
+            showJsonExpensesModal();
+            return;
+        }
+        parsedJsonExpenses = mapJsonTransactionsToExpenses(parsed);
+        if (!parsedJsonExpenses.length) {
+            jsonExpensesPreview.textContent = 'No se encontraron movimientos con descripción, fecha y monto.';
+            showJsonExpensesModal();
+            return;
+        }
+        renderJsonExpensesPreview();
+        showJsonExpensesModal();
+    }
+
+    function addJsonExpenses() {
+        if (!parsedJsonExpenses.length) { alert('Primero arrastra un JSON válido en la pestaña Gastos.'); return; }
+        if (!currentBackupData.expenses) currentBackupData.expenses = [];
+        let added = 0, skipped = 0, missingCategory = 0, missingAmount = 0;
+        parsedJsonExpenses.forEach((item, idx) => {
+            if (item.amount === null || isNaN(item.amount)) { missingAmount++; return; }
+            const select = jsonExpensesPreview ? jsonExpensesPreview.querySelector(`select[data-index="${idx}"]`) : null;
+            const category = select ? select.value : '';
+            if (!category) { missingCategory++; return; }
+            const dateStr = getISODateString(item.date);
+            const isDup = checkExpenseDuplicate(item.description, dateStr, item.amount);
+            if (isDup) { skipped++; return; }
+            const expense = {
+                name: item.description,
+                amount: item.amount,
+                currency: item.currency || 'USD',
+                category,
+                type: currentBackupData.expense_categories ? currentBackupData.expense_categories[category] || 'Variable' : 'Variable',
+                frequency: 'Único',
+                start_date: item.date,
+                end_date: null,
+                is_real: true,
+                movement_date: item.date,
+                payment_method: 'Efectivo / Debito',
+                credit_card: null,
+                installments: 1,
+                bank_source_type: item.sourceType,
+                bank_check_number: item.checkNumber,
+                bank_balance_after: item.balanceAfter,
+                bank_transaction_id: item.id,
+                bank_raw: item.raw
+            };
+            currentBackupData.expenses.push(expense);
+            added++;
+        });
+        if (lastImportedJsonRange) {
+            currentBackupData.bank_import_ranges = currentBackupData.bank_import_ranges || [];
+            const rangeKey = `${lastImportedJsonRange.from ? getISODateString(lastImportedJsonRange.from) : ''}|${lastImportedJsonRange.to ? getISODateString(lastImportedJsonRange.to) : ''}`;
+            if (!currentBackupData.bank_import_ranges.some(r => `${r.from}|${r.to}` === rangeKey)) {
+                currentBackupData.bank_import_ranges.push({
+                    from: lastImportedJsonRange.from ? getISODateString(lastImportedJsonRange.from) : '',
+                    to: lastImportedJsonRange.to ? getISODateString(lastImportedJsonRange.to) : '',
+                    imported_at: new Date().toISOString()
+                });
+            }
+        }
+        renderExpensesTable();
+        renderCashflowTable();
+        alert(`Gastos agregados: ${added}. Duplicados omitidos: ${skipped}. Sin categoría: ${missingCategory}. Pendientes sin monto: ${missingAmount}.`);
+        closeJsonExpensesModal();
+    }
+
     openImportExpensesButtons.forEach(btn => btn.addEventListener("click", showImportExpensesModal));
     if (importExpensesModalClose) importExpensesModalClose.addEventListener('click', closeImportExpensesModal);
     if (importExpensesModal) importExpensesModal.addEventListener('click', (e)=>{ if(e.target===importExpensesModal) closeImportExpensesModal(); });
+    if (importJsonExpensesClose) importJsonExpensesClose.addEventListener('click', closeJsonExpensesModal);
+    if (importJsonExpensesModal) importJsonExpensesModal.addEventListener('click', (e)=>{ if (e.target === importJsonExpensesModal) closeJsonExpensesModal(); });
+    if (addJsonExpensesButton) addJsonExpensesButton.addEventListener('click', addJsonExpenses);
     if (expenseDropZone) {
         expenseDropZone.addEventListener('click', () => { if(expenseFileInput) expenseFileInput.click(); });
         expenseDropZone.addEventListener('dragover', e => { e.preventDefault(); expenseDropZone.classList.add('dragover'); });
@@ -2533,6 +2773,17 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseDropZone.addEventListener('drop', e => { e.preventDefault(); expenseDropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleExpenseFile(e.dataTransfer.files[0]); });
     }
     if (expenseFileInput) expenseFileInput.addEventListener('change', e => { if (e.target.files[0]) handleExpenseFile(e.target.files[0]); });
+    if (expenseJsonDropZone) {
+        expenseJsonDropZone.addEventListener('click', () => { if (expenseJsonFileInput) expenseJsonFileInput.click(); });
+        expenseJsonDropZone.addEventListener('dragover', e => { e.preventDefault(); expenseJsonDropZone.classList.add('dragover'); });
+        expenseJsonDropZone.addEventListener('dragleave', () => expenseJsonDropZone.classList.remove('dragover'));
+        expenseJsonDropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            expenseJsonDropZone.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) handleJsonExpenseFile(e.dataTransfer.files[0]);
+        });
+    }
+    if (expenseJsonFileInput) expenseJsonFileInput.addEventListener('change', e => { if (e.target.files[0]) handleJsonExpenseFile(e.target.files[0]); });
     if (mapDateSelect) mapDateSelect.addEventListener('change', renderImportTable);
     if (mapDescSelect) mapDescSelect.addEventListener('change', renderImportTable);
     if (mapAmountSelect) mapAmountSelect.addEventListener('change', renderImportTable);
