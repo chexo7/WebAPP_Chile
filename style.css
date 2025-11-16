@@ -302,6 +302,7 @@ button.button-large {
     width: 100%;
     display: flex;
     flex-direction: column;
+    position: relative;
 }
 .dynamic-table-scroll {
     flex-grow: 1;
@@ -1410,6 +1411,56 @@ td.reimbursement-income {
     max-width: none;
     max-height: none;
     border-radius: 0;
+}
+#import-json-expenses-modal .modal-content {
+    max-width: 800px;
+    width: 90%;
+}
+#json-expenses-input {
+    width: 100%;
+    margin: 10px 0;
+    font-family: var(--font-family);
+}
+.json-drop-hint {
+    margin: 8px 0;
+    padding: 8px;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius);
+    background: var(--input-bg);
+    color: var(--muted-text-color);
+    font-size: 0.9em;
+}
+.json-drop-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.35);
+    color: #fff;
+    font-size: 1.2em;
+    z-index: 1200;
+}
+.json-expenses-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+#json-expenses-preview table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+#json-expenses-preview th, #json-expenses-preview td {
+    border: 1px solid var(--border-color);
+    padding: 6px;
+}
+#json-expenses-preview .duplicate-row {
+    background-color: var(--alt-row-bg);
 }
 
 .desktop-only { display: none; }
