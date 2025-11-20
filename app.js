@@ -176,10 +176,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let editLockRef = null;
 
     // --- ELEMENTOS PESTAÑA PRESUPUESTOS ---
-    const budgetForm = document.getElementById('budget-form');
-    const budgetCategorySelect = document.getElementById('budget-category-select');
-    const budgetAmountInput = document.getElementById('budget-amount-input');
-    const saveBudgetButton = document.getElementById('save-budget-button');
+    const budgetTemplateForm = document.getElementById('budget-template-form');
+    const budgetTemplateNameInput = document.getElementById('budget-template-name');
+    const budgetTemplateCategorySelect = document.getElementById('budget-template-category');
+    const budgetTemplateAmountInput = document.getElementById('budget-template-amount');
+    const budgetTemplateFrequencySelect = document.getElementById('budget-template-frequency');
+    const budgetTemplateStartInput = document.getElementById('budget-template-start');
+    const budgetTemplateNotesInput = document.getElementById('budget-template-notes');
+    const cancelBudgetTemplateButton = document.getElementById('cancel-budget-template');
     const budgetsTableView = document.querySelector('#budgets-table-view tbody');
     const budgetSummaryTableBody = document.querySelector('#budget-summary-table tbody');
     const budgetPrevPeriodButton = document.getElementById('budget-prev-period-button');
@@ -187,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const budgetYearSelect = document.getElementById('budget-year-select');
     const budgetMonthSelect = document.getElementById('budget-month-select');
     let currentBudgetViewDate = new Date();
+    let editingBudgetTemplateId = null;
 
     // --- ELEMENTOS PESTAÑA REGISTRO PAGOS ---
     const paymentsTabTitle = document.getElementById('payments-tab-title');
@@ -487,6 +492,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         encoded.budgets = encodeObjectKeysForFirebase(encoded.budgets || {}, sanitizedFields);
 
+        encoded.budget_templates = (encoded.budget_templates || []).map(template => {
+            const copy = { ...template };
+            if (copy.name) {
+                const safe = encodeFirebaseSafeText(copy.name);
+                if (safe !== copy.name) sanitizedFields.add(copy.name);
+                copy.name = safe;
+            }
+            if (copy.category) {
+                const safe = encodeFirebaseSafeText(copy.category);
+                if (safe !== copy.category) sanitizedFields.add(copy.category);
+                copy.category = safe;
+            }
+            return copy;
+        });
+
         encoded.expenses = (encoded.expenses || []).map(exp => {
             const copy = { ...exp };
             if (copy.name) {
@@ -526,6 +546,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         decoded.expenses = (decoded.expenses || []).map(exp => {
             const copy = { ...exp };
+            if (copy.name) copy.name = decodeFirebaseSafeText(copy.name);
+            if (copy.category) copy.category = decodeFirebaseSafeText(copy.category);
+            return copy;
+        });
+
+        decoded.budget_templates = (decoded.budget_templates || []).map(template => {
+            const copy = { ...template };
             if (copy.name) copy.name = decodeFirebaseSafeText(copy.name);
             if (copy.category) copy.category = decodeFirebaseSafeText(copy.category);
             return copy;
@@ -625,13 +652,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (changeLogList) changeLogList.innerHTML = '';
 
         if (expenseCategorySelect) expenseCategorySelect.innerHTML = '<option value="">Cargando...</option>';
-        if (budgetCategorySelect) budgetCategorySelect.innerHTML = '<option value="">Cargando...</option>';
+        if (budgetTemplateCategorySelect) budgetTemplateCategorySelect.innerHTML = '<option value="">Cargando...</option>';
         if (incomeReimbursementCategorySelect) incomeReimbursementCategorySelect.innerHTML = '<option value="">Cargando...</option>';
 
 
         resetIncomeForm();
         resetExpenseForm();
-        resetBudgetForm();
+        resetBudgetTemplateForm();
         resetReminderForm();
         if (cashflowChartInstance) {
             cashflowChartInstance.destroy();
@@ -774,6 +801,7 @@ document.addEventListener('DOMContentLoaded', () => {
             credit_cards: [],
             payments: {},
             budgets: {},
+            budget_templates: [],
             baby_steps_status: BABY_STEPS_DATA_JS.map(step => ({
                 dos: new Array(step.dos.length).fill(false),
                 donts: new Array(step.donts.length).fill(false)
@@ -816,6 +844,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!hydrated.budgets || typeof hydrated.budgets !== 'object') hydrated.budgets = {};
+        if (!Array.isArray(hydrated.budget_templates)) hydrated.budget_templates = [];
+        hydrated.budget_templates.forEach(template => {
+            if (template.start_date) template.start_date = toUTCDate(template.start_date);
+        });
         if (!hydrated.payments || typeof hydrated.payments !== 'object') hydrated.payments = {};
 
         if (!Array.isArray(hydrated.credit_cards)) {
@@ -1473,7 +1505,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabId === 'grafico') {
             setPeriodicity(activeCashflowPeriodicity, 'chart');
         }
-        if (tabId === 'presupuestos') { setupBudgetPeriodSelectors(); renderBudgetsTable(); renderBudgetSummaryTableForSelectedPeriod(); }
+        if (tabId === 'presupuestos') { setupBudgetPeriodSelectors(); renderBudgetsTable(); updateBudgetTablesForSelectedPeriod(); }
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); setPaymentPeriodicity(activePaymentsPeriodicity); }
         if (tabId === 'ajustes') {
             populateSettingsForm();
@@ -1943,7 +1975,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setPaymentPeriodicity(activePaymentsPeriodicity);
         renderBudgetsTable();
 
-        renderBudgetSummaryTableForSelectedPeriod();
+        updateBudgetTablesForSelectedPeriod();
     });
 
     if (printSummaryButton) {
@@ -2281,7 +2313,7 @@ document.addEventListener('DOMContentLoaded', () => {
     expenseMovementDateInput.addEventListener('change', updateExpensePaymentDate);
     expenseCreditCardSelect.addEventListener('change', updateExpensePaymentDate);
     function populateExpenseCategoriesDropdowns() {
-        const selects = [expenseCategorySelect, budgetCategorySelect];
+        const selects = [expenseCategorySelect, budgetTemplateCategorySelect];
         selects.forEach(select => {
             if (!select || !currentBackupData || !currentBackupData.expense_categories) {
                 if (select) select.innerHTML = '<option value="">No hay categorías</option>'; return;
@@ -2932,78 +2964,246 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- LÓGICA PESTAÑA PRESUPUESTOS ---
-    function resetBudgetForm() {
-        budgetForm.reset();
-        if (budgetCategorySelect.options.length > 0) budgetCategorySelect.selectedIndex = 0;
-        budgetAmountInput.value = '';
+    function resetBudgetTemplateForm() {
+        if (!budgetTemplateForm) return;
+        budgetTemplateForm.reset();
+        budgetTemplateFrequencySelect.value = 'Mensual';
+        budgetTemplateStartInput.value = getISODateString(new Date());
+        editingBudgetTemplateId = null;
+        if (cancelBudgetTemplateButton) hideElement(cancelBudgetTemplateButton);
     }
-    budgetForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const category = budgetCategorySelect.value;
-        const amount = parseFloat(budgetAmountInput.value);
-        if (!category) { alert("Selecciona una categoría."); return; }
-        if (isNaN(amount) || amount < 0) { alert("Ingresa un monto válido."); return; }
-        if (!isFirebaseKeySafe(category)) { alert(`Categoría "${category}" con nombre no permitido.`); return; }
-        if (!currentBackupData.budgets) currentBackupData.budgets = {};
-        currentBackupData.budgets[category] = amount;
-        renderBudgetsTable(); renderBudgetSummaryTableForSelectedPeriod(); renderCashflowTable();
-        alert(`Presupuesto para "${category}" guardado como ${formatCurrencyJS(amount, currentBackupData.display_currency_symbol || '$')}.`);
-    });
-    budgetCategorySelect.addEventListener('change', () => {
-        const selectedCategory = budgetCategorySelect.value;
-        budgetAmountInput.value = (selectedCategory && currentBackupData && currentBackupData.budgets) ? (currentBackupData.budgets[selectedCategory] || '0') : '0';
-    });
-    function renderBudgetsTable() {
-        if (!budgetsTableView || !currentBackupData || !currentBackupData.expense_categories) return;
-        budgetsTableView.innerHTML = '';
-        const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
-        sortedCategories.forEach(catName => {
-            const catType = currentBackupData.expense_categories[catName];
-            const budgetAmount = (currentBackupData.budgets && currentBackupData.budgets[catName] !== undefined) ? currentBackupData.budgets[catName] : 0;
-            const row = budgetsTableView.insertRow();
-            row.insertCell().textContent = catName;
-            row.insertCell().textContent = catType;
-            row.insertCell().textContent = formatCurrencyJS(budgetAmount, currentBackupData.display_currency_symbol || '$');
-            row.addEventListener('click', () => { budgetCategorySelect.value = catName; budgetAmountInput.value = budgetAmount; });
+
+    function ensureBudgetCategoryExists(categoryName) {
+        if (!currentBackupData) return;
+        if (!currentBackupData.expense_categories) currentBackupData.expense_categories = {};
+        if (!currentBackupData.expense_categories[categoryName]) {
+            currentBackupData.expense_categories[categoryName] = 'Fijo';
+            populateExpenseCategoriesDropdowns();
+            populateIncomeReimbursementCategoriesDropdown();
+        }
+    }
+
+    function getTemplateOccurrencesForMonth(template, viewDate) {
+        const occurrences = [];
+        if (!template || !template.start_date) return occurrences;
+        const year = viewDate.getUTCFullYear();
+        const month = viewDate.getUTCMonth();
+        const monthStart = new Date(Date.UTC(year, month, 1));
+        const monthEnd = new Date(Date.UTC(year, month + 1, 0));
+        const startDate = toUTCDate(template.start_date);
+        const frequency = template.frequency || 'Mensual';
+        if (!startDate) return occurrences;
+        const day = startDate.getUTCDate();
+        const daysInCurrentMonth = getDaysInMonth(year, month);
+        const baseDate = new Date(Date.UTC(year, month, Math.min(day, daysInCurrentMonth)));
+
+        if (frequency === 'Único') {
+            if (startDate.getUTCFullYear() === year && startDate.getUTCMonth() === month) occurrences.push(startDate);
+            return occurrences;
+        }
+
+        if (frequency === 'Mensual') {
+            if (baseDate >= startDate) occurrences.push(baseDate);
+            return occurrences;
+        }
+
+        if (frequency === 'Anual') {
+            if (startDate.getUTCMonth() === month && startDate.getUTCDate() === Math.min(day, daysInCurrentMonth) && year >= startDate.getUTCFullYear()) {
+                occurrences.push(baseDate);
+            }
+            return occurrences;
+        }
+
+        if (frequency === 'Trimestral') {
+            let candidate = new Date(startDate.getTime());
+            while (candidate < monthStart) {
+                candidate = addMonths(candidate, 3);
+            }
+            while (candidate <= monthEnd) {
+                occurrences.push(new Date(candidate.getTime()));
+                candidate = addMonths(candidate, 3);
+            }
+            return occurrences;
+        }
+
+        const stepDays = frequency === 'Quincenal' ? 14 : 7;
+        let cursor = new Date(startDate.getTime());
+        while (cursor < monthStart) {
+            cursor = addDays(cursor, stepDays);
+        }
+        while (cursor <= monthEnd) {
+            occurrences.push(new Date(cursor.getTime()));
+            cursor = addDays(cursor, stepDays);
+        }
+        return occurrences;
+    }
+
+    function hasExpenseForTemplate(template, viewDate) {
+        if (!currentBackupData || !Array.isArray(currentBackupData.expenses)) return false;
+        return currentBackupData.expenses.some(exp => {
+            if (!exp.movement_date) return false;
+            const date = toUTCDate(exp.movement_date);
+            return exp.name && template.name && exp.name.toLowerCase() === template.name.toLowerCase()
+                && date && date.getUTCFullYear() === viewDate.getUTCFullYear()
+                && date.getUTCMonth() === viewDate.getUTCMonth();
         });
     }
+
+    function getTemplateStatus(template, viewDate) {
+        const occurrences = getTemplateOccurrencesForMonth(template, viewDate);
+        if (occurrences.length === 0) return { label: 'Fuera de rango', className: 'overdue' };
+        const hasExpense = hasExpenseForTemplate(template, viewDate);
+        if (hasExpense) return { label: 'Registrado en Gastos', className: 'done' };
+        const firstOccurrence = occurrences[0];
+        const today = new Date();
+        const isOverdue = today > firstOccurrence && today.getUTCFullYear() === viewDate.getUTCFullYear() && today.getUTCMonth() === viewDate.getUTCMonth();
+        return { label: isOverdue ? 'Pendiente (vencido)' : 'Pendiente', className: isOverdue ? 'overdue' : 'pending' };
+    }
+
+    function prefillExpenseFormFromTemplate(template, viewDate) {
+        if (!template || !expenseForm) return;
+        ensureBudgetCategoryExists(template.category);
+        const occurrences = getTemplateOccurrencesForMonth(template, viewDate);
+        const movementDate = occurrences.length > 0 ? occurrences[0] : template.start_date || new Date();
+        expenseNameInput.value = template.name || '';
+        expenseAmountInput.value = template.amount || '';
+        expenseCategorySelect.value = template.category || '';
+        expenseFrequencySelect.value = (template.frequency === 'Quincenal') ? 'Bi-semanal' : (template.frequency === 'Trimestral' ? 'Mensual' : template.frequency || 'Mensual');
+        expenseStartDateInput.value = getISODateString(movementDate);
+        expenseMovementDateInput.value = getISODateString(movementDate);
+        expenseEndDateInput.value = '';
+        expenseOngoingCheckbox.checked = template.frequency !== 'Único';
+        activateTab('gastos');
+        expenseNameInput.focus();
+    }
+
+    function renderBudgetsTable() {
+        if (!budgetsTableView || !currentBackupData) return;
+        budgetsTableView.innerHTML = '';
+        const templates = currentBackupData.budget_templates || [];
+        if (templates.length === 0) {
+            const row = budgetsTableView.insertRow();
+            const cell = row.insertCell();
+            cell.colSpan = 6;
+            cell.textContent = 'Aún no tienes gastos fijos creados.';
+            cell.style.textAlign = 'center';
+            return;
+        }
+        templates
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .forEach(template => {
+                const row = budgetsTableView.insertRow();
+                row.insertCell().textContent = template.name;
+                row.insertCell().textContent = template.category;
+                row.insertCell().textContent = template.frequency || 'Mensual';
+                row.insertCell().textContent = formatCurrencyJS(parseFloat(template.amount) || 0, currentBackupData.display_currency_symbol || '$');
+                const status = getTemplateStatus(template, currentBudgetViewDate);
+                const statusCell = row.insertCell();
+                statusCell.innerHTML = `<span class="budget-status-chip ${status.className}">${status.label}</span>`;
+                const actionsCell = row.insertCell();
+                const sendBtn = document.createElement('button');
+                sendBtn.textContent = 'Enviar a Gastos';
+                sendBtn.addEventListener('click', () => prefillExpenseFormFromTemplate(template, currentBudgetViewDate));
+                const editBtn = document.createElement('button');
+                editBtn.textContent = 'Editar';
+                editBtn.addEventListener('click', () => {
+                    editingBudgetTemplateId = template.id;
+                    budgetTemplateNameInput.value = template.name;
+                    budgetTemplateCategorySelect.value = template.category;
+                    budgetTemplateAmountInput.value = template.amount;
+                    budgetTemplateFrequencySelect.value = template.frequency || 'Mensual';
+                    budgetTemplateStartInput.value = getISODateString(template.start_date || new Date());
+                    budgetTemplateNotesInput.value = template.notes || '';
+                    if (cancelBudgetTemplateButton) showElement(cancelBudgetTemplateButton, 'inline-block');
+                });
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Eliminar';
+                deleteBtn.classList.add('danger');
+                deleteBtn.addEventListener('click', () => {
+                    if (confirm(`¿Eliminar la plantilla "${template.name}"?`)) {
+                        currentBackupData.budget_templates = templates.filter(t => t.id !== template.id);
+                        renderBudgetsTable();
+                        updateBudgetTablesForSelectedPeriod();
+                    }
+                });
+                actionsCell.appendChild(sendBtn);
+                actionsCell.appendChild(editBtn);
+                actionsCell.appendChild(deleteBtn);
+            });
+    }
+
     function renderBudgetSummaryTable() {
         if (!budgetSummaryTableBody || !currentBackupData) return;
         budgetSummaryTableBody.innerHTML = '';
-        if (!currentBackupData.analysis_start_date || !currentBackupData.expenses || !currentBackupData.budgets || !currentBackupData.expense_categories) {
+        const templates = currentBackupData.budget_templates || [];
+        if (templates.length === 0) {
             const row = budgetSummaryTableBody.insertRow();
-            const cell = row.insertCell(); cell.colSpan = 5; cell.textContent = "Datos insuficientes."; cell.style.textAlign = "center";
+            const cell = row.insertCell();
+            cell.colSpan = 5;
+            cell.textContent = 'No hay gastos fijos configurados.';
+            cell.style.textAlign = 'center';
             return;
         }
-        const viewDate = currentBudgetViewDate instanceof Date ? currentBudgetViewDate : new Date();
-        const periodDates = cashflowPeriodDatesMap["Mensual"] || [];
-        const catTotals = cashflowCategoryTotalsMap["Mensual"] || [];
-        let monthIdx = -1;
-        for (let i = 0; i < periodDates.length; i++) {
-            const d = periodDates[i];
-            if (d.getUTCFullYear() === viewDate.getUTCFullYear() && d.getUTCMonth() === viewDate.getUTCMonth()) {
-                monthIdx = i;
-                break;
+        templates.forEach(template => {
+            const occurrences = getTemplateOccurrencesForMonth(template, currentBudgetViewDate);
+            const expected = (occurrences.length || 0) * (parseFloat(template.amount) || 0);
+            let registered = 0;
+            if (Array.isArray(currentBackupData.expenses)) {
+                currentBackupData.expenses.forEach(exp => {
+                    const date = toUTCDate(exp.movement_date);
+                    if (date && date.getUTCFullYear() === currentBudgetViewDate.getUTCFullYear() && date.getUTCMonth() === currentBudgetViewDate.getUTCMonth() && exp.name && template.name && exp.name.toLowerCase() === template.name.toLowerCase()) {
+                        registered += parseFloat(exp.amount) || 0;
+                    }
+                });
             }
-        }
-        const expensesThisMonth = monthIdx >= 0 ? (catTotals[monthIdx] || {}) : {};
-
-
-        const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
-        sortedCategories.forEach(catName => {
-            const budget = currentBackupData.budgets[catName] || 0;
-            const spent = expensesThisMonth[catName] || 0;
-            const difference = budget - spent;
-            const percentageSpent = budget > 0 ? (spent / budget * 100) : 0;
+            const difference = expected - registered;
+            const status = getTemplateStatus(template, currentBudgetViewDate);
             const row = budgetSummaryTableBody.insertRow();
-            row.insertCell().textContent = catName;
-            row.insertCell().textContent = formatCurrencyJS(budget, currentBackupData.display_currency_symbol);
-            row.insertCell().textContent = formatCurrencyJS(spent, currentBackupData.display_currency_symbol);
-            const diffCell = row.insertCell(); diffCell.textContent = formatCurrencyJS(difference, currentBackupData.display_currency_symbol);
-            diffCell.classList.toggle('text-red', difference < 0); diffCell.classList.toggle('text-green', difference > 0 && budget > 0);
-        const percCell = row.insertCell(); percCell.textContent = `${percentageSpent.toFixed(1)}%`;
-        if (budget > 0) { if (percentageSpent > 100) percCell.classList.add('text-red'); else if (percentageSpent >= 80) percCell.classList.add('text-orange'); else percCell.classList.add('text-green'); }
-    });
+            row.insertCell().textContent = template.name;
+            row.insertCell().textContent = formatCurrencyJS(expected, currentBackupData.display_currency_symbol || '$');
+            row.insertCell().textContent = formatCurrencyJS(registered, currentBackupData.display_currency_symbol || '$');
+            const diffCell = row.insertCell();
+            diffCell.textContent = formatCurrencyJS(difference, currentBackupData.display_currency_symbol || '$');
+            diffCell.classList.toggle('text-red', difference < 0);
+            diffCell.classList.toggle('text-green', difference >= 0 && expected > 0);
+            const statusCell = row.insertCell();
+            statusCell.innerHTML = `<span class="budget-status-chip ${status.className}">${status.label}</span>`;
+        });
+    }
+
+    if (budgetTemplateForm) {
+        budgetTemplateForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = budgetTemplateNameInput.value.trim();
+            const category = budgetTemplateCategorySelect.value;
+            const amount = parseFloat(budgetTemplateAmountInput.value);
+            const frequency = budgetTemplateFrequencySelect.value;
+            const startDate = toUTCDate(budgetTemplateStartInput.value);
+            const notes = budgetTemplateNotesInput.value.trim();
+            if (!name || !category || isNaN(amount) || amount <= 0 || !startDate) {
+                alert('Completa todos los campos con valores válidos.');
+                return;
+            }
+            ensureBudgetCategoryExists(category);
+            if (!currentBackupData.budget_templates) currentBackupData.budget_templates = [];
+            if (editingBudgetTemplateId) {
+                const idx = currentBackupData.budget_templates.findIndex(t => t.id === editingBudgetTemplateId);
+                if (idx >= 0) currentBackupData.budget_templates[idx] = { ...currentBackupData.budget_templates[idx], name, category, amount, frequency, start_date: startDate, notes };
+            } else {
+                const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}`;
+                currentBackupData.budget_templates.push({ id, name, category, amount, frequency, start_date: startDate, notes });
+            }
+            resetBudgetTemplateForm();
+            renderBudgetsTable();
+            updateBudgetTablesForSelectedPeriod();
+        });
+    }
+
+    if (cancelBudgetTemplateButton) {
+        cancelBudgetTemplateButton.addEventListener('click', () => {
+            resetBudgetTemplateForm();
+        });
     }
 
     function setupBudgetPeriodSelectors() {
@@ -3033,9 +3233,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         [budgetYearSelect, budgetMonthSelect].forEach(sel => {
             if (!sel) return;
-            sel.removeEventListener('change', renderBudgetSummaryTableForSelectedPeriod);
-            sel.addEventListener('change', renderBudgetSummaryTableForSelectedPeriod);
+            sel.removeEventListener('change', updateBudgetTablesForSelectedPeriod);
+            sel.addEventListener('change', updateBudgetTablesForSelectedPeriod);
         });
+    }
+
+    function updateBudgetTablesForSelectedPeriod() {
+        const year = parseInt(budgetYearSelect.value);
+        const monthIndex = parseInt(budgetMonthSelect.value);
+        currentBudgetViewDate = new Date(Date.UTC(year, monthIndex, 1));
+        renderBudgetsTable();
+        renderBudgetSummaryTable();
     }
 
     function navigateBudgetPeriod(direction) {
@@ -3045,14 +3253,7 @@ document.addEventListener('DOMContentLoaded', () => {
         newDate.setUTCMonth(newDate.getUTCMonth() + direction);
         budgetYearSelect.value = newDate.getUTCFullYear();
         budgetMonthSelect.value = newDate.getUTCMonth();
-        renderBudgetSummaryTableForSelectedPeriod();
-    }
-
-    function renderBudgetSummaryTableForSelectedPeriod() {
-        const year = parseInt(budgetYearSelect.value);
-        const monthIndex = parseInt(budgetMonthSelect.value);
-        currentBudgetViewDate = new Date(Date.UTC(year, monthIndex, 1));
-        renderBudgetSummaryTable();
+        updateBudgetTablesForSelectedPeriod();
     }
 
     if (budgetPrevPeriodButton) budgetPrevPeriodButton.addEventListener('click', () => navigateBudgetPeriod(-1));
@@ -3341,7 +3542,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p);
         }
 
-        renderBudgetSummaryTableForSelectedPeriod();
+        updateBudgetTablesForSelectedPeriod();
     }
 
     function buildExpenseOccurrenceContext(expense, useInstant) {

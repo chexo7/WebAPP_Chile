@@ -281,51 +281,79 @@
             </div>
 
             <div id="presupuestos" class="tab-content">
-                <h2>Gestión de Presupuestos Mensuales</h2>
+                <h2>Gastos Fijos y Presupuestos</h2>
+                <p class="section-subtitle">Diseña tus gastos fijos una sola vez y envíalos a la pestaña de Gastos sin duplicar información.</p>
                 <div class="form-and-table-layout">
                     <div class="form-container">
-                        <h3>Definir Presupuesto</h3>
-                        <form id="budget-form">
-                            <label for="budget-category-select">Categoría:</label>
-                            <select id="budget-category-select" required></select>
+                        <h3>Crear / Editar gasto fijo</h3>
+                        <form id="budget-template-form">
+                            <label for="budget-template-name">Nombre del gasto:</label>
+                            <input type="text" id="budget-template-name" required placeholder="Arriendo, internet, etc.">
 
-                            <label for="budget-amount-input">Monto Presupuestado Mensual:</label>
-                            <input type="number" id="budget-amount-input" step="any" required placeholder="0">
+                            <label for="budget-template-category">Categoría:</label>
+                            <select id="budget-template-category" required></select>
 
-                            <button type="submit" id="save-budget-button">Guardar Presupuesto</button>
+                            <label for="budget-template-amount">Monto:</label>
+                            <input type="number" id="budget-template-amount" step="any" required placeholder="0">
+
+                            <label for="budget-template-frequency">Frecuencia:</label>
+                            <select id="budget-template-frequency">
+                                <option value="Mensual">Mensual</option>
+                                <option value="Quincenal">Quincenal</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Trimestral">Trimestral</option>
+                                <option value="Anual">Anual</option>
+                                <option value="Único">Único</option>
+                            </select>
+
+                            <label for="budget-template-start">Próxima fecha / Fecha única:</label>
+                            <input type="date" id="budget-template-start" required>
+
+                            <label for="budget-template-notes">Notas (opcional):</label>
+                            <textarea id="budget-template-notes" rows="2" placeholder="Detalle, forma de pago, etc."></textarea>
+
+                            <div class="budget-template-actions">
+                                <button type="submit" id="save-budget-template">Guardar</button>
+                                <button type="button" id="cancel-budget-template" class="secondary" style="display:none;">Cancelar edición</button>
+                            </div>
                         </form>
                     </div>
                     <div class="table-container-dynamic">
-                        <h3>Presupuestos por Categoría</h3>
+                        <div class="budget-list-header">
+                            <h3>Gastos fijos programados</h3>
+                            <div class="budget-period-selector inline">
+                                <button id="budget-prev-period-button" title="Mes Anterior">&lt;</button>
+                                <select id="budget-year-select"></select>
+                                <select id="budget-month-select"></select>
+                                <button id="budget-next-period-button" title="Mes Siguiente">&gt;</button>
+                            </div>
+                        </div>
                         <div class="table-responsive dynamic-table-scroll">
                             <table id="budgets-table-view">
                                 <thead>
                                     <tr>
+                                        <th>Gasto</th>
                                         <th>Categoría</th>
-                                        <th>Tipo</th>
-                                        <th>Presupuesto Mensual</th>
+                                        <th>Frecuencia</th>
+                                        <th>Monto</th>
+                                        <th>Mes seleccionado</th>
+                                        <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     </tbody>
                             </table>
                         </div>
-                         <h3>Resumen Gasto vs Presupuesto (Mes Actual/Seleccionado)</h3>
-                        <div class="budget-period-selector">
-                            <button id="budget-prev-period-button" title="Mes Anterior">&lt;</button>
-                            <select id="budget-year-select"></select>
-                            <select id="budget-month-select"></select>
-                            <button id="budget-next-period-button" title="Mes Siguiente">&gt;</button>
-                        </div>
+                        <h3>Resumen gasto planificado vs real</h3>
                         <div class="table-responsive dynamic-table-scroll" id="budget-summary-table-container">
                             <table id="budget-summary-table">
                                 <thead>
                                     <tr>
-                                        <th>Categoría</th>
-                                        <th>Presupuesto</th>
-                                        <th>Gasto Real</th>
+                                        <th>Gasto fijo</th>
+                                        <th>Esperado</th>
+                                        <th>Registrado</th>
                                         <th>Diferencia</th>
-                                        <th>% Gastado</th>
+                                        <th>Estado</th>
                                     </tr>
                                 </thead>
                                 <tbody>
