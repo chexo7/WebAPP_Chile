@@ -186,7 +186,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const budgetNextPeriodButton = document.getElementById('budget-next-period-button');
     const budgetYearSelect = document.getElementById('budget-year-select');
     const budgetMonthSelect = document.getElementById('budget-month-select');
+    const fixedExpenseTemplateForm = document.getElementById('fixed-expense-template-form');
+    const fixedExpenseNameInput = document.getElementById('fixed-expense-name');
+    const fixedExpenseAmountInput = document.getElementById('fixed-expense-amount');
+    const fixedExpenseCategorySelect = document.getElementById('fixed-expense-category');
+    const fixedExpenseFrequencySelect = document.getElementById('fixed-expense-frequency');
+    const fixedExpenseDayInput = document.getElementById('fixed-expense-day');
+    const saveFixedExpenseTemplateButton = document.getElementById('save-fixed-expense-template');
+    const cancelEditFixedExpenseButton = document.getElementById('cancel-edit-fixed-expense');
+    const applyFixedExpensesButton = document.getElementById('apply-fixed-expenses-button');
+    const fixedExpenseTemplatesTable = document.querySelector('#fixed-expense-templates-table tbody');
     let currentBudgetViewDate = new Date();
+    let editingFixedExpenseId = null;
 
     // --- ELEMENTOS PESTAÑA REGISTRO PAGOS ---
     const paymentsTabTitle = document.getElementById('payments-tab-title');
@@ -502,6 +513,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return copy;
         });
 
+        encoded.fixed_expense_templates = (encoded.fixed_expense_templates || []).map(tpl => {
+            const copy = { ...tpl };
+            if (copy.name) {
+                const safe = encodeFirebaseSafeText(copy.name);
+                if (safe !== copy.name) sanitizedFields.add(copy.name);
+                copy.name = safe;
+            }
+            if (copy.category) {
+                const safe = encodeFirebaseSafeText(copy.category);
+                if (safe !== copy.category) sanitizedFields.add(copy.category);
+                copy.category = safe;
+            }
+            return copy;
+        });
+
         if (encoded.payments && typeof encoded.payments === 'object') {
             encoded.payments = encodeObjectKeysForFirebase(encoded.payments, sanitizedFields);
         }
@@ -531,7 +557,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return copy;
         });
 
+        decoded.fixed_expense_templates = (decoded.fixed_expense_templates || []).map(tpl => {
+            const copy = { ...tpl };
+            if (copy.name) copy.name = decodeFirebaseSafeText(copy.name);
+            if (copy.category) copy.category = decodeFirebaseSafeText(copy.category);
+            return copy;
+        });
+
         return decoded;
+    }
+
+    function createGuid() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+        return `id-${Math.random().toString(16).slice(2)}-${Date.now()}`;
     }
 
     // --- LÓGICA DE UI ---
@@ -618,6 +658,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (expensesTableView) expensesTableView.innerHTML = '';
         if (budgetsTableView) budgetsTableView.innerHTML = '';
         if (budgetSummaryTableBody) budgetSummaryTableBody.innerHTML = '';
+        if (fixedExpenseTemplatesTable) fixedExpenseTemplatesTable.innerHTML = '';
         if (paymentsTableView) paymentsTableView.innerHTML = '';
         if (babyStepsContainer) babyStepsContainer.innerHTML = '';
         if (pendingRemindersList) pendingRemindersList.innerHTML = '';
@@ -626,6 +667,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (expenseCategorySelect) expenseCategorySelect.innerHTML = '<option value="">Cargando...</option>';
         if (budgetCategorySelect) budgetCategorySelect.innerHTML = '<option value="">Cargando...</option>';
+        if (fixedExpenseCategorySelect) fixedExpenseCategorySelect.innerHTML = '<option value="">Cargando...</option>';
         if (incomeReimbursementCategorySelect) incomeReimbursementCategorySelect.innerHTML = '<option value="">Cargando...</option>';
 
 
@@ -774,6 +816,7 @@ document.addEventListener('DOMContentLoaded', () => {
             credit_cards: [],
             payments: {},
             budgets: {},
+            fixed_expense_templates: [],
             baby_steps_status: BABY_STEPS_DATA_JS.map(step => ({
                 dos: new Array(step.dos.length).fill(false),
                 donts: new Array(step.donts.length).fill(false)
@@ -817,6 +860,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!hydrated.budgets || typeof hydrated.budgets !== 'object') hydrated.budgets = {};
         if (!hydrated.payments || typeof hydrated.payments !== 'object') hydrated.payments = {};
+        if (!Array.isArray(hydrated.fixed_expense_templates)) hydrated.fixed_expense_templates = [];
+        hydrated.fixed_expense_templates = hydrated.fixed_expense_templates.map(tpl => ({
+            id: tpl.id || createGuid(),
+            name: tpl.name || '',
+            amount: parseFloat(tpl.amount) || 0,
+            category: tpl.category || '',
+            frequency: tpl.frequency || 'Mensual',
+            reference_day: Math.min(31, Math.max(1, parseInt(tpl.reference_day, 10) || 1)),
+            applied_periods: Array.isArray(tpl.applied_periods) ? tpl.applied_periods : []
+        }));
 
         if (!Array.isArray(hydrated.credit_cards)) {
             hydrated.credit_cards = [];
@@ -881,6 +934,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderIncomesTable();
         renderExpensesTable();
         renderBudgetsTable();
+        renderFixedExpenseTemplates();
+        resetFixedExpenseTemplateForm();
         renderBabySteps();
         renderReminders();
         renderLogTab();
@@ -1473,7 +1528,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabId === 'grafico') {
             setPeriodicity(activeCashflowPeriodicity, 'chart');
         }
-        if (tabId === 'presupuestos') { setupBudgetPeriodSelectors(); renderBudgetsTable(); renderBudgetSummaryTableForSelectedPeriod(); }
+        if (tabId === 'presupuestos') { setupBudgetPeriodSelectors(); renderBudgetsTable(); renderFixedExpenseTemplates(); renderBudgetSummaryTableForSelectedPeriod(); }
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); setPaymentPeriodicity(activePaymentsPeriodicity); }
         if (tabId === 'ajustes') {
             populateSettingsForm();
@@ -2281,7 +2336,7 @@ document.addEventListener('DOMContentLoaded', () => {
     expenseMovementDateInput.addEventListener('change', updateExpensePaymentDate);
     expenseCreditCardSelect.addEventListener('change', updateExpensePaymentDate);
     function populateExpenseCategoriesDropdowns() {
-        const selects = [expenseCategorySelect, budgetCategorySelect];
+        const selects = [expenseCategorySelect, budgetCategorySelect, fixedExpenseCategorySelect];
         selects.forEach(select => {
             if (!select || !currentBackupData || !currentBackupData.expense_categories) {
                 if (select) select.innerHTML = '<option value="">No hay categorías</option>'; return;
@@ -2325,6 +2380,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirm(`¿Eliminar categoría "${categoryToRemove}" y su presupuesto asociado?`)) {
             delete currentBackupData.expense_categories[categoryToRemove];
             if (currentBackupData.budgets) delete currentBackupData.budgets[categoryToRemove];
+            if (currentBackupData.fixed_expense_templates) {
+                currentBackupData.fixed_expense_templates = currentBackupData.fixed_expense_templates.filter(tpl => tpl.category !== categoryToRemove);
+                renderFixedExpenseTemplates();
+                resetFixedExpenseTemplateForm();
+            }
             populateExpenseCategoriesDropdowns(); renderBudgetsTable();
             alert(`Categoría "${categoryToRemove}" eliminada.`);
         }
@@ -2937,6 +2997,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (budgetCategorySelect.options.length > 0) budgetCategorySelect.selectedIndex = 0;
         budgetAmountInput.value = '';
     }
+    function resetFixedExpenseTemplateForm() {
+        if (!fixedExpenseTemplateForm) return;
+        fixedExpenseTemplateForm.reset();
+        editingFixedExpenseId = null;
+        if (fixedExpenseFrequencySelect) fixedExpenseFrequencySelect.value = 'Mensual';
+        if (fixedExpenseDayInput) fixedExpenseDayInput.value = '1';
+        if (cancelEditFixedExpenseButton) cancelEditFixedExpenseButton.style.display = 'none';
+        if (saveFixedExpenseTemplateButton) saveFixedExpenseTemplateButton.textContent = 'Guardar gasto fijo';
+    }
     budgetForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const category = budgetCategorySelect.value;
@@ -2953,6 +3022,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedCategory = budgetCategorySelect.value;
         budgetAmountInput.value = (selectedCategory && currentBackupData && currentBackupData.budgets) ? (currentBackupData.budgets[selectedCategory] || '0') : '0';
     });
+    if (fixedExpenseTemplateForm) {
+        fixedExpenseTemplateForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = (fixedExpenseNameInput.value || '').trim();
+            const amount = parseFloat(fixedExpenseAmountInput.value);
+            const category = fixedExpenseCategorySelect.value;
+            const frequency = fixedExpenseFrequencySelect.value;
+            const referenceDay = Math.min(31, Math.max(1, parseInt(fixedExpenseDayInput.value, 10) || 1));
+            if (!name) { alert('Ingresa un nombre para el gasto fijo.'); return; }
+            if (!isFirebaseKeySafe(name)) { alert(`El nombre \"${name}\" contiene caracteres no permitidos.`); return; }
+            if (!category) { alert('Selecciona una categoría.'); return; }
+            if (!isFirebaseKeySafe(category)) { alert(`Categoría \"${category}\" con nombre no permitido.`); return; }
+            if (isNaN(amount) || amount < 0) { alert('Ingresa un monto válido.'); return; }
+            const template = {
+                id: editingFixedExpenseId || createGuid(),
+                name,
+                amount,
+                category,
+                frequency,
+                reference_day: referenceDay,
+                applied_periods: editingFixedExpenseId ? (currentBackupData.fixed_expense_templates.find(t => t.id === editingFixedExpenseId)?.applied_periods || []) : []
+            };
+            if (!Array.isArray(currentBackupData.fixed_expense_templates)) currentBackupData.fixed_expense_templates = [];
+            const existingIndex = currentBackupData.fixed_expense_templates.findIndex(t => t.id === template.id);
+            if (existingIndex >= 0) currentBackupData.fixed_expense_templates[existingIndex] = template;
+            else currentBackupData.fixed_expense_templates.push(template);
+            resetFixedExpenseTemplateForm();
+            renderFixedExpenseTemplates();
+        });
+    }
+    if (cancelEditFixedExpenseButton) cancelEditFixedExpenseButton.addEventListener('click', resetFixedExpenseTemplateForm);
     function renderBudgetsTable() {
         if (!budgetsTableView || !currentBackupData || !currentBackupData.expense_categories) return;
         budgetsTableView.innerHTML = '';
@@ -2965,6 +3065,39 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = catType;
             row.insertCell().textContent = formatCurrencyJS(budgetAmount, currentBackupData.display_currency_symbol || '$');
             row.addEventListener('click', () => { budgetCategorySelect.value = catName; budgetAmountInput.value = budgetAmount; });
+        });
+    }
+    function renderFixedExpenseTemplates() {
+        if (!fixedExpenseTemplatesTable || !currentBackupData) return;
+        fixedExpenseTemplatesTable.innerHTML = '';
+        const templates = Array.isArray(currentBackupData.fixed_expense_templates) ? [...currentBackupData.fixed_expense_templates] : [];
+        if (!templates.length) {
+            const row = fixedExpenseTemplatesTable.insertRow();
+            const cell = row.insertCell();
+            cell.colSpan = 7; cell.textContent = 'Aún no hay gastos fijos guardados.'; cell.style.textAlign = 'center';
+            return;
+        }
+        templates.sort((a, b) => a.name.localeCompare(b.name));
+        templates.forEach(tpl => {
+            const row = fixedExpenseTemplatesTable.insertRow();
+            row.insertCell().textContent = tpl.name;
+            row.insertCell().textContent = formatCurrencyJS(tpl.amount || 0, currentBackupData.display_currency_symbol || '$');
+            row.insertCell().textContent = tpl.frequency;
+            row.insertCell().textContent = tpl.reference_day || 1;
+            row.insertCell().textContent = tpl.category || 'Sin categoría';
+            const lastApplied = (tpl.applied_periods && tpl.applied_periods.length) ? tpl.applied_periods[tpl.applied_periods.length - 1] : 'Nunca';
+            row.insertCell().textContent = lastApplied;
+            const actionsCell = row.insertCell();
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Editar';
+            editBtn.className = 'small-button';
+            editBtn.addEventListener('click', () => loadFixedExpenseTemplateForEdit(tpl.id));
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Eliminar';
+            deleteBtn.className = 'small-button danger';
+            deleteBtn.addEventListener('click', () => deleteFixedExpenseTemplate(tpl.id));
+            actionsCell.appendChild(editBtn);
+            actionsCell.appendChild(deleteBtn);
         });
     }
     function renderBudgetSummaryTable() {
@@ -3055,8 +3188,86 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBudgetSummaryTable();
     }
 
+    function loadFixedExpenseTemplateForEdit(templateId) {
+        const tpl = (currentBackupData.fixed_expense_templates || []).find(t => t.id === templateId);
+        if (!tpl) return;
+        fixedExpenseNameInput.value = tpl.name;
+        fixedExpenseAmountInput.value = tpl.amount;
+        fixedExpenseCategorySelect.value = tpl.category;
+        fixedExpenseFrequencySelect.value = tpl.frequency;
+        fixedExpenseDayInput.value = tpl.reference_day || 1;
+        editingFixedExpenseId = tpl.id;
+        saveFixedExpenseTemplateButton.textContent = 'Actualizar gasto fijo';
+        cancelEditFixedExpenseButton.style.display = 'inline-block';
+        document.getElementById('presupuestos').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function deleteFixedExpenseTemplate(templateId) {
+        const tpl = (currentBackupData.fixed_expense_templates || []).find(t => t.id === templateId);
+        if (!tpl) return;
+        if (!confirm(`¿Eliminar el gasto fijo "${tpl.name}"?`)) return;
+        currentBackupData.fixed_expense_templates = currentBackupData.fixed_expense_templates.filter(t => t.id !== templateId);
+        if (editingFixedExpenseId === templateId) resetFixedExpenseTemplateForm();
+        renderFixedExpenseTemplates();
+    }
+
+    function isSameMonthAndYear(dateObj, year, monthIndex) {
+        if (!(dateObj instanceof Date)) return false;
+        return dateObj.getUTCFullYear() === year && dateObj.getUTCMonth() === monthIndex;
+    }
+
+    function applyFixedExpensesToSelectedMonth() {
+        if (!currentBackupData || !Array.isArray(currentBackupData.fixed_expense_templates)) return;
+        const year = parseInt(budgetYearSelect.value);
+        const monthIndex = parseInt(budgetMonthSelect.value);
+        if (isNaN(year) || isNaN(monthIndex)) { alert('Selecciona un mes y año válidos.'); return; }
+        const periodKey = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+        let created = 0;
+        const skipped = [];
+        currentBackupData.fixed_expense_templates.forEach(tpl => {
+            if (tpl.applied_periods && tpl.applied_periods.includes(periodKey)) {
+                skipped.push(`${tpl.name} (ya aplicado)`);
+                return;
+            }
+            const existing = (currentBackupData.expenses || []).find(exp => exp.name === tpl.name && isSameMonthAndYear(exp.movement_date || exp.start_date, year, monthIndex));
+            if (existing) { skipped.push(`${tpl.name} (ya existe en Gastos)`); return; }
+            const movementDate = new Date(Date.UTC(year, monthIndex, tpl.reference_day || 1));
+            const expenseType = currentBackupData.expense_categories[tpl.category] || 'Fijo';
+            const entry = {
+                name: tpl.name,
+                amount: tpl.amount,
+                category: tpl.category,
+                type: expenseType,
+                frequency: tpl.frequency,
+                start_date: movementDate,
+                end_date: null,
+                is_real: true,
+                movement_date: movementDate,
+                payment_method: 'Efectivo / Debito',
+                credit_card: null,
+                installments: 1,
+                currency: 'USD'
+            };
+            if (!currentBackupData.expenses) currentBackupData.expenses = [];
+            currentBackupData.expenses.push(entry);
+            tpl.applied_periods = tpl.applied_periods || [];
+            tpl.applied_periods.push(periodKey);
+            created++;
+        });
+        renderExpensesTable();
+        renderCashflowTable();
+        renderFixedExpenseTemplates();
+        if (created === 0) {
+            alert(skipped.length ? `No se agregaron gastos fijos. Motivos: \n- ${skipped.join('\n- ')}` : 'No hay gastos fijos para agregar.');
+        } else {
+            const skippedMsg = skipped.length ? `\nOmitidos: \n- ${skipped.join('\n- ')}` : '';
+            alert(`Se agregaron ${created} gasto(s) fijo(s) al ${periodKey}.${skippedMsg}`);
+        }
+    }
+
     if (budgetPrevPeriodButton) budgetPrevPeriodButton.addEventListener('click', () => navigateBudgetPeriod(-1));
     if (budgetNextPeriodButton) budgetNextPeriodButton.addEventListener('click', () => navigateBudgetPeriod(1));
+    if (applyFixedExpensesButton) applyFixedExpensesButton.addEventListener('click', applyFixedExpensesToSelectedMonth);
 
     // --- LÓGICA PESTAÑA REGISTRO PAGOS ---
     function setupPaymentPeriodSelectors() {
