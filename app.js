@@ -303,6 +303,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let changeLogEntries = [];
     const FIREBASE_FORBIDDEN_KEY_CHARS = ['.', '$', '#', '[', ']', '/'];
     const FIREBASE_FORBIDDEN_CHARS_DISPLAY = FIREBASE_FORBIDDEN_KEY_CHARS.join(" ");
+    const FIREBASE_KEY_ESCAPE_MAP = {
+        '.': '\u2024', // one dot leader (visually similar to a period)
+        '$': '\uffe5', // fullwidth yen sign as a harmless lookalike
+        '#': '\uff03', // fullwidth number sign
+        '[': '\u3016', // left white lenticular bracket
+        ']': '\u3017', // right white lenticular bracket
+        '/': '\u2215'  // division slash
+    };
+    const FIREBASE_KEY_UNESCAPE_MAP = Object.fromEntries(
+        Object.entries(FIREBASE_KEY_ESCAPE_MAP).map(([k, v]) => [v, k])
+    );
+    const FIREBASE_KEY_ESCAPE_REGEX = /[.$#[\]\/]/g;
+    const FIREBASE_KEY_UNESCAPE_REGEX = new RegExp(`[${Object.values(FIREBASE_KEY_ESCAPE_MAP).join('')}]`, 'g');
 
     const BABY_STEPS_DATA_JS = [
         {
@@ -416,6 +429,109 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
         return !FIREBASE_FORBIDDEN_KEY_CHARS.some(char => text.includes(char));
+    }
+
+    function encodeFirebaseSafeText(text) {
+        if (typeof text !== 'string') return text;
+        return text.replace(FIREBASE_KEY_ESCAPE_REGEX, ch => FIREBASE_KEY_ESCAPE_MAP[ch] || ch);
+    }
+
+    function decodeFirebaseSafeText(text) {
+        if (typeof text !== 'string') return text;
+        return text.replace(FIREBASE_KEY_UNESCAPE_REGEX, ch => FIREBASE_KEY_UNESCAPE_MAP[ch] || ch);
+    }
+
+    function encodeObjectKeysForFirebase(obj, sanitizedSet) {
+        if (!obj || typeof obj !== 'object') return obj;
+        const result = {};
+        Object.entries(obj).forEach(([key, value]) => {
+            const safeKey = encodeFirebaseSafeText(key);
+            if (safeKey !== key && sanitizedSet) {
+                sanitizedSet.add(key);
+            }
+            result[safeKey] = value;
+        });
+        return result;
+    }
+
+    function decodeObjectKeysFromFirebase(obj) {
+        if (!obj || typeof obj !== 'object') return obj;
+        const result = {};
+        Object.entries(obj).forEach(([key, value]) => {
+            const decodedKey = decodeFirebaseSafeText(key);
+            result[decodedKey] = value;
+        });
+        return result;
+    }
+
+    function encodeBackupDataForFirebase(data) {
+        const sanitizedFields = new Set();
+        const encoded = JSON.parse(JSON.stringify(data));
+
+        encoded.incomes = (encoded.incomes || []).map(inc => {
+            const copy = { ...inc };
+            if (copy.name) {
+                const safe = encodeFirebaseSafeText(copy.name);
+                if (safe !== copy.name) sanitizedFields.add(copy.name);
+                copy.name = safe;
+            }
+            if (copy.reimbursement_category) {
+                const safe = encodeFirebaseSafeText(copy.reimbursement_category);
+                if (safe !== copy.reimbursement_category) sanitizedFields.add(copy.reimbursement_category);
+                copy.reimbursement_category = safe;
+            }
+            return copy;
+        });
+
+        encoded.expense_categories = encodeObjectKeysForFirebase(encoded.expense_categories || {}, sanitizedFields);
+
+        encoded.budgets = encodeObjectKeysForFirebase(encoded.budgets || {}, sanitizedFields);
+
+        encoded.expenses = (encoded.expenses || []).map(exp => {
+            const copy = { ...exp };
+            if (copy.name) {
+                const safe = encodeFirebaseSafeText(copy.name);
+                if (safe !== copy.name) sanitizedFields.add(copy.name);
+                copy.name = safe;
+            }
+            if (copy.category) {
+                const safe = encodeFirebaseSafeText(copy.category);
+                if (safe !== copy.category) sanitizedFields.add(copy.category);
+                copy.category = safe;
+            }
+            return copy;
+        });
+
+        if (encoded.payments && typeof encoded.payments === 'object') {
+            encoded.payments = encodeObjectKeysForFirebase(encoded.payments, sanitizedFields);
+        }
+
+        return { encoded, sanitizedFields: Array.from(sanitizedFields) };
+    }
+
+    function decodeBackupDataFromFirebase(data) {
+        if (!data || typeof data !== 'object') return data;
+        const decoded = JSON.parse(JSON.stringify(data));
+
+        decoded.expense_categories = decodeObjectKeysFromFirebase(decoded.expense_categories || {});
+        decoded.budgets = decodeObjectKeysFromFirebase(decoded.budgets || {});
+        decoded.payments = decodeObjectKeysFromFirebase(decoded.payments || {});
+
+        decoded.incomes = (decoded.incomes || []).map(inc => {
+            const copy = { ...inc };
+            if (copy.name) copy.name = decodeFirebaseSafeText(copy.name);
+            if (copy.reimbursement_category) copy.reimbursement_category = decodeFirebaseSafeText(copy.reimbursement_category);
+            return copy;
+        });
+
+        decoded.expenses = (decoded.expenses || []).map(exp => {
+            const copy = { ...exp };
+            if (copy.name) copy.name = decodeFirebaseSafeText(copy.name);
+            if (copy.category) copy.category = decodeFirebaseSafeText(copy.category);
+            return copy;
+        });
+
+        return decoded;
     }
 
     // --- LÓGICA DE UI ---
@@ -671,8 +787,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!rawData || typeof rawData !== 'object') {
             return null;
         }
-
-        const hydrated = JSON.parse(JSON.stringify(rawData));
+        const decodedData = decodeBackupDataFromFirebase(rawData);
+        const hydrated = JSON.parse(JSON.stringify(decodedData));
 
         if (!Array.isArray(hydrated.incomes)) hydrated.incomes = [];
         hydrated.incomes.forEach(inc => {
@@ -1175,50 +1291,37 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Error: No se pudo obtener la referencia de datos del usuario para guardar.");
             return;
         }
+        const firebaseSanitizedTargets = [];
 
-        let dataIsValidForSaving = true;
-        const validationIssues = [];
-
-        (currentBackupData.incomes || []).forEach((inc, index) => {
+        (currentBackupData.incomes || []).forEach((inc) => {
             if (!isFirebaseKeySafe(inc.name)) {
-                validationIssues.push(`Ingreso #${index + 1} ("${inc.name || 'Sin Nombre'}") tiene un nombre con caracteres no permitidos.`);
-                dataIsValidForSaving = false;
+                firebaseSanitizedTargets.push(`Ingreso: ${inc.name || 'Sin Nombre'}`);
             }
-            if (inc.is_reimbursement && (!inc.reimbursement_category || !isFirebaseKeySafe(inc.reimbursement_category))) {
-                validationIssues.push(`Ingreso de reembolso "${inc.name || 'Sin Nombre'}" no tiene una categoría de gasto válida seleccionada o la categoría tiene caracteres no permitidos.`);
-                dataIsValidForSaving = false;
+            if (inc.is_reimbursement && inc.reimbursement_category && !isFirebaseKeySafe(inc.reimbursement_category)) {
+                firebaseSanitizedTargets.push(`Categoría de reembolso: ${inc.reimbursement_category}`);
             }
         });
-        (currentBackupData.expenses || []).forEach((exp, index) => {
+        (currentBackupData.expenses || []).forEach((exp) => {
             if (!isFirebaseKeySafe(exp.name)) {
-                validationIssues.push(`Gasto #${index + 1} ("${exp.name || 'Sin Nombre'}") tiene un nombre con caracteres no permitidos.`);
-                dataIsValidForSaving = false;
+                firebaseSanitizedTargets.push(`Gasto: ${exp.name || 'Sin Nombre'}`);
             }
             if (exp.category && !isFirebaseKeySafe(exp.category)) {
-                validationIssues.push(`Gasto "${exp.name || 'Sin Nombre'}" usa una categoría con nombre no permitido: "${exp.category}".`);
-                dataIsValidForSaving = false;
+                firebaseSanitizedTargets.push(`Categoría de gasto: ${exp.category}`);
             }
         });
         if (currentBackupData.expense_categories) {
             for (const categoryName in currentBackupData.expense_categories) {
                 if (!isFirebaseKeySafe(categoryName)) {
-                    validationIssues.push(`La categoría de gasto "${categoryName}" tiene un nombre con caracteres no permitidos.`);
-                    dataIsValidForSaving = false;
+                    firebaseSanitizedTargets.push(`Categoría registrada: ${categoryName}`);
                 }
             }
         }
         if (currentBackupData.budgets) {
             for (const categoryName in currentBackupData.budgets) {
                 if (!isFirebaseKeySafe(categoryName)) {
-                    validationIssues.push(`El presupuesto para la categoría "${categoryName}" tiene un nombre con caracteres no permitidos.`);
-                    dataIsValidForSaving = false;
+                    firebaseSanitizedTargets.push(`Presupuesto: ${categoryName}`);
                 }
             }
-        }
-        if (!dataIsValidForSaving) {
-            alert("No se pueden guardar los cambios debido a los siguientes problemas:\n- " + validationIssues.join("\n- ") +
-                `\n\nLos caracteres no permitidos son: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}. Por favor, corrige estos elementos.`);
-            return;
         }
 
         const dataToSave = JSON.parse(JSON.stringify(currentBackupData));
@@ -1288,6 +1391,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         dataToSave.payments = formattedPayments;
 
+        const { encoded: firebaseSafeData, sanitizedFields } = encodeBackupDataForFirebase(dataToSave);
+        const allSanitized = [...new Set([...firebaseSanitizedTargets, ...sanitizedFields])];
+        if (allSanitized.length) {
+            console.info(`Se codificaron para compatibilidad con Firebase: ${allSanitized.join(', ')}`);
+        }
+
         const detailedChanges = generateDetailedChangeLog(originalLoadedData, currentBackupData);
 
         const now = new Date();
@@ -1317,29 +1426,20 @@ document.addEventListener('DOMContentLoaded', () => {
             changeLogEntries = [];
         }
         changeLogEntries.unshift(logEntry);
-        dataToSave.change_log = changeLogEntries;
+        firebaseSafeData.change_log = changeLogEntries;
 
         loadingMessage.textContent = "Guardando cambios como nueva versión...";
         showElement(loadingMessage);
 
         // MODIFICADO: Apunta a `users/${userSubPath}/backups/${newBackupKey}`
-        userRef.child(`backups/${newBackupKey}`).set(dataToSave)
+        userRef.child(`backups/${newBackupKey}`).set(firebaseSafeData)
             .then(() => {
                 hideElement(loadingMessage);
                 alert(`Cambios guardados exitosamente como nueva versión: ${formatBackupKey(newBackupKey)}`);
 
                 currentBackupKey = newBackupKey;
-                currentBackupData = JSON.parse(JSON.stringify(dataToSave));
-
-                currentBackupData.analysis_start_date = toUTCDate(currentBackupData.analysis_start_date);
-                (currentBackupData.incomes || []).forEach(inc => {
-                    if (inc.start_date) inc.start_date = toUTCDate(inc.start_date);
-                    if (inc.end_date) inc.end_date = toUTCDate(inc.end_date);
-                });
-                (currentBackupData.expenses || []).forEach(exp => {
-                    if (exp.start_date) exp.start_date = toUTCDate(exp.start_date);
-                    if (exp.end_date) exp.end_date = toUTCDate(exp.end_date);
-                });
+                const decodedSavedData = decodeBackupDataFromFirebase(firebaseSafeData);
+                currentBackupData = hydrateBackupData(decodedSavedData);
                 originalLoadedData = JSON.parse(JSON.stringify(currentBackupData));
 
                 fetchBackups();
