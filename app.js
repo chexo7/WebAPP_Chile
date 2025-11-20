@@ -2563,15 +2563,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const parsed = parseAmountString(trimmed);
         return isNaN(parsed) ? null : parsed;
     }
+    function normalizeExpenseNameForComparison(rawName) {
+        if (typeof rawName !== 'string') return '';
+        return decodeFirebaseSafeText(rawName).trim();
+    }
+
     function checkExpenseDuplicate(name, dateStr, amount) {
+        const normalizedName = normalizeExpenseNameForComparison(name);
         return (currentBackupData.expenses || []).some(exp => {
             const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
             const existingAmount = exp.amount === undefined || exp.amount === null ? null : parseFloat(exp.amount);
             const incomingAmount = amount === undefined || amount === null ? null : parseFloat(amount);
+            const expName = normalizeExpenseNameForComparison(exp.name);
             if (incomingAmount === null || isNaN(incomingAmount)) {
-                return expDate === dateStr && exp.name === name && (existingAmount === null || isNaN(existingAmount));
+                return expDate === dateStr && expName === normalizedName && (existingAmount === null || isNaN(existingAmount));
             }
-            return expDate === dateStr && exp.name === name && parseFloat(existingAmount) === incomingAmount;
+            return expDate === dateStr && expName === normalizedName && parseFloat(existingAmount) === incomingAmount;
         });
     }
     function createCategorySelect() {
