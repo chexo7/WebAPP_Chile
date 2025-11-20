@@ -79,6 +79,47 @@ function advancePeriodStart(date, periodicity) {
 }
 function getISODateString(date) { if (!(date instanceof Date) || isNaN(date.getTime())) return ''; return date.getUTCFullYear() + '-' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date.getUTCDate()).slice(-2); }
 
+const FIREBASE_CHAR_SAFE_MAP = {
+    '.': '．',
+    '$': '﹩',
+    '#': '＃',
+    '[': '［',
+    ']': '］',
+    '/': '／',
+};
+const FIREBASE_CHAR_REVERSE_MAP = Object.fromEntries(Object.entries(FIREBASE_CHAR_SAFE_MAP).map(([bad, good]) => [good, bad]));
+
+function encodeFirebaseSafeText(text) {
+    if (typeof text !== 'string') return text;
+    return Array.from(text).map(ch => FIREBASE_CHAR_SAFE_MAP[ch] || ch).join('');
+}
+
+function decodeFirebaseSafeText(text) {
+    if (typeof text !== 'string') return text;
+    return Array.from(text).map(ch => FIREBASE_CHAR_REVERSE_MAP[ch] || ch).join('');
+}
+
+function normalizeFirebaseKeyText(text) {
+    if (text === null || text === undefined) return '';
+    return encodeFirebaseSafeText(String(text).trim());
+}
+
+let currentBackupData = { expenses: [] };
+
+function checkExpenseDuplicate(name, dateStr, amount) {
+    const normalizedIncomingName = normalizeFirebaseKeyText(name);
+    return (currentBackupData.expenses || []).some(exp => {
+        const expDate = getISODateString(new Date(exp.movement_date || exp.start_date));
+        const existingAmount = exp.amount === undefined || exp.amount === null ? null : parseFloat(exp.amount);
+        const incomingAmount = amount === undefined || amount === null ? null : parseFloat(amount);
+        const normalizedExistingName = normalizeFirebaseKeyText(exp.name);
+        if (incomingAmount === null || isNaN(incomingAmount)) {
+            return expDate === dateStr && normalizedExistingName === normalizedIncomingName && (existingAmount === null || isNaN(existingAmount));
+        }
+        return expDate === dateStr && normalizedExistingName === normalizedIncomingName && parseFloat(existingAmount) === incomingAmount;
+    });
+}
+
 // getWeekNumber and getMondayOfWeek are crucial for weekly periodicity.
 function getWeekNumber(d) { 
     const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); 
@@ -1174,6 +1215,22 @@ runTest("NET_INCOME breakdown excludes reimbursements", () => {
     const filtered = rows.filter(r => r.type === 'Ingreso');
     assertEquals(1, filtered.length, "Filtered only one income");
     assertEquals("Salary", filtered[0].name, "Filtered income is Salary");
+});
+
+runTest("encodeFirebaseSafeText is reversible", () => {
+    const original = "ACME/Store#[01].";
+    const encoded = encodeFirebaseSafeText(original);
+    assertTrue(encoded.includes('／') && encoded.includes('＃'), "Encoded contains safe chars");
+    const decoded = decodeFirebaseSafeText(encoded);
+    assertEquals(original, decoded, "Decoding restores original text");
+});
+
+runTest("checkExpenseDuplicate normalizes forbidden chars", () => {
+    currentBackupData.expenses = [{ name: encodeFirebaseSafeText("ACME/Store#1"), amount: 27.35, movement_date: '2025-11-20' }];
+    const isDup = checkExpenseDuplicate("ACME/Store#1", '2025-11-20', 27.35);
+    assertTrue(isDup, "Duplicate detected despite forbidden chars");
+    const notDup = checkExpenseDuplicate("ACME/Store#1", '2025-11-21', 27.35);
+    assertTrue(!notDup, "Different date is not duplicate");
 });
 
 runTest("getExpenseOccurrenceDatesInPeriod - Monthly", () => {
