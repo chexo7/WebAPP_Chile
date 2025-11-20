@@ -404,24 +404,80 @@
             </div>
 
             <div id="grafico" class="tab-content">
-                <div class="subtabs-container" id="chart-subtabs">
-                    <button class="subtab-button active" data-parent="chart" data-period="Mensual">Mensual</button>
-                    <button class="subtab-button" data-parent="chart" data-period="Semanal">Semanal</button>
-                    <button class="subtab-button" data-parent="chart" data-period="Diario">Diario</button>
+                <div class="chart-section">
+                    <div class="subtabs-container" id="chart-subtabs">
+                        <button class="subtab-button active" data-parent="chart" data-period="Mensual">Mensual</button>
+                        <button class="subtab-button" data-parent="chart" data-period="Semanal">Semanal</button>
+                        <button class="subtab-button" data-parent="chart" data-period="Diario">Diario</button>
+                    </div>
+                    <div class="chart-header">
+                        <div>
+                            <p class="eyebrow">Análisis visual</p>
+                            <h2 id="grafico-title">Gráfico de Flujo de Caja</h2>
+                            <p class="chart-subtitle">Comparativo de saldo, ingresos, gastos y flujo neto con controles rápidos de visualización.</p>
+                        </div>
+                        <div class="chart-actions">
+                            <button id="reset-chart-zoom-button" class="ghost">Restablecer zoom</button>
+                            <button id="export-chart-button" class="accent">Exportar imagen</button>
+                        </div>
+                    </div>
+                    <div class="chart-kpi-grid">
+                        <div class="kpi-card">
+                            <p>Saldo final proyectado</p>
+                            <strong id="chart-kpi-balance">—</strong>
+                            <span id="chart-kpi-period" class="kpi-meta">—</span>
+                        </div>
+                        <div class="kpi-card">
+                            <p>Flujo neto promedio</p>
+                            <strong id="chart-kpi-avg-net">—</strong>
+                            <span id="chart-kpi-avg-net-detail" class="kpi-meta">—</span>
+                        </div>
+                        <div class="kpi-card">
+                            <p>Pico de gasto</p>
+                            <strong id="chart-kpi-max-expense">—</strong>
+                            <span id="chart-kpi-max-expense-period" class="kpi-meta">—</span>
+                        </div>
+                        <div class="kpi-card">
+                            <p>Meses de cobertura</p>
+                            <strong id="chart-kpi-coverage">—</strong>
+                            <span class="kpi-meta">Saldo / gasto promedio</span>
+                        </div>
+                    </div>
+                    <div class="chart-control-panel">
+                        <div>
+                            <p class="control-title">Capas visibles</p>
+                            <div class="chart-toggle-group">
+                                <label><input type="checkbox" class="chart-dataset-toggle" data-target="Saldo Final Estimado" checked> Saldo</label>
+                                <label><input type="checkbox" class="chart-dataset-toggle" data-target="Ingreso Total Neto" checked> Ingresos</label>
+                                <label><input type="checkbox" class="chart-dataset-toggle" data-target="Gasto Total" checked> Gastos</label>
+                                <label><input type="checkbox" class="chart-dataset-toggle" data-target="Flujo Neto del Período" checked> Flujo neto</label>
+                            </div>
+                        </div>
+                        <div class="chart-line-style">
+                            <p class="control-title">Perfil de línea</p>
+                            <select id="chart-line-style">
+                                <option value="smooth" selected>Suavizado</option>
+                                <option value="linear">Lineal</option>
+                                <option value="stepped">Escalonado</option>
+                            </select>
+                        </div>
+                        <div class="chart-range-group">
+                            <p class="control-title">Rango a mostrar</p>
+                            <div class="chart-range-inputs">
+                                <label for="mobile-chart-start">Desde:</label>
+                                <input type="date" id="mobile-chart-start">
+                                <label for="mobile-chart-end">Hasta:</label>
+                                <input type="date" id="mobile-chart-end">
+                                <button id="apply-mobile-chart-range">Aplicar</button>
+                            </div>
+                            <p class="chart-range-hint">El rango se adapta a la periodicidad seleccionada.</p>
+                        </div>
+                    </div>
+                    <div class="chart-container wide">
+                        <canvas id="cashflow-chart"></canvas>
+                    </div>
+                    <p id="chart-message" class="centered-text">Doble clic en el gráfico para activar el zoom.</p>
                 </div>
-                <h2 id="grafico-title">Gráfico de Flujo de Caja</h2>
-                <div class="chart-container">
-                    <canvas id="cashflow-chart"></canvas>
-                </div>
-                <div id="mobile-chart-range" class="mobile-chart-range" style="display:none;">
-                    <label for="mobile-chart-start">Desde:</label>
-                    <input type="date" id="mobile-chart-start">
-                    <label for="mobile-chart-end">Hasta:</label>
-                    <input type="date" id="mobile-chart-end">
-                    <button id="apply-mobile-chart-range">Aplicar</button>
-                </div>
-                <p id="chart-message" class="centered-text">Doble clic en el gráfico para activar el zoom.</p>
-
                 <div id="pie-month-container">
                     <h3>Distribución de Gastos por Categoría - Mensual</h3>
                     <div class="chart-period-selector multi-input">
