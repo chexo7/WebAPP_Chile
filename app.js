@@ -3049,10 +3049,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderBudgetSummaryTableForSelectedPeriod() {
+        if (!budgetYearSelect || !budgetMonthSelect) return;
         const year = parseInt(budgetYearSelect.value);
         const monthIndex = parseInt(budgetMonthSelect.value);
+        if (isNaN(year) || isNaN(monthIndex)) return;
         currentBudgetViewDate = new Date(Date.UTC(year, monthIndex, 1));
         renderBudgetSummaryTable();
+    }
+
+    function refreshBudgetSummaryIfReady() {
+        if (!budgetSummaryTableBody) return;
+        if (!budgetYearSelect || !budgetMonthSelect) return;
+        if (!currentBackupData || !currentBackupData.expense_categories) return;
+        renderBudgetSummaryTableForSelectedPeriod();
     }
 
     if (budgetPrevPeriodButton) budgetPrevPeriodButton.addEventListener('click', () => navigateBudgetPeriod(-1));
@@ -3172,6 +3181,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await renderCashflowTableFor('Mensual', cashflowMensualTableHead, cashflowMensualTableBody, cashflowMensualTitle);
             await renderCashflowTableFor('Semanal', cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle);
             await renderCashflowTableFor('Diario', cashflowDiarioTableHead, cashflowDiarioTableBody, cashflowDiarioTitle);
+            refreshBudgetSummaryIfReady();
         } catch (error) {
             console.error('Error al renderizar el flujo de caja:', error);
         }
