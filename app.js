@@ -303,6 +303,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let changeLogEntries = [];
     const FIREBASE_FORBIDDEN_KEY_CHARS = ['.', '$', '#', '[', ']', '/'];
     const FIREBASE_FORBIDDEN_CHARS_DISPLAY = FIREBASE_FORBIDDEN_KEY_CHARS.join(" ");
+    const FIREBASE_CHAR_SAFE_MAP = {
+        '.': '．', // fullwidth dot
+        '$': '﹩', // small dollar sign
+        '#': '＃', // fullwidth hash
+        '[': '［', // fullwidth left bracket
+        ']': '］', // fullwidth right bracket
+        '/': '／', // fullwidth slash
+    };
+    const FIREBASE_CHAR_REVERSE_MAP = Object.fromEntries(Object.entries(FIREBASE_CHAR_SAFE_MAP).map(([bad, good]) => [good, bad]));
 
     const BABY_STEPS_DATA_JS = [
         {
@@ -416,6 +425,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
         return !FIREBASE_FORBIDDEN_KEY_CHARS.some(char => text.includes(char));
+    }
+
+    function encodeFirebaseSafeText(text) {
+        if (typeof text !== 'string') return text;
+        return Array.from(text).map(ch => FIREBASE_CHAR_SAFE_MAP[ch] || ch).join('');
+    }
+
+    function decodeFirebaseSafeText(text) {
+        if (typeof text !== 'string') return text;
+        return Array.from(text).map(ch => FIREBASE_CHAR_REVERSE_MAP[ch] || ch).join('');
+    }
+
+    function normalizeFirebaseKeyText(text) {
+        if (text === null || text === undefined) return '';
+        return encodeFirebaseSafeText(String(text).trim());
     }
 
     // --- LÓGICA DE UI ---
@@ -2464,14 +2488,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return isNaN(parsed) ? null : parsed;
     }
     function checkExpenseDuplicate(name, dateStr, amount) {
+        const normalizedIncomingName = normalizeFirebaseKeyText(name);
         return (currentBackupData.expenses || []).some(exp => {
             const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
             const existingAmount = exp.amount === undefined || exp.amount === null ? null : parseFloat(exp.amount);
             const incomingAmount = amount === undefined || amount === null ? null : parseFloat(amount);
+            const normalizedExistingName = normalizeFirebaseKeyText(exp.name);
             if (incomingAmount === null || isNaN(incomingAmount)) {
-                return expDate === dateStr && exp.name === name && (existingAmount === null || isNaN(existingAmount));
+                return expDate === dateStr && normalizedExistingName === normalizedIncomingName && (existingAmount === null || isNaN(existingAmount));
             }
-            return expDate === dateStr && exp.name === name && parseFloat(existingAmount) === incomingAmount;
+            return expDate === dateStr && normalizedExistingName === normalizedIncomingName && parseFloat(existingAmount) === incomingAmount;
         });
     }
     function createCategorySelect() {
@@ -2613,7 +2639,8 @@ document.addEventListener('DOMContentLoaded', () => {
         lastImportedJsonRange = (fromDate || toDate) ? { from: fromDate, to: toDate } : null;
         const buildExpenseFromPosted = (tx) => {
             if (!tx) return null;
-            const description = (tx.Description || tx.description || '').trim();
+            const originalDescription = (tx.Description || tx.description || '').trim();
+            const description = normalizeFirebaseKeyText(originalDescription);
             const dateVal = tx.Date || tx.date;
             const dateObj = parseBankJsonDate(dateVal) || toUTCDate(dateVal, null);
             if (!description || !dateObj) return null;
@@ -2628,6 +2655,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `tx-${Date.now()}-${Math.random().toString(16).slice(2)}`,
                 date: dateObj,
                 description,
+                originalDescription,
                 amount,
                 currency: 'USD',
                 sourceType: tx.Type || tx.type || 'POSTED',
@@ -2673,7 +2701,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = document.createElement('tr');
             if (isDup) row.classList.add('duplicate-row');
             row.insertCell().textContent = dateStr;
-            row.insertCell().textContent = item.description;
+            row.insertCell().textContent = item.originalDescription || item.description;
             const amountCell = row.insertCell();
             amountCell.textContent = item.amount === null ? 'Pendiente sin monto' : formatAmountWithCurrency(item.amount, item.currency || 'USD');
             const catCell = row.insertCell();
@@ -2751,6 +2779,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 bank_transaction_id: item.id,
                 bank_raw: item.raw
             };
+            expense.bank_original_description = item.originalDescription || item.description;
             currentBackupData.expenses.push(expense);
             added++;
         });
