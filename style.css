@@ -219,6 +219,14 @@ button.accent {
 button.accent:hover {
     background-color: var(--accent-hover);
 }
+button.secondary {
+    background-color: #eef2f7;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+button.secondary:hover {
+    background-color: #dfe6f3;
+}
 button.small-button {
     padding: 5px 10px;
     font-size: 0.85rem;
@@ -851,6 +859,121 @@ td.reimbursement-income {
     width: 100%;
     max-width: 600px;
     margin: 0 auto;
+}
+
+.chart-enhancements {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 15px;
+    align-items: start;
+}
+
+.chart-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.summary-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 12px;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+    min-height: 90px;
+}
+
+.summary-card:hover {
+    transform: translateY(-2px);
+}
+
+.summary-label {
+    font-size: 0.9rem;
+    color: var(--light-text);
+    margin-bottom: 6px;
+}
+
+.summary-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+.summary-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.trend-chip {
+    background: #e8f0fe;
+    color: var(--primary-color);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.trend-chip.positive { background: #e8f7ed; color: var(--accent-color); }
+.trend-chip.negative { background: #fdeceb; color: var(--danger-color); }
+
+.accent-card { border-left: 4px solid var(--accent-color); }
+.danger-card { border-left: 4px solid var(--danger-color); }
+.warning-card { border-left: 4px solid var(--text-orange); }
+.balance-card { border-left: 4px solid var(--primary-color); }
+.span-2 { grid-column: span 2; }
+
+.chart-controls {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 12px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.control-group { border-top: 1px dashed var(--border-color); padding-top: 10px; }
+.control-group:first-child { border-top: none; padding-top: 0; }
+
+.control-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text-color);
+}
+
+.control-helper {
+    color: var(--light-text);
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+}
+
+.toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 8px;
+}
+
+.toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    color: var(--text-color);
+}
+
+.toggle-row input { width: auto; }
+
+.summary-card.danger-card .summary-value { color: var(--danger-color); }
+.summary-card.accent-card .summary-value { color: var(--accent-color); }
+.summary-card.warning-card .summary-value { color: var(--text-orange); }
+.summary-card.balance-card .summary-value { color: var(--primary-color); }
+
+@media (max-width: 900px) {
+    .chart-enhancements { grid-template-columns: 1fr; }
+    .span-2 { grid-column: span 1; }
 }
 
 #cashflow-chart {

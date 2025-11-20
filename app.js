@@ -223,6 +223,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const applyMobileChartRangeButton = document.getElementById('apply-mobile-chart-range');
     const chartSubtabs = document.getElementById('chart-subtabs');
     const graficoTitle = document.getElementById('grafico-title');
+    const chartIncomeTotal = document.getElementById('chart-income-total');
+    const chartExpenseTotal = document.getElementById('chart-expense-total');
+    const chartNetTotal = document.getElementById('chart-net-total');
+    const chartEndBalance = document.getElementById('chart-end-balance');
+    const chartTopExpensePeriod = document.getElementById('chart-top-expense-period');
+    const chartTrendChip = document.getElementById('chart-trend-chip');
+    const resetChartZoomButton = document.getElementById('reset-chart-zoom');
+    const chartDatasetToggles = {
+        balance: document.getElementById('toggle-dataset-balance'),
+        income: document.getElementById('toggle-dataset-income'),
+        expense: document.getElementById('toggle-dataset-expense'),
+        net: document.getElementById('toggle-dataset-net')
+    };
     const pieMonthInputs = [
         document.getElementById('pie-month-input-1'),
         document.getElementById('pie-month-input-2'),
@@ -3390,6 +3403,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- LÓGICA PESTAÑA GRÁFICO ---
+    function formatChartSummary(value) {
+        return formatCurrencyJS(value || 0, (currentBackupData && currentBackupData.display_currency_symbol) || '$');
+    }
+
+    function updateChartInsights(labels = [], incomes = [], totalExpenses = [], netFlows = [], endBalances = []) {
+        if (!chartIncomeTotal || !chartExpenseTotal || !chartNetTotal || !chartEndBalance || !chartTopExpensePeriod) return;
+        const parsedIncomes = incomes.map(v => parseFloat(v) || 0);
+        const parsedExpenses = totalExpenses.map(v => parseFloat(v) || 0);
+        const parsedNet = netFlows.map(v => parseFloat(v) || 0);
+        const parsedBalance = endBalances.map(v => parseFloat(v) || 0);
+
+        const totalIncome = parsedIncomes.reduce((a, b) => a + b, 0);
+        const totalExpense = parsedExpenses.reduce((a, b) => a + b, 0);
+        const netTotal = parsedNet.reduce((a, b) => a + b, 0);
+        const lastBalance = parsedBalance.length ? parsedBalance[parsedBalance.length - 1] : 0;
+
+        chartIncomeTotal.textContent = formatChartSummary(totalIncome);
+        chartExpenseTotal.textContent = formatChartSummary(totalExpense);
+        chartNetTotal.textContent = formatChartSummary(netTotal);
+        chartEndBalance.textContent = formatChartSummary(lastBalance);
+
+        if (chartTrendChip) {
+            const positive = netTotal >= 0;
+            chartTrendChip.textContent = positive ? 'Tendencia positiva' : 'Tendencia negativa';
+            chartTrendChip.classList.toggle('positive', positive);
+            chartTrendChip.classList.toggle('negative', !positive);
+        }
+
+        const maxExpense = parsedExpenses.length ? Math.max(...parsedExpenses) : null;
+        if (maxExpense !== null && isFinite(maxExpense) && maxExpense > 0) {
+            const idx = parsedExpenses.indexOf(maxExpense);
+            chartTopExpensePeriod.textContent = `${labels[idx] || 'Periodo'} · ${formatChartSummary(maxExpense)}`;
+        } else {
+            chartTopExpensePeriod.textContent = 'Sin datos disponibles';
+        }
+    }
+
+    function applyChartDatasetVisibility() {
+        if (!cashflowChartInstance) return;
+        cashflowChartInstance.data.datasets.forEach(ds => {
+            if (!ds.datasetKey) return;
+            const toggleEl = chartDatasetToggles[ds.datasetKey];
+            if (toggleEl) {
+                ds.hidden = !toggleEl.checked;
+            }
+        });
+        cashflowChartInstance.update();
+    }
+
+    function bindChartDatasetToggles() {
+        Object.values(chartDatasetToggles).forEach(toggleEl => {
+            if (!toggleEl) return;
+            toggleEl.addEventListener('change', applyChartDatasetVisibility);
+        });
+    }
+
     function renderCashflowChart(periodDates, incomes, totalExpenses, netFlows, endBalances, storeData = true) {
         if (storeData) {
             fullChartData = { periodDates, incomes, totalExpenses, netFlows, endBalances };
@@ -3411,6 +3480,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
         });
+        updateChartInsights(labels, incomes, totalExpenses, netFlows, endBalances);
         const currentPeriodIndex = findCurrentPeriodIndex(periodDates, activeCashflowPeriodicity);
         const xScaleOptions = { type: 'category' };
         if (currentPeriodIndex !== -1) {
@@ -3458,7 +3528,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }] : [];
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
             type: 'line',
-            data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
+            data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', datasetKey: 'balance', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', datasetKey: 'income', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', datasetKey: 'expense', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', datasetKey: 'net', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -3524,6 +3594,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             cashflowChartInstance.update();
         }
+        applyChartDatasetVisibility();
         cashflowChartCanvas.onclick = async (evt) => {
             if (!cashflowChartInstance) return;
             const points = cashflowChartInstance.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
@@ -4338,6 +4409,16 @@ function getMondayOfWeek(year, week) {
 
     pieMonthInputs.forEach(inp => inp && inp.addEventListener('change', updatePieMonthCharts));
     pieWeekInputs.forEach(inp => inp && inp.addEventListener('change', updatePieWeekCharts));
+
+    bindChartDatasetToggles();
+    if (resetChartZoomButton) {
+        resetChartZoomButton.addEventListener('click', () => {
+            disableChartZoom();
+            if (fullChartData) {
+                renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
+            }
+        });
+    }
 
     updatePieMonthCharts();
     updatePieWeekCharts();
