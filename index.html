@@ -410,6 +410,61 @@
                     <button class="subtab-button" data-parent="chart" data-period="Diario">Diario</button>
                 </div>
                 <h2 id="grafico-title">Gráfico de Flujo de Caja</h2>
+                <div class="chart-enhancements">
+                    <div class="chart-summary-grid">
+                        <div class="summary-card accent-card">
+                            <p class="summary-label">Ingreso Total</p>
+                            <p class="summary-value" id="chart-income-total">-</p>
+                        </div>
+                        <div class="summary-card danger-card">
+                            <p class="summary-label">Gasto Total</p>
+                            <p class="summary-value" id="chart-expense-total">-</p>
+                        </div>
+                        <div class="summary-card warning-card">
+                            <p class="summary-label">Flujo Neto Acumulado</p>
+                            <p class="summary-value" id="chart-net-total">-</p>
+                        </div>
+                        <div class="summary-card balance-card">
+                            <div class="summary-label-row">
+                                <p class="summary-label">Saldo Proyectado</p>
+                                <span class="trend-chip" id="chart-trend-chip">Sin datos</span>
+                            </div>
+                            <p class="summary-value" id="chart-end-balance">-</p>
+                        </div>
+                        <div class="summary-card span-2">
+                            <p class="summary-label">Periodo con mayor gasto</p>
+                            <p class="summary-value" id="chart-top-expense-period">-</p>
+                        </div>
+                    </div>
+                    <div class="chart-controls">
+                        <div class="control-group">
+                            <p class="control-title">Capas visibles</p>
+                            <div class="toggle-grid">
+                                <label class="toggle-row">
+                                    <input type="checkbox" id="toggle-dataset-balance" checked>
+                                    <span>Saldo final</span>
+                                </label>
+                                <label class="toggle-row">
+                                    <input type="checkbox" id="toggle-dataset-income" checked>
+                                    <span>Ingresos</span>
+                                </label>
+                                <label class="toggle-row">
+                                    <input type="checkbox" id="toggle-dataset-expense" checked>
+                                    <span>Gastos</span>
+                                </label>
+                                <label class="toggle-row">
+                                    <input type="checkbox" id="toggle-dataset-net" checked>
+                                    <span>Flujo neto</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <p class="control-title">Vista rápida</p>
+                            <p class="control-helper">Usa el zoom y el cursor para investigar periodos. Puedes regresar a la vista original en cualquier momento.</p>
+                            <button type="button" id="reset-chart-zoom" class="secondary">Restablecer vista</button>
+                        </div>
+                    </div>
+                </div>
                 <div class="chart-container">
                     <canvas id="cashflow-chart"></canvas>
                 </div>
