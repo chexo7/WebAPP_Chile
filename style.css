@@ -753,6 +753,48 @@ td.reimbursement-income {
     margin-top: 20px;
 }
 
+.budget-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.budget-period-selector.inline {
+    margin-top: 0;
+}
+
+.section-subtitle {
+    color: #555;
+    margin: -10px 0 15px;
+}
+
+.budget-template-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.budget-template-actions .secondary {
+    background: #e0e0e0;
+    color: #333;
+}
+
+.budget-status-chip {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.budget-status-chip.pending { background: #f39c12; }
+.budget-status-chip.done { background: #2ecc71; }
+.budget-status-chip.overdue { background: #e74c3c; }
+
 /* Estilos para Pestaña Registro Pagos */
 .payments-period-selector {
     display: flex;
