@@ -281,57 +281,104 @@
             </div>
 
             <div id="presupuestos" class="tab-content">
-                <h2>Gestión de Presupuestos Mensuales</h2>
-                <div class="form-and-table-layout">
+                <h2>Planificador de Presupuestos y Gastos Fijos</h2>
+                <p class="tab-description">Define tus gastos fijos una sola vez, programa su frecuencia y envíalos directamente a la pestaña de gastos cuando llegue el momento.</p>
+                <div class="form-and-table-layout budgets-grid">
                     <div class="form-container">
-                        <h3>Definir Presupuesto</h3>
+                        <h3>Nuevo gasto fijo / presupuesto</h3>
                         <form id="budget-form">
+                            <label for="budget-name-input">Nombre:</label>
+                            <input type="text" id="budget-name-input" required placeholder="Arriendo, internet, seguro...">
+
                             <label for="budget-category-select">Categoría:</label>
                             <select id="budget-category-select" required></select>
 
-                            <label for="budget-amount-input">Monto Presupuestado Mensual:</label>
+                            <label for="budget-amount-input">Monto:</label>
                             <input type="number" id="budget-amount-input" step="any" required placeholder="0">
 
-                            <button type="submit" id="save-budget-button">Guardar Presupuesto</button>
+                            <label for="budget-currency-select">Moneda:</label>
+                            <select id="budget-currency-select">
+                                <option value="USD" selected>USD - Dólar Estadounidense</option>
+                                <option value="CLP">CLP - Peso Chileno</option>
+                            </select>
+
+                            <label for="budget-frequency-select">Frecuencia:</label>
+                            <select id="budget-frequency-select">
+                                <option value="Mensual" selected>Mensual</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Bi-semanal">Bi-semanal</option>
+                                <option value="Trimestral">Trimestral</option>
+                                <option value="Anual">Anual</option>
+                                <option value="Único">Único</option>
+                            </select>
+
+                            <label for="budget-day-of-month-input">Día de cobro/ejecución:</label>
+                            <input type="number" id="budget-day-of-month-input" min="1" max="28" value="1">
+
+                            <label for="budget-start-date-input">Desde:</label>
+                            <input type="date" id="budget-start-date-input" required>
+
+                            <label for="budget-notes-input">Notas (opcional):</label>
+                            <textarea id="budget-notes-input" rows="2" placeholder="Referencia, medio de pago, etc."></textarea>
+
+                            <div class="checkbox-container">
+                                <input type="checkbox" id="budget-auto-apply">
+                                <label for="budget-auto-apply">Marcar como listo al enviarlo a gastos</label>
+                            </div>
+
+                            <div class="button-row">
+                                <button type="submit" id="save-budget-button">Guardar</button>
+                                <button type="button" id="reset-budget-button" class="ghost" aria-label="Limpiar formulario">Limpiar</button>
+                            </div>
                         </form>
                     </div>
                     <div class="table-container-dynamic">
-                        <h3>Presupuestos por Categoría</h3>
+                        <h3>Gastos fijos guardados</h3>
                         <div class="table-responsive dynamic-table-scroll">
-                            <table id="budgets-table-view">
+                            <table id="budget-templates-table">
                                 <thead>
                                     <tr>
+                                        <th>Gasto</th>
                                         <th>Categoría</th>
-                                        <th>Tipo</th>
-                                        <th>Presupuesto Mensual</th>
+                                        <th>Frecuencia</th>
+                                        <th>Monto</th>
+                                        <th>Inicio</th>
+                                        <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    </tbody>
+                                </tbody>
                             </table>
                         </div>
-                         <h3>Resumen Gasto vs Presupuesto (Mes Actual/Seleccionado)</h3>
+                    </div>
+                </div>
+                <div class="table-container-dynamic">
+                    <div class="budget-header-row">
+                        <h3>Agenda de presupuestos por mes</h3>
                         <div class="budget-period-selector">
                             <button id="budget-prev-period-button" title="Mes Anterior">&lt;</button>
                             <select id="budget-year-select"></select>
                             <select id="budget-month-select"></select>
                             <button id="budget-next-period-button" title="Mes Siguiente">&gt;</button>
                         </div>
-                        <div class="table-responsive dynamic-table-scroll" id="budget-summary-table-container">
-                            <table id="budget-summary-table">
-                                <thead>
-                                    <tr>
-                                        <th>Categoría</th>
-                                        <th>Presupuesto</th>
-                                        <th>Gasto Real</th>
-                                        <th>Diferencia</th>
-                                        <th>% Gastado</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    </tbody>
-                            </table>
-                        </div>
+                    </div>
+                    <p class="tab-description">Ve lo que viene, registra el gasto en un clic y evita duplicados al controlar qué ya fue enviado.</p>
+                    <div class="table-responsive dynamic-table-scroll" id="budget-summary-table-container">
+                        <table id="budget-agenda-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha prevista</th>
+                                    <th>Gasto</th>
+                                    <th>Categoría</th>
+                                    <th>Frecuencia</th>
+                                    <th>Monto</th>
+                                    <th>Estado</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
