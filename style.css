@@ -752,6 +752,31 @@ td.reimbursement-income {
 #budget-summary-table-container {
     margin-top: 20px;
 }
+.budget-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+    align-items: start;
+}
+.budget-period-selector.inline {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+}
+.budget-period-selector.inline button.accent {
+    margin-left: auto;
+}
+.form-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.table-container-dynamic .small-text {
+    margin-bottom: 8px;
+}
+#fixed-expense-templates-table th,
+#fixed-expense-templates-table td {
+    white-space: nowrap;
+}
 
 /* Estilos para Pestaña Registro Pagos */
 .payments-period-selector {
