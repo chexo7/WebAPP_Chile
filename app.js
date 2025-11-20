@@ -2563,15 +2563,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const parsed = parseAmountString(trimmed);
         return isNaN(parsed) ? null : parsed;
     }
+    function normalizeExpenseName(text) {
+        if (typeof text !== 'string') return '';
+        return decodeFirebaseSafeText(text).trim();
+    }
+
     function checkExpenseDuplicate(name, dateStr, amount) {
+        const normalizedIncomingName = normalizeExpenseName(name);
         return (currentBackupData.expenses || []).some(exp => {
             const expDate = exp.movement_date ? getISODateString(new Date(exp.movement_date)) : (exp.start_date ? getISODateString(new Date(exp.start_date)) : '');
             const existingAmount = exp.amount === undefined || exp.amount === null ? null : parseFloat(exp.amount);
             const incomingAmount = amount === undefined || amount === null ? null : parseFloat(amount);
+            const normalizedExistingName = normalizeExpenseName(exp.name);
             if (incomingAmount === null || isNaN(incomingAmount)) {
-                return expDate === dateStr && exp.name === name && (existingAmount === null || isNaN(existingAmount));
+                return expDate === dateStr && normalizedExistingName === normalizedIncomingName && (existingAmount === null || isNaN(existingAmount));
             }
-            return expDate === dateStr && exp.name === name && parseFloat(existingAmount) === incomingAmount;
+            return expDate === dateStr && normalizedExistingName === normalizedIncomingName && parseFloat(existingAmount) === incomingAmount;
         });
     }
     function createCategorySelect() {
@@ -2713,7 +2720,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lastImportedJsonRange = (fromDate || toDate) ? { from: fromDate, to: toDate } : null;
         const buildExpenseFromPosted = (tx) => {
             if (!tx) return null;
-            const description = (tx.Description || tx.description || '').trim();
+            const description = normalizeExpenseName(tx.Description || tx.description || '');
             const dateVal = tx.Date || tx.date;
             const dateObj = parseBankJsonDate(dateVal) || toUTCDate(dateVal, null);
             if (!description || !dateObj) return null;
