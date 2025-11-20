@@ -36,6 +36,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return isNaN(date.getTime()) ? fallback : date;
     }
 
+    function getPeriodKey(date) {
+        if (!(date instanceof Date) || isNaN(date.getTime())) return '';
+        return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+    }
+
+    function getDaysInMonth(year, monthIndex) {
+        return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+    }
+
     function setElementDisplay(element, displayValue) {
         if (element) {
             element.style.display = displayValue;
@@ -186,7 +195,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const budgetNextPeriodButton = document.getElementById('budget-next-period-button');
     const budgetYearSelect = document.getElementById('budget-year-select');
     const budgetMonthSelect = document.getElementById('budget-month-select');
+    const plannedExpenseForm = document.getElementById('planned-expense-form');
+    const plannedExpenseNameInput = document.getElementById('planned-expense-name');
+    const plannedExpenseCategorySelect = document.getElementById('planned-expense-category');
+    const plannedExpenseAmountInput = document.getElementById('planned-expense-amount');
+    const plannedExpenseCurrencySelect = document.getElementById('planned-expense-currency');
+    const plannedExpenseFrequencySelect = document.getElementById('planned-expense-frequency');
+    const plannedExpenseStartDateInput = document.getElementById('planned-expense-start-date');
+    const plannedExpenseDueDateInput = document.getElementById('planned-expense-due-date');
+    const plannedExpensesTableBody = document.querySelector('#planned-expenses-table tbody');
+    const savePlannedExpenseButton = document.getElementById('save-planned-expense-button');
+    const cancelEditPlannedExpenseButton = document.getElementById('cancel-edit-planned-expense-button');
     let currentBudgetViewDate = new Date();
+    let editingPlannedExpenseId = null;
 
     // --- ELEMENTOS PESTAÑA REGISTRO PAGOS ---
     const paymentsTabTitle = document.getElementById('payments-tab-title');
@@ -487,6 +508,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         encoded.budgets = encodeObjectKeysForFirebase(encoded.budgets || {}, sanitizedFields);
 
+        encoded.planned_expenses = (encoded.planned_expenses || []).map(plan => {
+            const copy = { ...plan };
+            if (copy.name) {
+                const safe = encodeFirebaseSafeText(copy.name);
+                if (safe !== copy.name) sanitizedFields.add(copy.name);
+                copy.name = safe;
+            }
+            if (copy.category) {
+                const safe = encodeFirebaseSafeText(copy.category);
+                if (safe !== copy.category) sanitizedFields.add(copy.category);
+                copy.category = safe;
+            }
+            return copy;
+        });
+
         encoded.expenses = (encoded.expenses || []).map(exp => {
             const copy = { ...exp };
             if (copy.name) {
@@ -516,6 +552,13 @@ document.addEventListener('DOMContentLoaded', () => {
         decoded.expense_categories = decodeObjectKeysFromFirebase(decoded.expense_categories || {});
         decoded.budgets = decodeObjectKeysFromFirebase(decoded.budgets || {});
         decoded.payments = decodeObjectKeysFromFirebase(decoded.payments || {});
+
+        decoded.planned_expenses = (decoded.planned_expenses || []).map(plan => {
+            const copy = { ...plan };
+            if (copy.name) copy.name = decodeFirebaseSafeText(copy.name);
+            if (copy.category) copy.category = decodeFirebaseSafeText(copy.category);
+            return copy;
+        });
 
         decoded.incomes = (decoded.incomes || []).map(inc => {
             const copy = { ...inc };
@@ -618,6 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (expensesTableView) expensesTableView.innerHTML = '';
         if (budgetsTableView) budgetsTableView.innerHTML = '';
         if (budgetSummaryTableBody) budgetSummaryTableBody.innerHTML = '';
+        if (plannedExpensesTableBody) plannedExpensesTableBody.innerHTML = '';
         if (paymentsTableView) paymentsTableView.innerHTML = '';
         if (babyStepsContainer) babyStepsContainer.innerHTML = '';
         if (pendingRemindersList) pendingRemindersList.innerHTML = '';
@@ -632,6 +676,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resetIncomeForm();
         resetExpenseForm();
         resetBudgetForm();
+        resetPlannedExpenseForm();
         resetReminderForm();
         if (cashflowChartInstance) {
             cashflowChartInstance.destroy();
@@ -774,6 +819,7 @@ document.addEventListener('DOMContentLoaded', () => {
             credit_cards: [],
             payments: {},
             budgets: {},
+            planned_expenses: [],
             baby_steps_status: BABY_STEPS_DATA_JS.map(step => ({
                 dos: new Array(step.dos.length).fill(false),
                 donts: new Array(step.donts.length).fill(false)
@@ -817,6 +863,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!hydrated.budgets || typeof hydrated.budgets !== 'object') hydrated.budgets = {};
         if (!hydrated.payments || typeof hydrated.payments !== 'object') hydrated.payments = {};
+
+        if (!Array.isArray(hydrated.planned_expenses)) hydrated.planned_expenses = [];
+        hydrated.planned_expenses = hydrated.planned_expenses.map(plan => {
+            const copy = { ...plan };
+            copy.start_date = toUTCDate(copy.start_date, null);
+            copy.target_payment_date = toUTCDate(copy.target_payment_date, copy.start_date || null);
+            copy.applied_periods = Array.isArray(copy.applied_periods)
+                ? Array.from(new Set(copy.applied_periods.filter(Boolean)))
+                : [];
+            copy.currency = copy.currency || 'USD';
+            copy.frequency = copy.frequency || 'Mensual';
+            return copy;
+        });
 
         if (!Array.isArray(hydrated.credit_cards)) {
             hydrated.credit_cards = [];
@@ -881,6 +940,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderIncomesTable();
         renderExpensesTable();
         renderBudgetsTable();
+        renderPlannedExpensesTable();
+        resetPlannedExpenseForm();
         renderBabySteps();
         renderReminders();
         renderLogTab();
@@ -1184,7 +1245,39 @@ document.addEventListener('DOMContentLoaded', () => {
         remainingPrevExpenses.forEach(prevExp => {
             details.push(`Gasto eliminado: ${prevExp.name} (${formatCurrencyJS(prevExp.amount, symbol)}, Cat: ${prevExp.category}, Inicio: ${getISODateString(new Date(prevExp.start_date))}).`);
         });
-    
+
+        // --- Planned Fixed Expenses ---
+        const prevPlanned = prevData.planned_expenses || [];
+        const currentPlanned = currentData.planned_expenses || [];
+        const planKey = plan => plan && (plan.id || plan.name);
+        const prevPlanMap = new Map(prevPlanned.map(plan => [planKey(plan), plan]));
+        const currentPlanMap = new Map(currentPlanned.map(plan => [planKey(plan), plan]));
+
+        currentPlanMap.forEach((plan, keyVal) => {
+            const prevPlan = prevPlanMap.get(keyVal);
+            const currentBaseDate = plan.start_date ? getISODateString(new Date(plan.start_date)) : 'N/A';
+            if (!prevPlan) {
+                details.push(`Gasto fijo planificado agregado: ${plan.name} (${formatCurrencyJS(plan.amount, symbol)}, ${plan.frequency}, Cat: ${plan.category}, Base: ${currentBaseDate}).`);
+            } else {
+                const prevBaseDate = prevPlan.start_date ? getISODateString(new Date(prevPlan.start_date)) : 'N/A';
+                const mods = [];
+                if (prevPlan.amount !== plan.amount) mods.push(`Monto ${formatCurrencyJS(prevPlan.amount, symbol)} -> ${formatCurrencyJS(plan.amount, symbol)}`);
+                if (prevPlan.frequency !== plan.frequency) mods.push(`Frecuencia ${prevPlan.frequency} -> ${plan.frequency}`);
+                if (prevPlan.category !== plan.category) mods.push(`Categoría ${prevPlan.category} -> ${plan.category}`);
+                if (prevBaseDate !== currentBaseDate) mods.push(`Fecha base ${prevBaseDate} -> ${currentBaseDate}`);
+                if (mods.length > 0) {
+                    details.push(`Gasto fijo planificado modificado '${plan.name}': ${mods.join(', ')}.`);
+                }
+            }
+        });
+
+        prevPlanMap.forEach((plan, keyVal) => {
+            if (!currentPlanMap.has(keyVal)) {
+                const prevBaseDate = plan.start_date ? getISODateString(new Date(plan.start_date)) : 'N/A';
+                details.push(`Gasto fijo planificado eliminado: ${plan.name} (${formatCurrencyJS(plan.amount, symbol)}, ${plan.frequency}, Base: ${prevBaseDate}).`);
+            }
+        });
+
         // --- Category, Budget, Reminder, etc. ---
         const prevCategories = prevData.expense_categories || {};
         const currentCategories = currentData.expense_categories || {};
@@ -1323,6 +1416,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+        (currentBackupData.planned_expenses || []).forEach((plan) => {
+            if (!isFirebaseKeySafe(plan.name || '')) {
+                firebaseSanitizedTargets.push(`Gasto fijo planificado: ${plan.name || 'Sin Nombre'}`);
+            }
+            if (plan.category && !isFirebaseKeySafe(plan.category)) {
+                firebaseSanitizedTargets.push(`Categoría de gasto fijo: ${plan.category}`);
+            }
+        });
 
         const dataToSave = JSON.parse(JSON.stringify(currentBackupData));
         delete dataToSave.usd_clp_rate; // No guardar la tasa USD/CLP en Firebase
@@ -1341,6 +1442,7 @@ document.addEventListener('DOMContentLoaded', () => {
             expenses: [],
             payments: {},
             budgets: {},
+            planned_expenses: [],
             baby_steps_status: BABY_STEPS_DATA_JS.map(step => ({
                 dos: new Array(step.dos.length).fill(false),
                 donts: new Array(step.donts.length).fill(false)
@@ -1381,6 +1483,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (typeof exp.is_real === 'undefined') {
                 exp.is_real = false;
+            }
+        });
+        (dataToSave.planned_expenses || []).forEach(plan => {
+            if (plan.start_date) plan.start_date = getISODateString(new Date(plan.start_date));
+            if (!Array.isArray(plan.applied_periods)) {
+                plan.applied_periods = [];
+            } else {
+                plan.applied_periods = Array.from(new Set(plan.applied_periods.filter(Boolean)));
             }
         });
         const formattedPayments = {};
@@ -1473,7 +1583,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabId === 'grafico') {
             setPeriodicity(activeCashflowPeriodicity, 'chart');
         }
-        if (tabId === 'presupuestos') { setupBudgetPeriodSelectors(); renderBudgetsTable(); renderBudgetSummaryTableForSelectedPeriod(); }
+        if (tabId === 'presupuestos') { setupBudgetPeriodSelectors(); renderBudgetsTable(); renderBudgetSummaryTableForSelectedPeriod(); renderPlannedExpensesTable(); resetPlannedExpenseForm(); }
         if (tabId === 'registro-pagos') { setupPaymentPeriodSelectors(); setPaymentPeriodicity(activePaymentsPeriodicity); }
         if (tabId === 'ajustes') {
             populateSettingsForm();
@@ -2281,7 +2391,7 @@ document.addEventListener('DOMContentLoaded', () => {
     expenseMovementDateInput.addEventListener('change', updateExpensePaymentDate);
     expenseCreditCardSelect.addEventListener('change', updateExpensePaymentDate);
     function populateExpenseCategoriesDropdowns() {
-        const selects = [expenseCategorySelect, budgetCategorySelect];
+        const selects = [expenseCategorySelect, budgetCategorySelect, plannedExpenseCategorySelect];
         selects.forEach(select => {
             if (!select || !currentBackupData || !currentBackupData.expense_categories) {
                 if (select) select.innerHTML = '<option value="">No hay categorías</option>'; return;
@@ -2296,7 +2406,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             if (sortedCategories.includes(currentValue)) select.value = currentValue;
-            else if (sortedCategories.length > 0 && select.id === 'expense-category') select.value = sortedCategories[0];
+            else if (sortedCategories.length > 0 && (select.id === 'expense-category' || select.id === 'planned-expense-category')) select.value = sortedCategories[0];
         });
         updateRemoveCategoryButtonState();
         populateIncomeReimbursementCategoriesDropdown();
@@ -3055,6 +3165,277 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isNaN(year) || isNaN(monthIndex)) return;
         currentBudgetViewDate = new Date(Date.UTC(year, monthIndex, 1));
         renderBudgetSummaryTable();
+        renderPlannedExpensesTable();
+    }
+
+    function resetPlannedExpenseForm() {
+        if (!plannedExpenseForm) return;
+        plannedExpenseForm.reset();
+        if (plannedExpenseFrequencySelect) plannedExpenseFrequencySelect.value = 'Mensual';
+        if (plannedExpenseCurrencySelect) plannedExpenseCurrencySelect.value = 'USD';
+        const baseDate = currentBackupData && currentBackupData.analysis_start_date
+            ? new Date(currentBackupData.analysis_start_date)
+            : new Date();
+        if (plannedExpenseStartDateInput) {
+            plannedExpenseStartDateInput.value = getISODateString(baseDate);
+        }
+        if (plannedExpenseDueDateInput) {
+            plannedExpenseDueDateInput.value = getISODateString(baseDate);
+        }
+        editingPlannedExpenseId = null;
+        if (savePlannedExpenseButton) savePlannedExpenseButton.textContent = 'Guardar plan';
+        hideElement(cancelEditPlannedExpenseButton);
+    }
+
+    function buildPlannedExpenseOccurrence(plan, referenceDate) {
+        const reference = toUTCDate(referenceDate);
+        const baseStart = toUTCDate(plan.start_date, reference);
+        const baseDate = toUTCDate(plan.target_payment_date, baseStart) || baseStart;
+        const refDate = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
+        const year = refDate.getUTCFullYear();
+        const month = refDate.getUTCMonth();
+        const safeBaseDay = Math.min(baseDate ? baseDate.getUTCDate() : 1, getDaysInMonth(year, month));
+        const firstDayOfMonth = new Date(Date.UTC(year, month, 1));
+
+        switch (plan.frequency) {
+            case 'Quincenal': {
+                const first = new Date(Date.UTC(year, month, safeBaseDay));
+                const second = new Date(Date.UTC(year, month, Math.min(safeBaseDay + 14, getDaysInMonth(year, month))));
+                return first >= firstDayOfMonth ? first : second;
+            }
+            case 'Semanal': {
+                const targetWeekday = baseDate ? baseDate.getUTCDay() : firstDayOfMonth.getUTCDay();
+                const firstWeekday = firstDayOfMonth.getUTCDay();
+                let offset = targetWeekday - firstWeekday;
+                if (offset < 0) offset += 7;
+                return new Date(Date.UTC(year, month, 1 + offset));
+            }
+            case 'Anual': {
+                const annualMonth = baseDate ? baseDate.getUTCMonth() : month;
+                const annualDay = Math.min(baseDate ? baseDate.getUTCDate() : safeBaseDay, getDaysInMonth(year, annualMonth));
+                return new Date(Date.UTC(year, annualMonth, annualDay));
+            }
+            case 'Único':
+                return baseDate;
+            default:
+                return new Date(Date.UTC(year, month, safeBaseDay));
+        }
+    }
+
+    function hasPlanBeenApplied(plan, periodKey) {
+        return Array.isArray(plan.applied_periods) && plan.applied_periods.includes(periodKey);
+    }
+
+    function renderPlannedExpensesTable() {
+        if (!plannedExpensesTableBody || !currentBackupData) return;
+        plannedExpensesTableBody.innerHTML = '';
+
+        const viewDate = currentBudgetViewDate instanceof Date && !isNaN(currentBudgetViewDate)
+            ? currentBudgetViewDate
+            : new Date();
+        const selectedPeriodKey = getPeriodKey(viewDate);
+
+        if (!Array.isArray(currentBackupData.planned_expenses) || currentBackupData.planned_expenses.length === 0) {
+            const row = plannedExpensesTableBody.insertRow();
+            const cell = row.insertCell();
+            cell.colSpan = 7;
+            cell.textContent = 'Agrega tus gastos fijos planificados para verlos aquí.';
+            cell.style.textAlign = 'center';
+            return;
+        }
+
+        const sortedPlans = [...currentBackupData.planned_expenses].sort((a, b) => a.name.localeCompare(b.name));
+        sortedPlans.forEach(plan => {
+            const row = plannedExpensesTableBody.insertRow();
+            row.insertCell().textContent = plan.name;
+            const symbol = plan.currency === 'CLP' ? '$' : '$';
+            row.insertCell().textContent = `${formatCurrencyJS(plan.amount, symbol)} ${plan.currency || ''}`.trim();
+            const dueCell = row.insertCell();
+            dueCell.textContent = plan.target_payment_date ? getISODateString(new Date(plan.target_payment_date)) : '—';
+            row.insertCell().textContent = plan.frequency || 'Mensual';
+
+            const occurrenceDate = buildPlannedExpenseOccurrence(plan, viewDate);
+            const occurrenceKey = getPeriodKey(occurrenceDate);
+            const nextDateCell = row.insertCell();
+            nextDateCell.textContent = occurrenceDate ? getISODateString(occurrenceDate) : '—';
+            if (occurrenceKey && occurrenceKey !== selectedPeriodKey) {
+                const helper = document.createElement('div');
+                helper.classList.add('small-text');
+                helper.textContent = `Programado para ${occurrenceKey}`;
+                nextDateCell.appendChild(helper);
+            }
+
+            const statusCell = row.insertCell();
+            const statusBadge = document.createElement('span');
+            const alreadyApplied = occurrenceKey ? hasPlanBeenApplied(plan, occurrenceKey) : false;
+            statusBadge.classList.add('status-pill', alreadyApplied ? 'success' : 'pending');
+            statusBadge.textContent = alreadyApplied
+                ? `Aplicado (${occurrenceKey || selectedPeriodKey})`
+                : (occurrenceKey ? `Pendiente (${selectedPeriodKey})` : 'Pendiente (sin fecha)');
+            statusCell.appendChild(statusBadge);
+
+            const actionsCell = row.insertCell();
+            const actionWrapper = document.createElement('div');
+            actionWrapper.classList.add('planned-expense-actions');
+
+            const applyBtn = document.createElement('button');
+            applyBtn.type = 'button';
+            applyBtn.textContent = 'Agregar a Gastos';
+            applyBtn.classList.add('accent');
+            applyBtn.disabled = alreadyApplied || !occurrenceKey;
+            if (!occurrenceKey) applyBtn.title = 'Define una fecha base válida para usar este plan en el período seleccionado.';
+            applyBtn.addEventListener('click', () => applyPlannedExpenseToExpenses(plan.id || plan.name));
+
+            const editBtn = document.createElement('button');
+            editBtn.type = 'button';
+            editBtn.textContent = 'Editar';
+            editBtn.addEventListener('click', () => startPlannedExpenseEdit(plan.id || plan.name));
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.textContent = 'Eliminar';
+            deleteBtn.classList.add('danger');
+            deleteBtn.addEventListener('click', () => deletePlannedExpense(plan.id || plan.name));
+
+            actionWrapper.appendChild(applyBtn);
+            actionWrapper.appendChild(editBtn);
+            actionWrapper.appendChild(deleteBtn);
+            actionsCell.appendChild(actionWrapper);
+        });
+    }
+
+    function startPlannedExpenseEdit(planId) {
+        if (!currentBackupData || !Array.isArray(currentBackupData.planned_expenses)) return;
+        const plan = currentBackupData.planned_expenses.find(p => (p.id || p.name) === planId);
+        if (!plan) return;
+        plannedExpenseNameInput.value = plan.name || '';
+        plannedExpenseCategorySelect.value = plan.category || '';
+        plannedExpenseAmountInput.value = plan.amount || '';
+        plannedExpenseCurrencySelect.value = plan.currency || 'USD';
+        plannedExpenseFrequencySelect.value = plan.frequency || 'Mensual';
+        plannedExpenseStartDateInput.value = plan.start_date ? getISODateString(new Date(plan.start_date)) : '';
+        if (plannedExpenseDueDateInput) {
+            plannedExpenseDueDateInput.value = plan.target_payment_date
+                ? getISODateString(new Date(plan.target_payment_date))
+                : plannedExpenseStartDateInput.value || '';
+        }
+        editingPlannedExpenseId = plan.id || plan.name;
+        if (savePlannedExpenseButton) savePlannedExpenseButton.textContent = 'Actualizar plan';
+        showElement(cancelEditPlannedExpenseButton, 'inline-block');
+    }
+
+    function deletePlannedExpense(planId) {
+        if (!currentBackupData || !Array.isArray(currentBackupData.planned_expenses)) return;
+        const planIndex = currentBackupData.planned_expenses.findIndex(p => (p.id || p.name) === planId);
+        if (planIndex === -1) return;
+        const planName = currentBackupData.planned_expenses[planIndex].name || 'plan';
+        if (confirm(`¿Eliminar el plan de gasto fijo "${planName}"?`)) {
+            currentBackupData.planned_expenses.splice(planIndex, 1);
+            if (editingPlannedExpenseId === planId) resetPlannedExpenseForm();
+            renderPlannedExpensesTable();
+        }
+    }
+
+    function applyPlannedExpenseToExpenses(planId) {
+        if (!currentBackupData || !Array.isArray(currentBackupData.planned_expenses)) return;
+        const plan = currentBackupData.planned_expenses.find(p => (p.id || p.name) === planId);
+        if (!plan) return;
+        const referenceDate = currentBudgetViewDate instanceof Date && !isNaN(currentBudgetViewDate) ? currentBudgetViewDate : new Date();
+        const occurrenceDate = buildPlannedExpenseOccurrence(plan, referenceDate);
+        const occurrenceKey = getPeriodKey(occurrenceDate);
+        if (!occurrenceKey) {
+            alert('No se pudo calcular una fecha objetivo para este gasto fijo. Revisa la fecha base.');
+            return;
+        }
+        if (hasPlanBeenApplied(plan, occurrenceKey)) {
+            alert(`Ya registraste este gasto fijo para ${occurrenceKey}.`);
+            return;
+        }
+        const duplicate = (currentBackupData.expenses || []).some(exp => {
+            const dateToCheck = toUTCDate(exp.movement_date || exp.start_date);
+            return exp.name === plan.name && getPeriodKey(dateToCheck) === occurrenceKey;
+        });
+        if (duplicate) {
+            alert('Ya existe un gasto con este nombre en el período seleccionado.');
+            return;
+        }
+        const expenseEntry = {
+            name: plan.name,
+            amount: plan.amount,
+            category: plan.category,
+            type: currentBackupData.expense_categories[plan.category] || 'Variable',
+            frequency: 'Único',
+            start_date: occurrenceDate,
+            end_date: null,
+            is_real: true,
+            movement_date: occurrenceDate,
+            payment_method: 'Efectivo / Debito',
+            credit_card: null,
+            installments: 1,
+            currency: plan.currency || 'USD'
+        };
+        if (!currentBackupData.expenses) currentBackupData.expenses = [];
+        currentBackupData.expenses.push(expenseEntry);
+        plan.applied_periods = Array.isArray(plan.applied_periods)
+            ? Array.from(new Set([...plan.applied_periods, occurrenceKey]))
+            : [occurrenceKey];
+        renderExpensesTable();
+        renderCashflowTable();
+        renderPlannedExpensesTable();
+        alert(`Se agregó "${plan.name}" a tus gastos para el período ${occurrenceKey}.`);
+    }
+
+    if (plannedExpenseForm) {
+        plannedExpenseForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!currentBackupData) { alert('Carga una versión de datos antes de registrar gastos fijos planificados.'); return; }
+            const name = plannedExpenseNameInput.value.trim();
+            const category = plannedExpenseCategorySelect.value;
+            const amount = parseFloat(plannedExpenseAmountInput.value);
+            const currency = plannedExpenseCurrencySelect.value || 'USD';
+            const frequency = plannedExpenseFrequencySelect.value || 'Mensual';
+            const startDate = toUTCDate(plannedExpenseStartDateInput.value, new Date());
+            const targetPaymentDate = plannedExpenseDueDateInput
+                ? toUTCDate(plannedExpenseDueDateInput.value, startDate)
+                : startDate;
+
+            if (!name) { alert('El nombre del gasto fijo no puede estar vacío.'); return; }
+            if (!isFirebaseKeySafe(name)) { alert(`El nombre "${name}" contiene caracteres no permitidos.`); return; }
+            if (!category) { alert('Selecciona una categoría para el gasto fijo.'); return; }
+            if (!isFirebaseKeySafe(category)) { alert(`La categoría "${category}" contiene caracteres no permitidos.`); return; }
+            if (isNaN(amount) || amount <= 0) { alert('Ingresa un monto válido.'); return; }
+            if (!startDate) { alert('Define una fecha base válida.'); return; }
+            if (plannedExpenseDueDateInput && !targetPaymentDate) { alert('Define una fecha presupuestada válida.'); return; }
+
+            if (!currentBackupData.planned_expenses) currentBackupData.planned_expenses = [];
+            const planId = editingPlannedExpenseId || `plan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const existingIndex = currentBackupData.planned_expenses.findIndex(p => (p.id || p.name) === planId);
+            const persistedPlan = {
+                id: planId,
+                name,
+                category,
+                amount,
+                currency,
+                frequency,
+                start_date: startDate,
+                target_payment_date: targetPaymentDate,
+                applied_periods: existingIndex >= 0 && Array.isArray(currentBackupData.planned_expenses[existingIndex].applied_periods)
+                    ? currentBackupData.planned_expenses[existingIndex].applied_periods
+                    : []
+            };
+            if (existingIndex >= 0) {
+                currentBackupData.planned_expenses[existingIndex] = persistedPlan;
+            } else {
+                currentBackupData.planned_expenses.push(persistedPlan);
+            }
+            renderPlannedExpensesTable();
+            resetPlannedExpenseForm();
+        });
+    }
+    if (cancelEditPlannedExpenseButton) {
+        cancelEditPlannedExpenseButton.addEventListener('click', () => {
+            resetPlannedExpenseForm();
+        });
     }
 
     function refreshBudgetSummaryIfReady() {
