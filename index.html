@@ -404,64 +404,120 @@
             </div>
 
             <div id="grafico" class="tab-content">
-                <div class="subtabs-container" id="chart-subtabs">
-                    <button class="subtab-button active" data-parent="chart" data-period="Mensual">Mensual</button>
-                    <button class="subtab-button" data-parent="chart" data-period="Semanal">Semanal</button>
-                    <button class="subtab-button" data-parent="chart" data-period="Diario">Diario</button>
-                </div>
-                <h2 id="grafico-title">Gráfico de Flujo de Caja</h2>
-                <div class="chart-container">
-                    <canvas id="cashflow-chart"></canvas>
-                </div>
-                <div id="mobile-chart-range" class="mobile-chart-range" style="display:none;">
-                    <label for="mobile-chart-start">Desde:</label>
-                    <input type="date" id="mobile-chart-start">
-                    <label for="mobile-chart-end">Hasta:</label>
-                    <input type="date" id="mobile-chart-end">
-                    <button id="apply-mobile-chart-range">Aplicar</button>
-                </div>
-                <p id="chart-message" class="centered-text">Doble clic en el gráfico para activar el zoom.</p>
-
-                <div id="pie-month-container">
-                    <h3>Distribución de Gastos por Categoría - Mensual</h3>
-                    <div class="chart-period-selector multi-input">
-                        <input type="month" id="pie-month-input-1">
-                        <input type="month" id="pie-month-input-2">
-                        <input type="month" id="pie-month-input-3">
+                <div class="chart-section-header">
+                    <div>
+                        <p class="eyebrow">Visualización</p>
+                        <h2 id="grafico-title">Gráfico de Flujo de Caja</h2>
+                        <p class="section-subtitle">Explora la evolución de ingresos, gastos y saldos con controles pensados para el análisis rápido.</p>
                     </div>
-                    <div class="multi-pie-container">
-                        <div class="chart-container">
-                            <canvas id="pie-chart-month-1"></canvas>
-                        </div>
-                        <div class="chart-container">
-                            <canvas id="pie-chart-month-2"></canvas>
-                        </div>
-                        <div class="chart-container">
-                            <canvas id="pie-chart-month-3"></canvas>
-                        </div>
+                    <div class="chart-actions">
+                        <button id="chart-reset-zoom" class="ghost">Restablecer zoom</button>
+                        <button id="chart-download-image" class="accent">Descargar gráfico</button>
                     </div>
-                    <div id="pie-month-legend" class="shared-legend"></div>
                 </div>
 
-                <div id="pie-week-container" style="display:none;">
-                    <h3>Distribución de Gastos por Categoría - Semanal</h3>
-                    <div class="chart-period-selector multi-input">
-                        <input type="week" id="pie-week-input-1">
-                        <input type="week" id="pie-week-input-2">
-                        <input type="week" id="pie-week-input-3">
+                <div class="chart-layout">
+                    <div class="chart-main">
+                        <div class="subtabs-container" id="chart-subtabs">
+                            <button class="subtab-button active" data-parent="chart" data-period="Mensual">Mensual</button>
+                            <button class="subtab-button" data-parent="chart" data-period="Semanal">Semanal</button>
+                            <button class="subtab-button" data-parent="chart" data-period="Diario">Diario</button>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-container">
+                                <canvas id="cashflow-chart"></canvas>
+                            </div>
+                            <div class="chart-meta">
+                                <div id="mobile-chart-range" class="mobile-chart-range" style="display:none;">
+                                    <label for="mobile-chart-start">Desde:</label>
+                                    <input type="date" id="mobile-chart-start">
+                                    <label for="mobile-chart-end">Hasta:</label>
+                                    <input type="date" id="mobile-chart-end">
+                                    <button id="apply-mobile-chart-range">Aplicar</button>
+                                </div>
+                                <p id="chart-message" class="centered-text">Doble clic en el gráfico para activar el zoom.</p>
+                            </div>
+                        </div>
+                        <div class="chart-guidelines">
+                            <h3>Consejos rápidos</h3>
+                            <ul>
+                                <li><strong>Zoom controlado:</strong> mantén el comportamiento original con doble clic o gesto de pellizco para acercar y usa el botón de restablecer para volver al panorama general.</li>
+                                <li><strong>Rangos móviles:</strong> en dispositivos táctiles acota la vista con los campos de fecha para enfocarte en periodos concretos.</li>
+                                <li><strong>Detalle transaccional:</strong> toca cualquier punto del gráfico para abrir el desglose de ingresos y gastos correspondientes.</li>
+                            </ul>
+                        </div>
                     </div>
-                    <div class="multi-pie-container">
-                        <div class="chart-container">
-                            <canvas id="pie-chart-week-1"></canvas>
+
+                    <aside class="chart-side-panel">
+                        <div class="info-card">
+                            <h3>Cómo leer el gráfico</h3>
+                            <p>Las líneas de ingresos, gastos y flujo neto conservan la paleta y el grosor definidos para el proyecto. Usa la periodicidad para cambiar la granularidad sin perder contexto visual.</p>
                         </div>
-                        <div class="chart-container">
-                            <canvas id="pie-chart-week-2"></canvas>
+                        <div class="info-card">
+                            <h3>Comparaciones sugeridas</h3>
+                            <ul>
+                                <li>Activa la vista semanal para validar tendencias de corto plazo tras cambios de hábitos.</li>
+                                <li>Usa la vista diaria cuando existan gastos instantáneos y necesites ubicar picos específicos.</li>
+                                <li>Descarga el gráfico en PNG para compartir avances con tu equipo o adjuntarlo a reportes.</li>
+                            </ul>
                         </div>
-                        <div class="chart-container">
-                            <canvas id="pie-chart-week-3"></canvas>
+                    </aside>
+                </div>
+
+                <div class="chart-distribution">
+                    <div id="pie-month-container" class="chart-card">
+                        <div class="chart-card-header">
+                            <div>
+                                <p class="eyebrow">Gastos mensuales</p>
+                                <h3>Distribución por categoría</h3>
+                            </div>
+                            <p class="small-text">Selecciona hasta tres meses para contrastar la composición del gasto manteniendo la misma leyenda.</p>
                         </div>
+                        <div class="chart-period-selector multi-input">
+                            <input type="month" id="pie-month-input-1">
+                            <input type="month" id="pie-month-input-2">
+                            <input type="month" id="pie-month-input-3">
+                        </div>
+                        <div class="multi-pie-container">
+                            <div class="chart-container">
+                                <canvas id="pie-chart-month-1"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="pie-chart-month-2"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="pie-chart-month-3"></canvas>
+                            </div>
+                        </div>
+                        <div id="pie-month-legend" class="shared-legend"></div>
                     </div>
-                    <div id="pie-week-legend" class="shared-legend"></div>
+
+                    <div id="pie-week-container" class="chart-card" style="display:none;">
+                        <div class="chart-card-header">
+                            <div>
+                                <p class="eyebrow">Gastos semanales</p>
+                                <h3>Distribución por categoría</h3>
+                            </div>
+                            <p class="small-text">Elige semanas específicas para identificar desvíos puntuales o validar el impacto de ajustes recientes.</p>
+                        </div>
+                        <div class="chart-period-selector multi-input">
+                            <input type="week" id="pie-week-input-1">
+                            <input type="week" id="pie-week-input-2">
+                            <input type="week" id="pie-week-input-3">
+                        </div>
+                        <div class="multi-pie-container">
+                            <div class="chart-container">
+                                <canvas id="pie-chart-week-1"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="pie-chart-week-2"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="pie-chart-week-3"></canvas>
+                            </div>
+                        </div>
+                        <div id="pie-week-legend" class="shared-legend"></div>
+                    </div>
                 </div>
             </div>
 

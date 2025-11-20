@@ -224,6 +224,17 @@ button.small-button {
     font-size: 0.85rem;
 }
 
+button.ghost {
+    background-color: transparent;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    box-shadow: none;
+}
+button.ghost:hover {
+    background-color: #f7f7fa;
+    color: var(--primary-color);
+}
+
 /* NUEVO: Estilo para botón grande */
 button.button-large {
     padding: 12px 24px;
@@ -836,6 +847,120 @@ td.reimbursement-income {
 }
 
 /* Estilos para Pestaña Gráfico */
+.chart-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.chart-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-size: 0.8rem;
+    color: var(--accent-color);
+    margin: 0 0 6px;
+    font-weight: 700;
+}
+
+.section-subtitle {
+    color: var(--light-text);
+    margin: 4px 0 0;
+    max-width: 820px;
+}
+
+.chart-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 18px;
+    align-items: start;
+}
+
+.chart-main {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.chart-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px;
+}
+
+.chart-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.chart-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chart-guidelines {
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius);
+    padding: 12px;
+    background: #fafafe;
+}
+
+.chart-guidelines ul {
+    padding-left: 18px;
+    margin: 8px 0 0;
+    color: var(--text-color);
+}
+
+.chart-guidelines li + li {
+    margin-top: 6px;
+}
+
+.chart-side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.info-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 14px;
+    box-shadow: var(--shadow);
+}
+
+.info-card ul {
+    padding-left: 18px;
+    margin: 10px 0 0;
+}
+
+.info-card li + li {
+    margin-top: 6px;
+}
+
+.chart-distribution {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+}
+
 .chart-container {
     width: 100%;
     max-width: 95%; /* Changed from 800px */
@@ -878,6 +1003,12 @@ td.reimbursement-income {
     text-align: center;
     margin-top: 20px;
     color: var(--light-text);
+}
+
+@media (max-width: 1024px) {
+    .chart-layout {
+        grid-template-columns: 1fr;
+    }
 }
 
 
