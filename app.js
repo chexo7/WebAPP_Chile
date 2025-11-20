@@ -202,9 +202,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const plannedExpenseCurrencySelect = document.getElementById('planned-expense-currency');
     const plannedExpenseFrequencySelect = document.getElementById('planned-expense-frequency');
     const plannedExpenseStartDateInput = document.getElementById('planned-expense-start-date');
+    const plannedExpenseDueDateInput = document.getElementById('planned-expense-due-date');
     const plannedExpensesTableBody = document.querySelector('#planned-expenses-table tbody');
     const savePlannedExpenseButton = document.getElementById('save-planned-expense-button');
     const cancelEditPlannedExpenseButton = document.getElementById('cancel-edit-planned-expense-button');
+    const plannedExpenseTemplateButtons = document.querySelectorAll('.chip-button[data-template]');
     let currentBudgetViewDate = new Date();
     let editingPlannedExpenseId = null;
 
@@ -867,6 +869,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hydrated.planned_expenses = hydrated.planned_expenses.map(plan => {
             const copy = { ...plan };
             copy.start_date = toUTCDate(copy.start_date, null);
+            copy.payment_due_date = toUTCDate(copy.payment_due_date, null);
             copy.applied_periods = Array.isArray(copy.applied_periods)
                 ? Array.from(new Set(copy.applied_periods.filter(Boolean)))
                 : [];
@@ -1253,26 +1256,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         currentPlanMap.forEach((plan, keyVal) => {
             const prevPlan = prevPlanMap.get(keyVal);
-            const currentBaseDate = plan.start_date ? getISODateString(new Date(plan.start_date)) : 'N/A';
-            if (!prevPlan) {
-                details.push(`Gasto fijo planificado agregado: ${plan.name} (${formatCurrencyJS(plan.amount, symbol)}, ${plan.frequency}, Cat: ${plan.category}, Base: ${currentBaseDate}).`);
-            } else {
-                const prevBaseDate = prevPlan.start_date ? getISODateString(new Date(prevPlan.start_date)) : 'N/A';
-                const mods = [];
-                if (prevPlan.amount !== plan.amount) mods.push(`Monto ${formatCurrencyJS(prevPlan.amount, symbol)} -> ${formatCurrencyJS(plan.amount, symbol)}`);
-                if (prevPlan.frequency !== plan.frequency) mods.push(`Frecuencia ${prevPlan.frequency} -> ${plan.frequency}`);
-                if (prevPlan.category !== plan.category) mods.push(`Categoría ${prevPlan.category} -> ${plan.category}`);
-                if (prevBaseDate !== currentBaseDate) mods.push(`Fecha base ${prevBaseDate} -> ${currentBaseDate}`);
-                if (mods.length > 0) {
-                    details.push(`Gasto fijo planificado modificado '${plan.name}': ${mods.join(', ')}.`);
+                const currentBaseDate = plan.start_date ? getISODateString(new Date(plan.start_date)) : 'N/A';
+                const currentDueDate = plan.payment_due_date ? getISODateString(new Date(plan.payment_due_date)) : 'N/A';
+                if (!prevPlan) {
+                    details.push(`Gasto fijo planificado agregado: ${plan.name} (${formatCurrencyJS(plan.amount, symbol)}, ${plan.frequency}, Cat: ${plan.category}, Base: ${currentBaseDate}, Pago: ${currentDueDate}).`);
+                } else {
+                    const prevBaseDate = prevPlan.start_date ? getISODateString(new Date(prevPlan.start_date)) : 'N/A';
+                    const prevDueDate = prevPlan.payment_due_date ? getISODateString(new Date(prevPlan.payment_due_date)) : 'N/A';
+                    const mods = [];
+                    if (prevPlan.amount !== plan.amount) mods.push(`Monto ${formatCurrencyJS(prevPlan.amount, symbol)} -> ${formatCurrencyJS(plan.amount, symbol)}`);
+                    if (prevPlan.frequency !== plan.frequency) mods.push(`Frecuencia ${prevPlan.frequency} -> ${plan.frequency}`);
+                    if (prevPlan.category !== plan.category) mods.push(`Categoría ${prevPlan.category} -> ${plan.category}`);
+                    if (prevBaseDate !== currentBaseDate) mods.push(`Fecha base ${prevBaseDate} -> ${currentBaseDate}`);
+                    if (prevDueDate !== currentDueDate) mods.push(`Pago presupuestado ${prevDueDate} -> ${currentDueDate}`);
+                    if (mods.length > 0) {
+                        details.push(`Gasto fijo planificado modificado '${plan.name}': ${mods.join(', ')}.`);
+                    }
                 }
-            }
-        });
+            });
 
         prevPlanMap.forEach((plan, keyVal) => {
             if (!currentPlanMap.has(keyVal)) {
                 const prevBaseDate = plan.start_date ? getISODateString(new Date(plan.start_date)) : 'N/A';
-                details.push(`Gasto fijo planificado eliminado: ${plan.name} (${formatCurrencyJS(plan.amount, symbol)}, ${plan.frequency}, Base: ${prevBaseDate}).`);
+                const prevDueDate = plan.payment_due_date ? getISODateString(new Date(plan.payment_due_date)) : 'N/A';
+                details.push(`Gasto fijo planificado eliminado: ${plan.name} (${formatCurrencyJS(plan.amount, symbol)}, ${plan.frequency}, Base: ${prevBaseDate}, Pago: ${prevDueDate}).`);
             }
         });
 
@@ -3175,13 +3182,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 : new Date();
             plannedExpenseStartDateInput.value = getISODateString(baseDate);
         }
+        if (plannedExpenseDueDateInput) {
+            plannedExpenseDueDateInput.value = plannedExpenseStartDateInput ? plannedExpenseStartDateInput.value : '';
+        }
         editingPlannedExpenseId = null;
         if (savePlannedExpenseButton) savePlannedExpenseButton.textContent = 'Guardar plan';
         hideElement(cancelEditPlannedExpenseButton);
     }
 
     function buildPlannedExpenseOccurrence(plan, referenceDate) {
-        const baseDate = toUTCDate(plan.start_date, toUTCDate(referenceDate));
+        const baseDate = toUTCDate(plan.payment_due_date, null) || toUTCDate(plan.start_date, toUTCDate(referenceDate));
         const refDate = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
         const year = refDate.getUTCFullYear();
         const month = refDate.getUTCMonth();
@@ -3247,6 +3257,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const occurrenceKey = getPeriodKey(occurrenceDate);
             const nextDateCell = row.insertCell();
             nextDateCell.textContent = occurrenceDate ? getISODateString(occurrenceDate) : '—';
+            if (plan.payment_due_date) {
+                const dueText = getISODateString(new Date(plan.payment_due_date));
+                if (dueText !== nextDateCell.textContent) {
+                    const helper = document.createElement('div');
+                    helper.classList.add('small-text');
+                    helper.textContent = `Pago presupuestado: ${dueText}`;
+                    nextDateCell.appendChild(helper);
+                }
+            }
             if (occurrenceKey && occurrenceKey !== selectedPeriodKey) {
                 const helper = document.createElement('div');
                 helper.classList.add('small-text');
@@ -3303,6 +3322,7 @@ document.addEventListener('DOMContentLoaded', () => {
         plannedExpenseCurrencySelect.value = plan.currency || 'USD';
         plannedExpenseFrequencySelect.value = plan.frequency || 'Mensual';
         plannedExpenseStartDateInput.value = plan.start_date ? getISODateString(new Date(plan.start_date)) : '';
+        if (plannedExpenseDueDateInput) plannedExpenseDueDateInput.value = plan.payment_due_date ? getISODateString(new Date(plan.payment_due_date)) : plannedExpenseStartDateInput.value;
         editingPlannedExpenseId = plan.id || plan.name;
         if (savePlannedExpenseButton) savePlannedExpenseButton.textContent = 'Actualizar plan';
         showElement(cancelEditPlannedExpenseButton, 'inline-block');
@@ -3369,6 +3389,44 @@ document.addEventListener('DOMContentLoaded', () => {
         alert(`Se agregó "${plan.name}" a tus gastos para el período ${occurrenceKey}.`);
     }
 
+    function pickCategoryByKeywords(keywords = []) {
+        if (!currentBackupData || !currentBackupData.expense_categories) return '';
+        const categories = Object.keys(currentBackupData.expense_categories);
+        const lowerKeywords = keywords.map(k => k.toLowerCase());
+        const match = categories.find(cat => lowerKeywords.some(key => cat.toLowerCase().includes(key)));
+        return match || categories[0] || '';
+    }
+
+    function applyPlannedTemplate(templateKey) {
+        const baseDate = currentBudgetViewDate instanceof Date && !isNaN(currentBudgetViewDate)
+            ? new Date(currentBudgetViewDate)
+            : new Date();
+
+        if (templateKey === 'rent') {
+            if (plannedExpenseNameInput) plannedExpenseNameInput.value = 'Arriendo';
+            if (plannedExpenseFrequencySelect) plannedExpenseFrequencySelect.value = 'Mensual';
+            const rentCategory = pickCategoryByKeywords(['arri', 'vivienda', 'casa']);
+            if (rentCategory && plannedExpenseCategorySelect) plannedExpenseCategorySelect.value = rentCategory;
+            const rentDate = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), 5));
+            const rentDateISO = getISODateString(rentDate);
+            if (plannedExpenseStartDateInput) plannedExpenseStartDateInput.value = rentDateISO;
+            if (plannedExpenseDueDateInput) plannedExpenseDueDateInput.value = rentDateISO;
+            return;
+        }
+
+        if (templateKey === 'groceries') {
+            if (plannedExpenseNameInput) plannedExpenseNameInput.value = 'Supermercado';
+            if (plannedExpenseFrequencySelect) plannedExpenseFrequencySelect.value = 'Semanal';
+            const groceryCategory = pickCategoryByKeywords(['super', 'mercado', 'comida', 'alimento']);
+            if (groceryCategory && plannedExpenseCategorySelect) plannedExpenseCategorySelect.value = groceryCategory;
+            const nextMonday = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), baseDate.getUTCDate()));
+            while (nextMonday.getUTCDay() !== 1) { nextMonday.setUTCDate(nextMonday.getUTCDate() + 1); }
+            const mondayISO = getISODateString(nextMonday);
+            if (plannedExpenseStartDateInput) plannedExpenseStartDateInput.value = mondayISO;
+            if (plannedExpenseDueDateInput) plannedExpenseDueDateInput.value = mondayISO;
+        }
+    }
+
     if (plannedExpenseForm) {
         plannedExpenseForm.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -3379,6 +3437,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const currency = plannedExpenseCurrencySelect.value || 'USD';
             const frequency = plannedExpenseFrequencySelect.value || 'Mensual';
             const startDate = toUTCDate(plannedExpenseStartDateInput.value, new Date());
+            const paymentDueDate = plannedExpenseDueDateInput ? toUTCDate(plannedExpenseDueDateInput.value, null) : null;
 
             if (!name) { alert('El nombre del gasto fijo no puede estar vacío.'); return; }
             if (!isFirebaseKeySafe(name)) { alert(`El nombre "${name}" contiene caracteres no permitidos.`); return; }
@@ -3398,6 +3457,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currency,
                 frequency,
                 start_date: startDate,
+                payment_due_date: paymentDueDate,
                 applied_periods: existingIndex >= 0 && Array.isArray(currentBackupData.planned_expenses[existingIndex].applied_periods)
                     ? currentBackupData.planned_expenses[existingIndex].applied_periods
                     : []
@@ -3409,6 +3469,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             renderPlannedExpensesTable();
             resetPlannedExpenseForm();
+        });
+    }
+    if (plannedExpenseTemplateButtons && plannedExpenseTemplateButtons.length > 0) {
+        plannedExpenseTemplateButtons.forEach(btn => {
+            btn.addEventListener('click', () => applyPlannedTemplate(btn.dataset.template));
         });
     }
     if (cancelEditPlannedExpenseButton) {

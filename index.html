@@ -305,6 +305,13 @@
                             <p class="small-text">Define montos recurrentes con su frecuencia y pásalos a la pestaña de Gastos cuando corresponda, evitando duplicados.</p>
                         </div>
                         <form id="planned-expense-form">
+                            <div class="quick-plan-row">
+                                <div class="quick-plan-buttons">
+                                    <button type="button" class="chip-button" data-template="rent">Arriendo mensual</button>
+                                    <button type="button" class="chip-button" data-template="groceries">Supermercado semanal</button>
+                                </div>
+                                <p class="small-text">Usa un atajo o completa los campos manualmente.</p>
+                            </div>
                             <label for="planned-expense-name">Nombre:</label>
                             <input type="text" id="planned-expense-name" required placeholder="Arriendo, internet, seguro...">
 
@@ -334,9 +341,13 @@
                                 <option value="Único">Único</option>
                             </select>
 
-                            <label for="planned-expense-start-date">Fecha base / próximo pago:</label>
+                            <label for="planned-expense-start-date">Fecha base:</label>
                             <input type="date" id="planned-expense-start-date">
-                            <p class="small-text">La fecha base define el día de referencia para cada período (ej: el 5 de cada mes).</p>
+                            <p class="small-text">Esta fecha se usa como referencia para repetir el gasto (ej: el 5 de cada mes o el lunes de la semana).</p>
+
+                            <label for="planned-expense-due-date">Fecha presupuestada de pago:</label>
+                            <input type="date" id="planned-expense-due-date" placeholder="Próximo pago planificado">
+                            <p class="small-text">Déjala en blanco si coincide con la fecha base. Úsala para fijar un pago concreto dentro del mes.</p>
 
                             <button type="submit" id="save-planned-expense-button">Guardar plan</button>
                             <button type="button" id="cancel-edit-planned-expense-button" class="danger" style="display:none;">Cancelar edición</button>
