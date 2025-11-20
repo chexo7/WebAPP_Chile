@@ -404,21 +404,83 @@
             </div>
 
             <div id="grafico" class="tab-content">
+                <div class="chart-header">
+                    <div>
+                        <p class="eyebrow">Análisis visual</p>
+                        <h2 id="grafico-title">Gráfico de Flujo de Caja</h2>
+                        <p class="section-subtitle">Controla la vista, descubre picos y comparte los hallazgos sin salir de la pestaña.</p>
+                    </div>
+                    <div class="chart-actions">
+                        <button id="reset-chart-view" class="ghost">Restablecer vista</button>
+                        <button id="download-chart-image" class="ghost accent">Descargar PNG</button>
+                    </div>
+                </div>
+
+                <div class="chart-summary-grid">
+                    <div class="summary-card" id="chart-summary-balance">
+                        <p class="summary-label">Saldo final proyectado</p>
+                        <p class="summary-value" id="chart-summary-balance-value">--</p>
+                        <p class="summary-helper" id="chart-summary-balance-helper">Basado en el periodo visible</p>
+                    </div>
+                    <div class="summary-card" id="chart-summary-lowest">
+                        <p class="summary-label">Punto mínimo</p>
+                        <p class="summary-value" id="chart-summary-lowest-value">--</p>
+                        <p class="summary-helper" id="chart-summary-lowest-helper">Fecha más exigente</p>
+                    </div>
+                    <div class="summary-card" id="chart-summary-income">
+                        <p class="summary-label">Ingreso medio</p>
+                        <p class="summary-value" id="chart-summary-income-value">--</p>
+                        <p class="summary-helper">Promedio en rango visible</p>
+                    </div>
+                    <div class="summary-card" id="chart-summary-expense">
+                        <p class="summary-label">Gasto medio</p>
+                        <p class="summary-value" id="chart-summary-expense-value">--</p>
+                        <p class="summary-helper">Incluye fijos y variables</p>
+                    </div>
+                </div>
+
                 <div class="subtabs-container" id="chart-subtabs">
                     <button class="subtab-button active" data-parent="chart" data-period="Mensual">Mensual</button>
                     <button class="subtab-button" data-parent="chart" data-period="Semanal">Semanal</button>
                     <button class="subtab-button" data-parent="chart" data-period="Diario">Diario</button>
                 </div>
-                <h2 id="grafico-title">Gráfico de Flujo de Caja</h2>
+
+                <div class="chart-control-grid">
+                    <div class="chart-control-block">
+                        <h4>Rango rápido</h4>
+                        <div class="chart-quick-range">
+                            <button class="ghost" data-range="3">Últimos 3</button>
+                            <button class="ghost" data-range="6">Últimos 6</button>
+                            <button class="ghost" data-range="12">Últimos 12</button>
+                            <button class="ghost active" data-range="all">Todo</button>
+                        </div>
+                    </div>
+                    <div class="chart-control-block">
+                        <h4>Capas del gráfico</h4>
+                        <div class="chart-toggle-list">
+                            <label class="chip-toggle chart-dataset-toggle"><input type="checkbox" data-key="saldo" checked>Saldo final</label>
+                            <label class="chip-toggle chart-dataset-toggle"><input type="checkbox" data-key="ingresos" checked>Ingresos</label>
+                            <label class="chip-toggle chart-dataset-toggle"><input type="checkbox" data-key="gastos" checked>Gastos</label>
+                            <label class="chip-toggle chart-dataset-toggle"><input type="checkbox" data-key="flujo" checked>Flujo neto</label>
+                        </div>
+                    </div>
+                    <div class="chart-control-block">
+                        <h4>Curva y vista</h4>
+                        <div class="chart-toggle-row">
+                            <label class="switch-label"><input type="checkbox" id="chart-smooth-toggle">Suavizar saldo</label>
+                            <div id="mobile-chart-range" class="mobile-chart-range" style="display:none;">
+                                <label for="mobile-chart-start">Desde:</label>
+                                <input type="date" id="mobile-chart-start">
+                                <label for="mobile-chart-end">Hasta:</label>
+                                <input type="date" id="mobile-chart-end">
+                                <button id="apply-mobile-chart-range">Aplicar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="chart-container">
                     <canvas id="cashflow-chart"></canvas>
-                </div>
-                <div id="mobile-chart-range" class="mobile-chart-range" style="display:none;">
-                    <label for="mobile-chart-start">Desde:</label>
-                    <input type="date" id="mobile-chart-start">
-                    <label for="mobile-chart-end">Hasta:</label>
-                    <input type="date" id="mobile-chart-end">
-                    <button id="apply-mobile-chart-range">Aplicar</button>
                 </div>
                 <p id="chart-message" class="centered-text">Doble clic en el gráfico para activar el zoom.</p>
 

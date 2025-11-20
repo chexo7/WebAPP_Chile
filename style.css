@@ -96,6 +96,19 @@ h4 {
     margin-bottom: 0.5rem;
 }
 
+.eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.75rem;
+    color: var(--light-text);
+    margin: 0 0 4px;
+}
+
+.section-subtitle {
+    color: var(--light-text);
+    margin: 4px 0 0;
+}
+
 
 /* Contenedores de autenticación y datos */
 #auth-container, #data-selection-container, #main-content-container {
@@ -218,6 +231,14 @@ button.accent {
 }
 button.accent:hover {
     background-color: var(--accent-hover);
+}
+button.ghost {
+    background: #fff;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+button.ghost:hover {
+    background: #f2f4f8;
 }
 button.small-button {
     padding: 5px 10px;
@@ -824,6 +845,124 @@ td.reimbursement-income {
 .shared-legend li {
     display: flex;
     align-items: center;
+    font-size: 0.9rem;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.chart-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.chart-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin: 10px 0 20px;
+}
+
+.summary-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 12px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.summary-label {
+    font-size: 0.85rem;
+    color: var(--light-text);
+    margin: 0 0 6px;
+}
+
+.summary-value {
+    font-size: 1.3rem;
+    margin: 0 0 6px;
+    color: var(--text-color);
+    font-weight: 700;
+}
+
+.summary-helper {
+    margin: 0;
+    color: var(--light-text);
+    font-size: 0.85rem;
+}
+
+.chart-control-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin: 10px 0 5px;
+}
+
+.chart-control-block {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 12px;
+    background: #f9fafc;
+}
+
+.chart-control-block h4 {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    color: var(--primary-color);
+}
+
+.chart-quick-range {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chart-quick-range button.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+.chart-toggle-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chip-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.chip-toggle input {
+    margin: 0;
+}
+
+.chart-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.switch-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 0.9rem;
 }
 
