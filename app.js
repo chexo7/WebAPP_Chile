@@ -251,6 +251,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const chartModalClose = document.getElementById('chart-modal-close');
     const chartModalTitle = document.getElementById('chart-modal-title');
     const chartModalTableBody = document.querySelector('#chart-modal-table tbody');
+    const chartQuickRangeButtons = document.querySelectorAll('.chart-quick-range button');
+    const chartDatasetToggles = document.querySelectorAll('.chart-dataset-toggle input[type="checkbox"]');
+    const chartSmoothToggle = document.getElementById('chart-smooth-toggle');
+    const resetChartViewButton = document.getElementById('reset-chart-view');
+    const downloadChartImageButton = document.getElementById('download-chart-image');
+    const chartSummaryElements = {
+        balance: document.getElementById('chart-summary-balance-value'),
+        balanceHelper: document.getElementById('chart-summary-balance-helper'),
+        lowest: document.getElementById('chart-summary-lowest-value'),
+        lowestHelper: document.getElementById('chart-summary-lowest-helper'),
+        income: document.getElementById('chart-summary-income-value'),
+        expense: document.getElementById('chart-summary-expense-value')
+    };
     let cashflowChartInstance = null;
     const pieMonthChartInstances = [null, null, null];
     const pieWeekChartInstances = [null, null, null];
@@ -258,6 +271,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
     let fullChartData = null;
     let activeCashflowPeriodicity = 'Mensual';
+    let chartDatasetVisibility = { saldo: true, ingresos: true, gastos: true, flujo: true };
+    let chartSmoothingEnabled = false;
     let activePaymentsPeriodicity = 'Mensual';
     const cashflowPeriodDatesMap = { Mensual: [], Semanal: [], Diario: [] };
     const cashflowCategoryTotalsMap = { Mensual: [], Semanal: [], Diario: [] };
@@ -3390,6 +3405,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- LÓGICA PESTAÑA GRÁFICO ---
+    function getChartLabelForDate(date, periodicity = activeCashflowPeriodicity) {
+        if (!(date instanceof Date)) return '';
+        if (periodicity === 'Semanal') {
+            const [year, week] = getWeekNumber(date);
+            return `Sem ${week} ${year}`;
+        }
+        if (periodicity === 'Diario') {
+            return `${DATE_DAY_FORMAT(date)} ${date.getUTCFullYear()}`;
+        }
+        return `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+    }
+
+    function updateChartInsights(dataset) {
+        if (!dataset || !chartSummaryElements.balance) return;
+        const symbol = currentBackupData?.display_currency_symbol || '$';
+        const { periodDates = [], incomes = [], totalExpenses = [], endBalances = [] } = dataset;
+
+        if (!periodDates.length || !endBalances.length) {
+            Object.values(chartSummaryElements).forEach(el => { if (el) el.textContent = '--'; });
+            if (chartSummaryElements.balanceHelper) chartSummaryElements.balanceHelper.textContent = 'Basado en el periodo visible';
+            if (chartSummaryElements.lowestHelper) chartSummaryElements.lowestHelper.textContent = 'Fecha más exigente';
+            return;
+        }
+
+        const lastBalance = endBalances[endBalances.length - 1];
+        const minBalance = Math.min(...endBalances);
+        const minIndex = endBalances.indexOf(minBalance);
+        const avgIncome = incomes.reduce((acc, val) => acc + (val || 0), 0) / incomes.length;
+        const avgExpense = totalExpenses.reduce((acc, val) => acc + (val || 0), 0) / totalExpenses.length;
+        const minDate = periodDates[minIndex];
+
+        chartSummaryElements.balance.textContent = formatCurrencyJS(lastBalance, symbol);
+        chartSummaryElements.lowest.textContent = formatCurrencyJS(minBalance, symbol);
+        chartSummaryElements.income.textContent = formatCurrencyJS(avgIncome, symbol);
+        chartSummaryElements.expense.textContent = formatCurrencyJS(-avgExpense, symbol);
+
+        if (chartSummaryElements.balanceHelper) chartSummaryElements.balanceHelper.textContent = 'Basado en el periodo visible';
+        if (chartSummaryElements.lowestHelper) chartSummaryElements.lowestHelper.textContent = minDate ? `Período: ${getChartLabelForDate(minDate)}` : 'Fecha más exigente';
+    }
+
     function renderCashflowChart(periodDates, incomes, totalExpenses, netFlows, endBalances, storeData = true) {
         if (storeData) {
             fullChartData = { periodDates, incomes, totalExpenses, netFlows, endBalances };
@@ -3456,9 +3511,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.restore();
             }
         }] : [];
+        const smoothingTension = chartSmoothingEnabled ? 0.35 : 0.1;
+        const datasets = [
+            { label: 'Saldo Final Estimado', metaKey: 'saldo', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: smoothingTension, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1 },
+            { label: 'Ingreso Total Neto', metaKey: 'ingresos', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2 },
+            { label: 'Gasto Total', metaKey: 'gastos', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2 },
+            { label: 'Flujo Neto del Período', metaKey: 'flujo', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2 }
+        ];
+        datasets.forEach(ds => { ds.hidden = chartDatasetVisibility[ds.metaKey] === false; });
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
             type: 'line',
-            data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
+            data: { labels: labels, datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -3524,6 +3587,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             cashflowChartInstance.update();
         }
+        updateChartInsights({ periodDates, incomes, totalExpenses, netFlows, endBalances });
         cashflowChartCanvas.onclick = async (evt) => {
             if (!cashflowChartInstance) return;
             const points = cashflowChartInstance.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
@@ -4342,6 +4406,26 @@ function getMondayOfWeek(year, week) {
     updatePieMonthCharts();
     updatePieWeekCharts();
 
+    chartQuickRangeButtons.forEach(btn => {
+        if (!btn) return;
+        btn.addEventListener('click', () => applyQuickChartRange(btn.dataset.range));
+    });
+    chartDatasetToggles.forEach(toggle => {
+        toggle.addEventListener('change', () => {
+            chartDatasetVisibility[toggle.dataset.key] = toggle.checked;
+            applyDatasetVisibility();
+        });
+    });
+    if (chartSmoothToggle) {
+        chartSmoothToggle.addEventListener('change', () => {
+            chartSmoothingEnabled = chartSmoothToggle.checked;
+            updateChartSmoothing();
+        });
+    }
+    if (resetChartViewButton) resetChartViewButton.addEventListener('click', resetChartView);
+    if (downloadChartImageButton) downloadChartImageButton.addEventListener('click', downloadChartImage);
+    refreshQuickRangeHighlight('all');
+
     // --- CONFIGURAR ZOOM EN EL GRÁFICO ---
     function enableChartZoom() {
         if (!cashflowChartInstance) return;
@@ -4377,16 +4461,20 @@ function getMondayOfWeek(year, week) {
 
     function applyMobileChartRange() {
         if (!isTouchDevice || !fullChartData) return;
+        refreshQuickRangeHighlight(null);
+        disableChartZoom();
         const startStr = mobileChartStartInput ? mobileChartStartInput.value : '';
         const endStr = mobileChartEndInput ? mobileChartEndInput.value : '';
         if (!startStr || !endStr) {
             renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
+            refreshQuickRangeHighlight('all');
             return;
         }
         const startDate = toUTCDate(startStr);
         const endDate = toUTCDate(endStr);
         if (isNaN(startDate) || isNaN(endDate) || startDate > endDate) {
             renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
+            refreshQuickRangeHighlight('all');
             return;
         }
         const fDates = [];
@@ -4405,6 +4493,71 @@ function getMondayOfWeek(year, week) {
             }
         }
         renderCashflowChart(fDates, fInc, fExp, fNet, fEnd, false);
+    }
+
+    function refreshQuickRangeHighlight(rangeValue) {
+        if (!chartQuickRangeButtons) return;
+        chartQuickRangeButtons.forEach(btn => {
+            btn.classList.toggle('active', !!rangeValue && btn.dataset.range === String(rangeValue));
+        });
+    }
+
+    function applyQuickChartRange(rangeValue) {
+        if (!fullChartData || !Array.isArray(fullChartData.periodDates)) return;
+        disableChartZoom();
+        if (!rangeValue) {
+            refreshQuickRangeHighlight(null);
+            return;
+        }
+        if (rangeValue === 'all') {
+            refreshQuickRangeHighlight('all');
+            renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
+            return;
+        }
+        const count = parseInt(rangeValue, 10);
+        if (isNaN(count) || count <= 0) return;
+        const startIndex = Math.max(fullChartData.periodDates.length - count, 0);
+        const fDates = fullChartData.periodDates.slice(startIndex);
+        const fInc = fullChartData.incomes.slice(startIndex);
+        const fExp = fullChartData.totalExpenses.slice(startIndex);
+        const fNet = fullChartData.netFlows.slice(startIndex);
+        const fEnd = fullChartData.endBalances.slice(startIndex);
+        refreshQuickRangeHighlight(rangeValue);
+        renderCashflowChart(fDates, fInc, fExp, fNet, fEnd, false);
+    }
+
+    function applyDatasetVisibility() {
+        if (!cashflowChartInstance) return;
+        cashflowChartInstance.data.datasets.forEach(ds => {
+            if (!ds || typeof ds.metaKey === 'undefined') return;
+            ds.hidden = chartDatasetVisibility[ds.metaKey] === false;
+        });
+        cashflowChartInstance.update();
+    }
+
+    function updateChartSmoothing() {
+        if (!cashflowChartInstance) return;
+        cashflowChartInstance.data.datasets.forEach(ds => {
+            if (ds.type && ds.type !== 'line') return;
+            ds.tension = chartSmoothingEnabled ? 0.35 : 0.1;
+        });
+        cashflowChartInstance.update();
+    }
+
+    function downloadChartImage() {
+        if (!cashflowChartInstance) return;
+        const link = document.createElement('a');
+        link.href = cashflowChartInstance.toBase64Image();
+        link.download = 'flujo-caja.png';
+        link.click();
+    }
+
+    function resetChartView() {
+        disableChartZoom();
+        refreshQuickRangeHighlight('all');
+        if (fullChartData) {
+            renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
+        }
     }
 
     function openChartModal(title, rows) {
