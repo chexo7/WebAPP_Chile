@@ -3023,6 +3023,22 @@ document.addEventListener('DOMContentLoaded', () => {
         budgetAmountInput.value = normalizedBudget.amount || '0';
         if (budgetFrequencySelect) budgetFrequencySelect.value = normalizedBudget.frequency;
     });
+
+    function deleteBudget(category) {
+        if (!currentBackupData || !currentBackupData.budgets) return;
+        if (!(category in currentBackupData.budgets)) return;
+        const confirmation = confirm(`¿Eliminar el presupuesto de "${category}"?`);
+        if (!confirmation) return;
+        delete currentBackupData.budgets[category];
+        if (budgetCategorySelect && budgetCategorySelect.value === category) {
+            budgetAmountInput.value = '';
+            if (budgetFrequencySelect) budgetFrequencySelect.value = 'Mensual';
+        }
+        renderBudgetsTable();
+        renderBudgetSummaryTableForSelectedPeriod();
+        renderCashflowTable();
+    }
+
     function renderBudgetsTable() {
         if (!budgetsTableView || !currentBackupData || !currentBackupData.expense_categories) return;
         budgetsTableView.innerHTML = '';
@@ -3040,6 +3056,16 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = formatCurrencyJS(budgetEntry.amount, currentBackupData.display_currency_symbol || '$');
             row.insertCell().textContent = budgetEntry.frequency;
             row.insertCell().textContent = formatCurrencyJS(monthlyBudget, currentBackupData.display_currency_symbol || '$');
+            const actionsCell = row.insertCell();
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Eliminar';
+            deleteButton.type = 'button';
+            deleteButton.className = 'danger';
+            deleteButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                deleteBudget(catName);
+            });
+            actionsCell.appendChild(deleteButton);
             row.addEventListener('click', () => {
                 budgetCategorySelect.value = catName;
                 budgetAmountInput.value = budgetEntry.amount;
