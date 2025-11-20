@@ -221,6 +221,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const mobileChartStartInput = document.getElementById('mobile-chart-start');
     const mobileChartEndInput = document.getElementById('mobile-chart-end');
     const applyMobileChartRangeButton = document.getElementById('apply-mobile-chart-range');
+    const chartResetZoomButton = document.getElementById('chart-reset-zoom');
+    const chartDownloadImageButton = document.getElementById('chart-download-image');
     const chartSubtabs = document.getElementById('chart-subtabs');
     const graficoTitle = document.getElementById('grafico-title');
     const pieMonthInputs = [
@@ -4256,6 +4258,25 @@ function getMondayOfWeek(year, week) {
         if (applyMobileChartRangeButton) {
             applyMobileChartRangeButton.addEventListener('click', applyMobileChartRange);
         }
+    }
+
+    if (chartResetZoomButton) {
+        chartResetZoomButton.addEventListener('click', () => {
+            if (!cashflowChartInstance) return;
+            disableChartZoom();
+        });
+    }
+
+    if (chartDownloadImageButton) {
+        chartDownloadImageButton.addEventListener('click', () => {
+            if (!cashflowChartInstance) return;
+            const period = activeCashflowPeriodicity ? activeCashflowPeriodicity.toLowerCase() : 'mensual';
+            const timestamp = new Date().toISOString().slice(0, 10);
+            const link = document.createElement('a');
+            link.download = `flujo-${period}-${timestamp}.png`;
+            link.href = cashflowChartInstance.toBase64Image();
+            link.click();
+        });
     }
 
     pieMonthInputs.forEach(inp => { if (inp) inp.value = today.toISOString().slice(0,7); });
