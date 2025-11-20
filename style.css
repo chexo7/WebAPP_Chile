@@ -317,7 +317,8 @@ button.button-large {
 #expenses-table-view,
 #budgets-table-view,
 #payments-table-view,
-#budget-summary-table {
+#budget-summary-table,
+#planned-expenses-table {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
@@ -335,7 +336,9 @@ button.button-large {
 #payments-table-view th,
 #payments-table-view td,
 #budget-summary-table th,
-#budget-summary-table td {
+#budget-summary-table td,
+#planned-expenses-table th,
+#planned-expenses-table td {
     padding: 10px 12px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
@@ -694,6 +697,34 @@ td.reimbursement-income {
     cursor: pointer;
 }
 
+.section-intro {
+    margin: -10px 0 15px;
+    color: var(--light-text);
+}
+
+.budget-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 18px;
+    align-items: start;
+}
+
+.budget-card {
+    height: 100%;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border-color);
+}
+
+.section-header h3 {
+    margin-bottom: 6px;
+}
+
+.dual-input-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+}
+
 /* Estilos específicos para Pestaña Ajustes */
 .settings-form-container {
     max-width: 600px;
@@ -751,6 +782,59 @@ td.reimbursement-income {
 /* Estilos para Pestaña Presupuestos */
 #budget-summary-table-container {
     margin-top: 20px;
+}
+
+.planned-expense-panel .table-responsive {
+    max-height: 520px;
+}
+
+.planned-expense-panel h3 {
+    margin-bottom: 6px;
+}
+
+.quick-planned-expense-card .small-text {
+    margin-top: -4px;
+    color: var(--light-text);
+}
+
+.quick-planned-expense-card button {
+    margin-top: 6px;
+}
+
+.planned-expense-panel p.small-text {
+    margin-top: -4px;
+    margin-bottom: 10px;
+}
+
+#planned-expenses-table td:last-child {
+    min-width: 180px;
+}
+
+.planned-expense-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.status-pill {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border: 1px solid transparent;
+}
+
+.status-pill.success {
+    background-color: #e7f5eb;
+    color: #1f7a3f;
+    border-color: #b5dfc2;
+}
+
+.status-pill.pending {
+    background-color: #fff5e0;
+    color: #a56700;
+    border-color: #ffdd9b;
 }
 
 /* Estilos para Pestaña Registro Pagos */
