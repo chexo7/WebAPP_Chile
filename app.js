@@ -179,9 +179,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const budgetForm = document.getElementById('budget-form');
     const budgetCategorySelect = document.getElementById('budget-category-select');
     const budgetAmountInput = document.getElementById('budget-amount-input');
+    const budgetFrequencySelect = document.getElementById('budget-frequency-select');
     const saveBudgetButton = document.getElementById('save-budget-button');
     const budgetsTableView = document.querySelector('#budgets-table-view tbody');
     const budgetSummaryTableBody = document.querySelector('#budget-summary-table tbody');
+    const budgetDeleteList = document.getElementById('budget-delete-list');
     const budgetPrevPeriodButton = document.getElementById('budget-prev-period-button');
     const budgetNextPeriodButton = document.getElementById('budget-next-period-button');
     const budgetYearSelect = document.getElementById('budget-year-select');
@@ -534,6 +536,25 @@ document.addEventListener('DOMContentLoaded', () => {
         return decoded;
     }
 
+    function normalizeBudgetEntry(rawBudget) {
+        if (rawBudget && typeof rawBudget === 'object' && !Array.isArray(rawBudget)) {
+            const normalizedAmount = parseFloat(rawBudget.amount);
+            return {
+                amount: isNaN(normalizedAmount) ? 0 : normalizedAmount,
+                frequency: rawBudget.frequency || 'Mensual'
+            };
+        }
+        const parsedAmount = parseFloat(rawBudget);
+        return {
+            amount: isNaN(parsedAmount) ? 0 : parsedAmount,
+            frequency: 'Mensual'
+        };
+    }
+
+    function createDefaultBudgetEntry() {
+        return { amount: 0, frequency: 'Mensual' };
+    }
+
     // --- LÓGICA DE UI ---
     function showLoginScreen() {
         showElement(authContainer);
@@ -816,6 +837,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!hydrated.budgets || typeof hydrated.budgets !== 'object') hydrated.budgets = {};
+        Object.keys(hydrated.budgets).forEach(catName => {
+            hydrated.budgets[catName] = normalizeBudgetEntry(hydrated.budgets[catName]);
+        });
         if (!hydrated.payments || typeof hydrated.payments !== 'object') hydrated.payments = {};
 
         if (!Array.isArray(hydrated.credit_cards)) {
@@ -1203,28 +1227,38 @@ document.addEventListener('DOMContentLoaded', () => {
     
         const prevBudgets = prevData.budgets || {};
         const currentBudgets = currentData.budgets || {};
+        const formatBudgetEntry = (budgetEntry) => {
+            const normalized = normalizeBudgetEntry(budgetEntry);
+            return `${formatCurrencyJS(normalized.amount, symbol)} (${normalized.frequency})`;
+        };
         Object.keys(currentCategories).forEach(catName => { // Iterate current categories to capture new and modified budgets
-            const prevAmount = prevBudgets[catName]; // Can be undefined
-            const currentAmount = currentBudgets[catName]; // Can be undefined
-    
-            if (currentAmount !== undefined && prevAmount !== currentAmount) { // Only log if current is defined and different
-                 if (prevAmount === undefined && currentAmount !== 0) { // New budget for existing or new category
-                    details.push(`Presupuesto para '${catName}' establecido a: ${formatCurrencyJS(currentAmount, symbol)}.`);
-                } else if (prevAmount !== undefined) { // Modified budget for existing category
-                    details.push(`Presupuesto para '${catName}' cambiado de ${formatCurrencyJS(prevAmount, symbol)} a ${formatCurrencyJS(currentAmount, symbol)}.`);
-                } else if (prevAmount === undefined && currentAmount === 0 && !prevCategories[catName]) {
-                    // This case means a new category was added, and its budget is implicitly 0.
-                    // We don't need to log "budget set to 0" if the category is new and budget is 0.
-                    // The category addition itself is logged above.
+            const prevEntry = prevBudgets[catName];
+            const currentEntry = currentBudgets[catName];
+
+            if (currentEntry === undefined) return;
+
+            const prevDefined = prevEntry !== undefined;
+            const prevNormalized = prevDefined ? normalizeBudgetEntry(prevEntry) : null;
+            const currentNormalized = normalizeBudgetEntry(currentEntry);
+            const hasChanged = !prevDefined || prevNormalized.amount !== currentNormalized.amount || prevNormalized.frequency !== currentNormalized.frequency;
+
+            if (hasChanged) {
+                if (!prevDefined && (currentNormalized.amount !== 0 || currentNormalized.frequency !== 'Mensual')) {
+                    details.push(`Presupuesto para '${catName}' establecido a: ${formatBudgetEntry(currentEntry)}.`);
+                } else if (prevDefined) {
+                    details.push(`Presupuesto para '${catName}' cambiado de ${formatBudgetEntry(prevEntry)} a ${formatBudgetEntry(currentEntry)}.`);
                 }
             }
         });
          Object.keys(prevBudgets).forEach(catName => {
-            if (currentBudgets[catName] === undefined && prevBudgets[catName] !== 0) { // Budget removed for a category that might still exist or was removed
-                if (currentCategories[catName]) { // Category still exists, budget explicitly removed (set to 0 or undefined)
-                     details.push(`Presupuesto para '${catName}' cambiado de ${formatCurrencyJS(prevBudgets[catName], symbol)} a ${formatCurrencyJS(0, symbol)}.`);
-                } else { // Category was removed, and it had a budget
-                    details.push(`Presupuesto para categoría eliminada '${catName}' (era ${formatCurrencyJS(prevBudgets[catName], symbol)}) removido.`);
+            if (currentBudgets[catName] === undefined) { // Budget removed for a category that might still exist or was removed
+                const prevNormalized = normalizeBudgetEntry(prevBudgets[catName]);
+                if (prevNormalized.amount !== 0 || prevNormalized.frequency !== 'Mensual') {
+                    if (currentCategories[catName]) { // Category still exists, budget explicitly removed (set to 0 or undefined)
+                        details.push(`Presupuesto para '${catName}' eliminado (antes ${formatBudgetEntry(prevBudgets[catName])}).`);
+                    } else { // Category was removed, and it had a budget
+                        details.push(`Presupuesto para categoría eliminada '${catName}' (era ${formatBudgetEntry(prevBudgets[catName])}) removido.`);
+                    }
                 }
             }
         });
@@ -2302,20 +2336,20 @@ document.addEventListener('DOMContentLoaded', () => {
         populateIncomeReimbursementCategoriesDropdown();
     }
     addCategoryButton.addEventListener('click', () => {
-        const newCategoryName = prompt("Nombre de la nueva categoría de gasto:");
-        if (newCategoryName && newCategoryName.trim()) {
-            const trimmedName = newCategoryName.trim();
-            if (!isFirebaseKeySafe(trimmedName)) { alert(`El nombre de categoría "${trimmedName}" contiene caracteres no permitidos: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}.`); return; }
-            if (currentBackupData.expense_categories[trimmedName]) { alert(`La categoría "${trimmedName}" ya existe.`); return; }
-            const categoryType = prompt(`Tipo para "${trimmedName}" (Fijo/Variable):`, "Variable");
-            if (categoryType && (categoryType.toLowerCase() === 'fijo' || categoryType.toLowerCase() === 'variable')) {
-                currentBackupData.expense_categories[trimmedName] = categoryType.charAt(0).toUpperCase() + categoryType.slice(1).toLowerCase();
-                if (!currentBackupData.budgets) currentBackupData.budgets = {};
-                currentBackupData.budgets[trimmedName] = 0;
-                populateExpenseCategoriesDropdowns(); renderBudgetsTable();
-                alert(`Categoría "${trimmedName}" (${currentBackupData.expense_categories[trimmedName]}) agregada.`);
-            } else if (categoryType !== null) alert("Tipo de categoría inválido. Debe ser 'Fijo' o 'Variable'.");
-        }
+            const newCategoryName = prompt("Nombre de la nueva categoría de gasto:");
+            if (newCategoryName && newCategoryName.trim()) {
+                const trimmedName = newCategoryName.trim();
+                if (!isFirebaseKeySafe(trimmedName)) { alert(`El nombre de categoría "${trimmedName}" contiene caracteres no permitidos: ${FIREBASE_FORBIDDEN_CHARS_DISPLAY}.`); return; }
+                if (currentBackupData.expense_categories[trimmedName]) { alert(`La categoría "${trimmedName}" ya existe.`); return; }
+                const categoryType = prompt(`Tipo para "${trimmedName}" (Fijo/Variable):`, "Variable");
+                if (categoryType && (categoryType.toLowerCase() === 'fijo' || categoryType.toLowerCase() === 'variable')) {
+                    currentBackupData.expense_categories[trimmedName] = categoryType.charAt(0).toUpperCase() + categoryType.slice(1).toLowerCase();
+                    if (!currentBackupData.budgets) currentBackupData.budgets = {};
+                    currentBackupData.budgets[trimmedName] = createDefaultBudgetEntry();
+                    populateExpenseCategoriesDropdowns(); renderBudgetsTable();
+                    alert(`Categoría "${trimmedName}" (${currentBackupData.expense_categories[trimmedName]}) agregada.`);
+                } else if (categoryType !== null) alert("Tipo de categoría inválido. Debe ser 'Fijo' o 'Variable'.");
+            }
     });
     removeCategoryButton.addEventListener('click', () => {
         const categoryToRemove = expenseCategorySelect.value;
@@ -2932,39 +2966,142 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- LÓGICA PESTAÑA PRESUPUESTOS ---
+    function getDaysInMonthForDate(dateObj) {
+        const year = dateObj.getUTCFullYear();
+        const month = dateObj.getUTCMonth();
+        return getDaysInMonth(year, month);
+    }
+
+    function getOccurrencesForFrequency(frequency, targetDate) {
+        const safeDate = targetDate instanceof Date ? targetDate : new Date();
+        const daysInMonth = getDaysInMonthForDate(safeDate);
+        const weeksInMonth = Math.ceil(daysInMonth / 7);
+        switch (frequency) {
+            case 'Semanal':
+                return weeksInMonth;
+            case 'Quincenal':
+                return 2;
+            case 'Diario':
+                return daysInMonth;
+            case 'Mensual':
+            default:
+                return 1;
+        }
+    }
+
+    function calculateMonthlyBudgetValue(rawBudgetEntry, targetDate) {
+        const normalizedBudget = normalizeBudgetEntry(rawBudgetEntry);
+        const occurrences = getOccurrencesForFrequency(normalizedBudget.frequency, targetDate);
+        return normalizedBudget.amount * occurrences;
+    }
+
     function resetBudgetForm() {
         budgetForm.reset();
         if (budgetCategorySelect.options.length > 0) budgetCategorySelect.selectedIndex = 0;
         budgetAmountInput.value = '';
+        if (budgetFrequencySelect) budgetFrequencySelect.value = 'Mensual';
     }
     budgetForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const category = budgetCategorySelect.value;
         const amount = parseFloat(budgetAmountInput.value);
+        const frequency = budgetFrequencySelect ? budgetFrequencySelect.value : 'Mensual';
         if (!category) { alert("Selecciona una categoría."); return; }
         if (isNaN(amount) || amount < 0) { alert("Ingresa un monto válido."); return; }
+        if (!frequency) { alert("Selecciona una frecuencia."); return; }
         if (!isFirebaseKeySafe(category)) { alert(`Categoría "${category}" con nombre no permitido.`); return; }
         if (!currentBackupData.budgets) currentBackupData.budgets = {};
-        currentBackupData.budgets[category] = amount;
+        currentBackupData.budgets[category] = normalizeBudgetEntry({ amount, frequency });
         renderBudgetsTable(); renderBudgetSummaryTableForSelectedPeriod(); renderCashflowTable();
-        alert(`Presupuesto para "${category}" guardado como ${formatCurrencyJS(amount, currentBackupData.display_currency_symbol || '$')}.`);
+        const monthlyValue = calculateMonthlyBudgetValue(currentBackupData.budgets[category], currentBudgetViewDate || new Date());
+        alert(`Presupuesto para "${category}" guardado como ${formatCurrencyJS(amount, currentBackupData.display_currency_symbol || '$')} (${frequency}). Mensual estimado: ${formatCurrencyJS(monthlyValue, currentBackupData.display_currency_symbol || '$')}.`);
     });
     budgetCategorySelect.addEventListener('change', () => {
         const selectedCategory = budgetCategorySelect.value;
-        budgetAmountInput.value = (selectedCategory && currentBackupData && currentBackupData.budgets) ? (currentBackupData.budgets[selectedCategory] || '0') : '0';
+        const normalizedBudget = (selectedCategory && currentBackupData && currentBackupData.budgets)
+            ? normalizeBudgetEntry(currentBackupData.budgets[selectedCategory])
+            : createDefaultBudgetEntry();
+        budgetAmountInput.value = normalizedBudget.amount || '0';
+        if (budgetFrequencySelect) budgetFrequencySelect.value = normalizedBudget.frequency;
     });
+
+    function deleteBudget(category) {
+        if (!currentBackupData || !currentBackupData.budgets) return;
+        if (!(category in currentBackupData.budgets)) return;
+        const confirmation = confirm(`¿Eliminar el presupuesto de "${category}"?`);
+        if (!confirmation) return;
+        delete currentBackupData.budgets[category];
+        if (budgetCategorySelect && budgetCategorySelect.value === category) {
+            budgetAmountInput.value = '';
+            if (budgetFrequencySelect) budgetFrequencySelect.value = 'Mensual';
+        }
+        renderBudgetsTable();
+        renderBudgetSummaryTableForSelectedPeriod();
+        renderCashflowTable();
+        renderBudgetDeletionList();
+    }
+
     function renderBudgetsTable() {
-        if (!budgetsTableView || !currentBackupData || !currentBackupData.expense_categories) return;
+        if (!budgetsTableView || !currentBackupData || !currentBackupData.expense_categories) {
+            renderBudgetDeletionList();
+            return;
+        }
         budgetsTableView.innerHTML = '';
+        const targetDate = (currentBudgetViewDate instanceof Date) ? currentBudgetViewDate : new Date();
         const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
         sortedCategories.forEach(catName => {
             const catType = currentBackupData.expense_categories[catName];
-            const budgetAmount = (currentBackupData.budgets && currentBackupData.budgets[catName] !== undefined) ? currentBackupData.budgets[catName] : 0;
+            const budgetEntry = (currentBackupData.budgets && currentBackupData.budgets[catName] !== undefined)
+                ? normalizeBudgetEntry(currentBackupData.budgets[catName])
+                : createDefaultBudgetEntry();
+            const monthlyBudget = calculateMonthlyBudgetValue(budgetEntry, targetDate);
             const row = budgetsTableView.insertRow();
             row.insertCell().textContent = catName;
             row.insertCell().textContent = catType;
-            row.insertCell().textContent = formatCurrencyJS(budgetAmount, currentBackupData.display_currency_symbol || '$');
-            row.addEventListener('click', () => { budgetCategorySelect.value = catName; budgetAmountInput.value = budgetAmount; });
+            row.insertCell().textContent = formatCurrencyJS(budgetEntry.amount, currentBackupData.display_currency_symbol || '$');
+            row.insertCell().textContent = budgetEntry.frequency;
+            row.insertCell().textContent = formatCurrencyJS(monthlyBudget, currentBackupData.display_currency_symbol || '$');
+            row.addEventListener('click', () => {
+                budgetCategorySelect.value = catName;
+                budgetAmountInput.value = budgetEntry.amount;
+                if (budgetFrequencySelect) budgetFrequencySelect.value = budgetEntry.frequency;
+            });
+        });
+        renderBudgetDeletionList();
+    }
+
+    function renderBudgetDeletionList() {
+        if (!budgetDeleteList) return;
+        budgetDeleteList.innerHTML = '';
+        const hasBudgets = currentBackupData && currentBackupData.budgets && Object.keys(currentBackupData.budgets).length > 0;
+        if (!hasBudgets) {
+            const emptyItem = document.createElement('li');
+            emptyItem.textContent = 'No hay presupuestos guardados todavía.';
+            budgetDeleteList.appendChild(emptyItem);
+            return;
+        }
+        const viewDate = currentBudgetViewDate instanceof Date ? currentBudgetViewDate : new Date();
+        const categories = Object.keys(currentBackupData.budgets).sort();
+        categories.forEach(catName => {
+            const budgetEntry = normalizeBudgetEntry(currentBackupData.budgets[catName]);
+            const monthlyBudget = calculateMonthlyBudgetValue(budgetEntry, viewDate);
+            const item = document.createElement('li');
+            const infoWrapper = document.createElement('div');
+            const title = document.createElement('strong');
+            title.textContent = catName;
+            const meta = document.createElement('div');
+            meta.className = 'budget-delete-meta';
+            meta.textContent = `${budgetEntry.frequency} · ${formatCurrencyJS(budgetEntry.amount, currentBackupData.display_currency_symbol || '$')} (Estimado mensual: ${formatCurrencyJS(monthlyBudget, currentBackupData.display_currency_symbol || '$')})`;
+            infoWrapper.appendChild(title);
+            infoWrapper.appendChild(meta);
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Eliminar';
+            deleteButton.type = 'button';
+            deleteButton.className = 'danger';
+            deleteButton.addEventListener('click', () => deleteBudget(catName));
+            item.appendChild(infoWrapper);
+            item.appendChild(deleteButton);
+            budgetDeleteList.appendChild(item);
         });
     }
     function renderBudgetSummaryTable() {
@@ -2991,7 +3128,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
         sortedCategories.forEach(catName => {
-            const budget = currentBackupData.budgets[catName] || 0;
+            const budget = calculateMonthlyBudgetValue(currentBackupData.budgets[catName], viewDate);
             const spent = expensesThisMonth[catName] || 0;
             const difference = budget - spent;
             const percentageSpent = budget > 0 ? (spent / budget * 100) : 0;
@@ -3001,9 +3138,13 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = formatCurrencyJS(spent, currentBackupData.display_currency_symbol);
             const diffCell = row.insertCell(); diffCell.textContent = formatCurrencyJS(difference, currentBackupData.display_currency_symbol);
             diffCell.classList.toggle('text-red', difference < 0); diffCell.classList.toggle('text-green', difference > 0 && budget > 0);
-        const percCell = row.insertCell(); percCell.textContent = `${percentageSpent.toFixed(1)}%`;
-        if (budget > 0) { if (percentageSpent > 100) percCell.classList.add('text-red'); else if (percentageSpent >= 80) percCell.classList.add('text-orange'); else percCell.classList.add('text-green'); }
-    });
+            const percCell = row.insertCell(); percCell.textContent = `${percentageSpent.toFixed(1)}%`;
+            if (budget > 0) {
+                if (percentageSpent > 100) percCell.classList.add('text-red');
+                else if (percentageSpent >= 80) percCell.classList.add('text-orange');
+                else percCell.classList.add('text-green');
+            }
+        });
     }
 
     function setupBudgetPeriodSelectors() {
@@ -3055,6 +3196,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isNaN(year) || isNaN(monthIndex)) return;
         currentBudgetViewDate = new Date(Date.UTC(year, monthIndex, 1));
         renderBudgetSummaryTable();
+        renderBudgetsTable();
     }
 
     function refreshBudgetSummaryIfReady() {
