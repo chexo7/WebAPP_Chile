@@ -315,9 +315,9 @@ button.button-large {
 /* Tablas dinámicas (Ingresos/Gastos/Presupuestos) */
 #incomes-table-view,
 #expenses-table-view,
-#budgets-table-view,
 #payments-table-view,
-#budget-summary-table {
+#budget-templates-table,
+#budget-agenda-table {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
@@ -330,12 +330,12 @@ button.button-large {
 #incomes-table-view td,
 #expenses-table-view th,
 #expenses-table-view td,
-#budgets-table-view th,
-#budgets-table-view td,
 #payments-table-view th,
 #payments-table-view td,
-#budget-summary-table th,
-#budget-summary-table td {
+#budget-templates-table th,
+#budget-templates-table td,
+#budget-agenda-table th,
+#budget-agenda-table td {
     padding: 10px 12px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
@@ -346,13 +346,17 @@ button.button-large {
 
 #incomes-table-view th:last-child,
 #expenses-table-view th:last-child,
-#payments-table-view th:last-child {
+#payments-table-view th:last-child,
+#budget-templates-table th:last-child,
+#budget-agenda-table th:last-child {
     text-align: center;
 }
 
 #incomes-table-view td:last-child,
 #expenses-table-view td:last-child,
-#payments-table-view td:last-child {
+#payments-table-view td:last-child,
+#budget-templates-table td:last-child,
+#budget-agenda-table td:last-child {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
@@ -364,9 +368,9 @@ button.button-large {
 /* Cabeceras de tabla */
 #incomes-table-view thead th,
 #expenses-table-view thead th,
-#budgets-table-view thead th,
 #payments-table-view thead th,
-#budget-summary-table thead th {
+#budget-templates-table thead th,
+#budget-agenda-table thead th {
     background-color: var(--header-bg);
     color: var(--primary-color);
     font-weight: 600;
@@ -378,9 +382,9 @@ button.button-large {
 /* Estilo Hover para filas */
 #incomes-table-view tbody tr:hover td,
 #expenses-table-view tbody tr:hover td,
-#budgets-table-view tbody tr:hover td,
 #payments-table-view tbody tr:hover td,
-#budget-summary-table tbody tr:hover td {
+#budget-templates-table tbody tr:hover td,
+#budget-agenda-table tbody tr:hover td {
     background-color: var(--row-hover-bg);
 }
 
@@ -407,12 +411,12 @@ button.button-large {
     #incomes-table-view td,
     #expenses-table-view th,
     #expenses-table-view td,
-    #budgets-table-view th,
-    #budgets-table-view td,
     #payments-table-view th,
     #payments-table-view td,
-    #budget-summary-table th,
-    #budget-summary-table td {
+    #budget-templates-table th,
+    #budget-templates-table td,
+    #budget-agenda-table th,
+    #budget-agenda-table td {
         padding: 8px 10px;
         font-size: 0.85rem;
     }
@@ -749,8 +753,62 @@ td.reimbursement-income {
 
 
 /* Estilos para Pestaña Presupuestos */
+.tab-description {
+    color: var(--light-text);
+    margin: 6px 0 14px 0;
+}
+
+.budgets-grid {
+    grid-template-columns: 1.2fr 1fr;
+    align-items: start;
+}
+
+.budget-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 #budget-summary-table-container {
-    margin-top: 20px;
+    margin-top: 12px;
+}
+
+.button-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+#budget-templates-table td .tag {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: #eef2ff;
+    color: var(--primary-color);
+    font-size: 0.8rem;
+}
+
+#budget-agenda-table td .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.status-pill.pending {
+    background: #fff7ed;
+    color: #d97706;
+}
+
+.status-pill.done {
+    background: #ecfdf3;
+    color: #15803d;
 }
 
 /* Estilos para Pestaña Registro Pagos */
@@ -1297,6 +1355,14 @@ td.reimbursement-income {
   }
   h1 { font-size: 1.6rem; }
   h2 { font-size: 1.2rem; }
+
+  .budgets-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .budget-header-row {
+    align-items: flex-start;
+  }
   #auth-container, #data-selection-container, #main-content-container {
     padding: 10px;
   }
