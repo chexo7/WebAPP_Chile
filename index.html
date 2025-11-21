@@ -289,13 +289,27 @@
                             <label for="budget-category-select">Categoría:</label>
                             <select id="budget-category-select" required></select>
 
-                            <label for="budget-amount-input">Monto Presupuestado Mensual:</label>
+                            <label for="budget-amount-input">Monto fijo a presupuestar:</label>
                             <input type="number" id="budget-amount-input" step="any" required placeholder="0">
+
+                            <label for="budget-frequency-select">Frecuencia del gasto:</label>
+                            <select id="budget-frequency-select" required>
+                                <option value="Mensual">Mensual</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Quincenal">Quincenal</option>
+                                <option value="Diario">Diario</option>
+                            </select>
 
                             <button type="submit" id="save-budget-button">Guardar Presupuesto</button>
                         </form>
                     </div>
                     <div class="table-container-dynamic">
+                        <div class="budget-period-selector">
+                            <button id="budget-prev-period-button" title="Mes Anterior">&lt;</button>
+                            <select id="budget-year-select"></select>
+                            <select id="budget-month-select"></select>
+                            <button id="budget-next-period-button" title="Mes Siguiente">&gt;</button>
+                        </div>
                         <h3>Presupuestos por Categoría</h3>
                         <div class="table-responsive dynamic-table-scroll">
                             <table id="budgets-table-view">
@@ -303,20 +317,21 @@
                                     <tr>
                                         <th>Categoría</th>
                                         <th>Tipo</th>
-                                        <th>Presupuesto Mensual</th>
+                                        <th>Monto Fijo</th>
+                                        <th>Frecuencia</th>
+                                        <th>Presupuesto Mensual (mes seleccionado)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     </tbody>
                             </table>
                         </div>
-                         <h3>Resumen Gasto vs Presupuesto (Mes Actual/Seleccionado)</h3>
-                        <div class="budget-period-selector">
-                            <button id="budget-prev-period-button" title="Mes Anterior">&lt;</button>
-                            <select id="budget-year-select"></select>
-                            <select id="budget-month-select"></select>
-                            <button id="budget-next-period-button" title="Mes Siguiente">&gt;</button>
+                        <div class="budget-delete-panel">
+                            <h4>Eliminar presupuestos creados</h4>
+                            <p class="small-text">Selecciona el presupuesto que quieras eliminar de la lista.</p>
+                            <ul id="budget-delete-list" class="budget-delete-list"></ul>
                         </div>
+                        <h3>Resumen Gasto vs Presupuesto (Mes Actual/Seleccionado)</h3>
                         <div class="table-responsive dynamic-table-scroll" id="budget-summary-table-container">
                             <table id="budget-summary-table">
                                 <thead>
