@@ -753,6 +753,49 @@ td.reimbursement-income {
     margin-top: 20px;
 }
 
+#budget-delete-panel {
+    margin: 15px 0;
+    padding: 12px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+}
+
+#budget-delete-list {
+    width: 100%;
+}
+
+.budget-delete-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.budget-delete-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius);
+    background: var(--background);
+    gap: 12px;
+}
+
+.budget-delete-list-item span {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.subtle-help {
+    color: var(--light-text);
+    margin: 0 0 10px 0;
+}
+
 /* Estilos para Pestaña Registro Pagos */
 .payments-period-selector {
     display: flex;

@@ -182,6 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const budgetFrequencySelect = document.getElementById('budget-frequency-select');
     const saveBudgetButton = document.getElementById('save-budget-button');
     const budgetsTableView = document.querySelector('#budgets-table-view tbody');
+    const budgetDeleteListContainer = document.getElementById('budget-delete-list');
     const budgetSummaryTableBody = document.querySelector('#budget-summary-table tbody');
     const budgetPrevPeriodButton = document.getElementById('budget-prev-period-button');
     const budgetNextPeriodButton = document.getElementById('budget-next-period-button');
@@ -3039,8 +3040,39 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCashflowTable();
     }
 
+    function renderBudgetDeleteList() {
+        if (!budgetDeleteListContainer) return;
+        budgetDeleteListContainer.innerHTML = '';
+        const budgets = (currentBackupData && currentBackupData.budgets) ? currentBackupData.budgets : null;
+        const categories = budgets ? Object.keys(budgets).sort() : [];
+        if (categories.length === 0) {
+            const emptyMessage = document.createElement('p');
+            emptyMessage.className = 'subtle-help';
+            emptyMessage.textContent = 'No hay presupuestos definidos para eliminar.';
+            budgetDeleteListContainer.appendChild(emptyMessage);
+            return;
+        }
+        const list = document.createElement('ul');
+        list.className = 'budget-delete-list';
+        categories.forEach(catName => {
+            const item = document.createElement('li');
+            item.className = 'budget-delete-list-item';
+            const label = document.createElement('span');
+            label.textContent = catName;
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'danger small-button';
+            deleteButton.textContent = 'Eliminar';
+            deleteButton.addEventListener('click', () => deleteBudget(catName));
+            item.appendChild(label);
+            item.appendChild(deleteButton);
+            list.appendChild(item);
+        });
+        budgetDeleteListContainer.appendChild(list);
+    }
+
     function renderBudgetsTable() {
-        if (!budgetsTableView || !currentBackupData || !currentBackupData.expense_categories) return;
+        if (!budgetsTableView || !currentBackupData || !currentBackupData.expense_categories) { renderBudgetDeleteList(); return; }
         budgetsTableView.innerHTML = '';
         const targetDate = (currentBudgetViewDate instanceof Date) ? currentBudgetViewDate : new Date();
         const sortedCategories = Object.keys(currentBackupData.expense_categories).sort();
@@ -3072,6 +3104,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (budgetFrequencySelect) budgetFrequencySelect.value = budgetEntry.frequency;
             });
         });
+        renderBudgetDeleteList();
     }
     function renderBudgetSummaryTable() {
         if (!budgetSummaryTableBody || !currentBackupData) return;
