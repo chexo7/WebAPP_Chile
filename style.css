@@ -958,6 +958,26 @@ td.reimbursement-income {
     display: block;
 }
 
+.kpi-card-full {
+    grid-column: 1 / -1;
+}
+
+.kpi-list {
+    margin: 8px 0 0 0;
+    padding-left: 18px;
+    color: var(--text-color);
+}
+
+.kpi-list li {
+    margin-bottom: 4px;
+    line-height: 1.4;
+}
+
+.kpi-list .kpi-value {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
 .kpi-meta {
     font-size: 0.85rem;
     color: var(--light-text);
