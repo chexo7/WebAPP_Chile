@@ -169,7 +169,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const usdClpRateCache = {};
     const usdClpRatePending = {};
+    const USD_CLP_RATE_STORAGE_KEY = 'webapp_chile_latest_usd_clp';
+    const USD_CLP_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 horas
+    const USD_CLP_PERSISTENCE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
+    const USD_CLP_FETCH_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos
     let latestUsdClpRate = null;
+    let latestUsdClpRateTimestamp = null;
+    let lastUsdClpFetchAttempt = 0;
 
     // --- BLOQUEO DE EDICIÓN ---
     let editLockAcquired = false;
@@ -1593,6 +1599,38 @@ document.addEventListener('DOMContentLoaded', () => {
         return getISODateString(date);
     }
 
+    function persistLatestUsdClpRate(rate, timestamp = Date.now()) {
+        if (typeof localStorage === 'undefined') return;
+        if (typeof rate !== 'number' || !isFinite(rate) || rate <= 0) return;
+        try {
+            localStorage.setItem(USD_CLP_RATE_STORAGE_KEY, JSON.stringify({ rate, timestamp }));
+        } catch (error) {
+            console.warn('No se pudo persistir la tasa USD/CLP en localStorage:', error);
+        }
+    }
+
+    function restorePersistedUsdClpRate() {
+        if (typeof localStorage === 'undefined') return;
+        try {
+            const stored = localStorage.getItem(USD_CLP_RATE_STORAGE_KEY);
+            if (!stored) return;
+            const parsed = JSON.parse(stored);
+            const { rate, timestamp } = parsed || {};
+            const isValidRate = typeof rate === 'number' && isFinite(rate) && rate > 0;
+            const isFreshEnough = !timestamp || (Date.now() - timestamp <= USD_CLP_PERSISTENCE_MAX_AGE_MS);
+            if (isValidRate && isFreshEnough) {
+                latestUsdClpRate = rate;
+                latestUsdClpRateTimestamp = timestamp || Date.now();
+                const todayKey = getDateKey(new Date());
+                if (todayKey) usdClpRateCache[todayKey] = rate;
+            }
+        } catch (error) {
+            console.warn('No se pudo restaurar la tasa USD/CLP desde localStorage:', error);
+        }
+    }
+
+    restorePersistedUsdClpRate();
+
     function isSameUtcDay(dateA, dateB) {
         const keyA = getDateKey(dateA);
         const keyB = getDateKey(dateB);
@@ -1613,10 +1651,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!key) return;
         usdClpRateCache[key] = rate;
         latestUsdClpRate = rate;
+        latestUsdClpRateTimestamp = Date.now();
+        persistLatestUsdClpRate(rate, latestUsdClpRateTimestamp);
     }
 
     async function fetchCurrentUsdClpRate() {
         const API_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=clp';
+        const now = Date.now();
+        const hasRecentRate = latestUsdClpRate && latestUsdClpRateTimestamp && (now - latestUsdClpRateTimestamp < USD_CLP_CACHE_MAX_AGE_MS);
+        if (hasRecentRate) {
+            return latestUsdClpRate;
+        }
+        if (now - lastUsdClpFetchAttempt < USD_CLP_FETCH_COOLDOWN_MS) {
+            return latestUsdClpRate;
+        }
+        lastUsdClpFetchAttempt = now;
         const response = await fetch(API_URL);
         if (!response.ok) {
             throw new Error(`Error de red: ${response.status}`);
@@ -1626,6 +1675,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof clpRate !== 'number' || !isFinite(clpRate)) {
             throw new Error('Tasa CLP no encontrada en la respuesta de la API.');
         }
+        storeUsdClpRate(new Date(), clpRate);
         return clpRate;
     }
 
