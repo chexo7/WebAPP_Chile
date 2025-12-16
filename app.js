@@ -1655,8 +1655,40 @@ document.addEventListener('DOMContentLoaded', () => {
         persistLatestUsdClpRate(rate, latestUsdClpRateTimestamp);
     }
 
-    async function fetchCurrentUsdClpRate() {
+    async function fetchUsdClpFromOpenErApi() {
+        const API_URL = 'https://open.er-api.com/v6/latest/USD';
+        const response = await fetch(API_URL, { headers: { 'Accept': 'application/json' } });
+        if (!response.ok) {
+            throw new Error(`Error de red (ER-API): ${response.status}`);
+        }
+        const data = await response.json();
+        const { result, error_type: errorType } = data || {};
+        if (result && result !== 'success') {
+            throw new Error(`API ER-API: ${errorType || 'desconocido'}`);
+        }
+        const rates = (data && (data.rates || data.conversion_rates)) || {};
+        const clpRate = rates.CLP ?? rates.clp;
+        if (typeof clpRate !== 'number' || !isFinite(clpRate)) {
+            throw new Error('Tasa CLP no encontrada en ER-API.');
+        }
+        return clpRate;
+    }
+
+    async function fetchUsdClpFromCoinGecko() {
         const API_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=clp';
+        const response = await fetch(API_URL);
+        if (!response.ok) {
+            throw new Error(`Error de red (CoinGecko): ${response.status}`);
+        }
+        const data = await response.json();
+        const clpRate = data && data.usd && data.usd.clp;
+        if (typeof clpRate !== 'number' || !isFinite(clpRate)) {
+            throw new Error('Tasa CLP no encontrada en la respuesta de CoinGecko.');
+        }
+        return clpRate;
+    }
+
+    async function fetchCurrentUsdClpRate() {
         const now = Date.now();
         const hasRecentRate = latestUsdClpRate && latestUsdClpRateTimestamp && (now - latestUsdClpRateTimestamp < USD_CLP_CACHE_MAX_AGE_MS);
         if (hasRecentRate) {
@@ -1666,14 +1698,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return latestUsdClpRate;
         }
         lastUsdClpFetchAttempt = now;
-        const response = await fetch(API_URL);
-        if (!response.ok) {
-            throw new Error(`Error de red: ${response.status}`);
-        }
-        const data = await response.json();
-        const clpRate = data && data.usd && data.usd.clp;
-        if (typeof clpRate !== 'number' || !isFinite(clpRate)) {
-            throw new Error('Tasa CLP no encontrada en la respuesta de la API.');
+        let clpRate = null;
+        try {
+            clpRate = await fetchUsdClpFromOpenErApi();
+        } catch (primaryError) {
+            console.warn('ER-API (primario) falló, intentando CoinGecko como respaldo.', primaryError);
+            clpRate = await fetchUsdClpFromCoinGecko();
         }
         storeUsdClpRate(new Date(), clpRate);
         return clpRate;
