@@ -1757,19 +1757,36 @@ document.addEventListener('DOMContentLoaded', () => {
             uniqueDates.set(key, new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())));
         });
 
-        const fetchers = [];
+        const missingDates = [];
         uniqueDates.forEach((date, key) => {
             if (!usdClpRateCache[key]) {
-                fetchers.push(fetchUsdClpRateForDate(date));
+                missingDates.push({ key, date });
             }
         });
 
-        if (fetchers.length > 0) {
-            await Promise.all(fetchers.map(p => p.catch(error => {
-                console.warn('No se pudo obtener una de las tasas USD/CLP requeridas:', error);
-                return null;
-            })));
+        if (missingDates.length === 0) return;
+
+        // ER-API no entrega histórico, así que cuando hay varias fechas pendientes reutilizamos
+        // una sola llamada (tasa actual) para todas para evitar múltiples peticiones seguidas
+        // y los límites/errores típicos de proveedores como CoinGecko.
+        if (missingDates.length > 1) {
+            let reusableRate = null;
+            try {
+                reusableRate = await fetchCurrentUsdClpRate();
+            } catch (error) {
+                console.warn('No se pudo obtener una tasa USD/CLP reutilizable en lote:', error);
+                reusableRate = (latestUsdClpRate && latestUsdClpRate > 0) ? latestUsdClpRate : null;
+            }
+            if (typeof reusableRate === 'number' && isFinite(reusableRate) && reusableRate > 0) {
+                missingDates.forEach(({ date }) => storeUsdClpRate(date, reusableRate));
+                return;
+            }
         }
+
+        await Promise.all(missingDates.map(({ date }) => fetchUsdClpRateForDate(date).catch(error => {
+            console.warn('No se pudo obtener una de las tasas USD/CLP requeridas:', error);
+            return null;
+        })));
     }
 
     function getCachedUsdClpRate(date) {
