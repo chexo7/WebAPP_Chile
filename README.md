@@ -24,7 +24,7 @@ Este proyecto es una aplicación web integral para la gestión de finanzas perso
 *   **Seguimiento de Pagos:** Funcionalidad para marcar gastos programados como pagados en un período específico (mensual/semanal).
 *   **Baby Steps de Dave Ramsey:** Herramienta para seguir y marcar el progreso en los "Baby Steps" para la libertad financiera.
 *   **Recordatorios:** Lista de tareas pendientes y completadas para gestionar recordatorios financieros.
-*   **Tasa de Cambio USD/CLP:** Obtención automática de la tasa de cambio USD/CLP desde CoinGecko para fines informativos.
+*   **Tasa de Cambio USD/CLP:** Obtención automática de la tasa de cambio USD/CLP desde open.er-api.com para fines informativos.
 *   **Validación de Datos:** Mecanismos para asegurar la integridad de los datos, como la validación de caracteres no permitidos en claves de Firebase.
 
 ## Stack Tecnológico
@@ -33,7 +33,7 @@ Este proyecto es una aplicación web integral para la gestión de finanzas perso
 *   **Base de Datos:** Firebase Realtime Database
 *   **Autenticación:** Firebase Authentication
 *   **Gráficos:** Chart.js
-*   **APIs Externas:** CoinGecko API (para la tasa de cambio USD/CLP)
+*   **APIs Externas:** open.er-api.com (para la tasa de cambio USD/CLP)
 
 ## Estructura del Proyecto
 
@@ -49,7 +49,7 @@ El proyecto se organiza de la siguiente manera:
     *   Cálculos financieros (flujo de caja, presupuestos).
     *   Renderizado dinámico de tablas y otros componentes.
     *   Integración con Chart.js para los gráficos.
-    *   Llamadas a la API de CoinGecko.
+    *   Llamadas a la API de open.er-api.com.
 *   `config.js`: Almacena la configuración de Firebase necesaria para conectar la aplicación con los servicios de Firebase (apiKey, authDomain, databaseURL, etc.). **Importante:** Este archivo contiene información sensible y debe ser configurado correctamente para que la aplicación funcione.
 *   `README.md`: Este archivo, con la descripción del proyecto.
 
@@ -98,5 +98,5 @@ La aplicación utiliza Firebase Realtime Database para almacenar todos los datos
 
 ## Notas Adicionales
 
-*   **Tasa de Cambio USD/CLP:** La aplicación obtiene la tasa de cambio entre USD y CLP de forma automática desde la API de CoinGecko. Esta tasa se muestra en la pestaña de "Ajustes" y es solo para fines informativos, no se almacena persistente con los datos del usuario en Firebase.
+*   **Tasa de Cambio USD/CLP:** La aplicación obtiene la tasa de cambio entre USD y CLP de forma automática desde la API de open.er-api.com (ExchangeRate-API). Esta tasa se muestra en la pestaña de "Ajustes" y es solo para fines informativos, no se almacena persistente con los datos del usuario en Firebase.
 *   **Validación de Nombres/Claves:** Para asegurar la compatibilidad con Firebase Realtime Database, los nombres de ingresos, gastos y categorías no deben contener caracteres prohibidos por Firebase para las claves (ej: `.`, `$`, `#`, `[`, `]`, `/`). La aplicación incluye validaciones para prevenir el guardado de datos con estos caracteres en nombres que podrían ser usados como claves.
