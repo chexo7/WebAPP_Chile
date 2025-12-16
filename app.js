@@ -169,7 +169,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const usdClpRateCache = {};
     const usdClpRatePending = {};
+    const USD_CLP_RATE_STORAGE_KEY = 'webapp_chile_latest_usd_clp';
+    const USD_CLP_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 horas
+    const USD_CLP_PERSISTENCE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
+    const USD_CLP_FETCH_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos
     let latestUsdClpRate = null;
+    let latestUsdClpRateTimestamp = null;
+    let lastUsdClpFetchAttempt = 0;
 
     // --- BLOQUEO DE EDICIÓN ---
     let editLockAcquired = false;
@@ -1593,18 +1599,42 @@ document.addEventListener('DOMContentLoaded', () => {
         return getISODateString(date);
     }
 
+    function persistLatestUsdClpRate(rate, timestamp = Date.now()) {
+        if (typeof localStorage === 'undefined') return;
+        if (typeof rate !== 'number' || !isFinite(rate) || rate <= 0) return;
+        try {
+            localStorage.setItem(USD_CLP_RATE_STORAGE_KEY, JSON.stringify({ rate, timestamp }));
+        } catch (error) {
+            console.warn('No se pudo persistir la tasa USD/CLP en localStorage:', error);
+        }
+    }
+
+    function restorePersistedUsdClpRate() {
+        if (typeof localStorage === 'undefined') return;
+        try {
+            const stored = localStorage.getItem(USD_CLP_RATE_STORAGE_KEY);
+            if (!stored) return;
+            const parsed = JSON.parse(stored);
+            const { rate, timestamp } = parsed || {};
+            const isValidRate = typeof rate === 'number' && isFinite(rate) && rate > 0;
+            const isFreshEnough = !timestamp || (Date.now() - timestamp <= USD_CLP_PERSISTENCE_MAX_AGE_MS);
+            if (isValidRate && isFreshEnough) {
+                latestUsdClpRate = rate;
+                latestUsdClpRateTimestamp = timestamp || Date.now();
+                const todayKey = getDateKey(new Date());
+                if (todayKey) usdClpRateCache[todayKey] = rate;
+            }
+        } catch (error) {
+            console.warn('No se pudo restaurar la tasa USD/CLP desde localStorage:', error);
+        }
+    }
+
+    restorePersistedUsdClpRate();
+
     function isSameUtcDay(dateA, dateB) {
         const keyA = getDateKey(dateA);
         const keyB = getDateKey(dateB);
         return keyA !== null && keyA === keyB;
-    }
-
-    function formatDateForCoinGecko(date) {
-        const normalized = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-        const day = ('0' + normalized.getUTCDate()).slice(-2);
-        const month = ('0' + (normalized.getUTCMonth() + 1)).slice(-2);
-        const year = normalized.getUTCFullYear();
-        return `${day}-${month}-${year}`;
     }
 
     function storeUsdClpRate(date, rate) {
@@ -1613,35 +1643,58 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!key) return;
         usdClpRateCache[key] = rate;
         latestUsdClpRate = rate;
+        latestUsdClpRateTimestamp = Date.now();
+        persistLatestUsdClpRate(rate, latestUsdClpRateTimestamp);
+    }
+
+    async function fetchUsdClpFromOpenErApi() {
+        const API_URL = 'https://open.er-api.com/v6/latest/USD';
+        const response = await fetch(API_URL, { headers: { 'Accept': 'application/json' } });
+        if (!response.ok) {
+            throw new Error(`Error de red (ER-API): ${response.status}`);
+        }
+        const data = await response.json();
+        const { result, error_type: errorType } = data || {};
+        if (result && result !== 'success') {
+            throw new Error(`API ER-API: ${errorType || 'desconocido'}`);
+        }
+        const rates = (data && (data.rates || data.conversion_rates)) || {};
+        const clpRate = rates.CLP ?? rates.clp;
+        if (typeof clpRate !== 'number' || !isFinite(clpRate)) {
+            throw new Error('Tasa CLP no encontrada en ER-API.');
+        }
+        return clpRate;
     }
 
     async function fetchCurrentUsdClpRate() {
-        const API_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=clp';
-        const response = await fetch(API_URL);
-        if (!response.ok) {
-            throw new Error(`Error de red: ${response.status}`);
+        const now = Date.now();
+        const hasRecentRate = latestUsdClpRate && latestUsdClpRateTimestamp && (now - latestUsdClpRateTimestamp < USD_CLP_CACHE_MAX_AGE_MS);
+        if (hasRecentRate) {
+            return latestUsdClpRate;
         }
-        const data = await response.json();
-        const clpRate = data && data.usd && data.usd.clp;
-        if (typeof clpRate !== 'number' || !isFinite(clpRate)) {
-            throw new Error('Tasa CLP no encontrada en la respuesta de la API.');
+        if (now - lastUsdClpFetchAttempt < USD_CLP_FETCH_COOLDOWN_MS) {
+            return latestUsdClpRate;
         }
+        lastUsdClpFetchAttempt = now;
+        let clpRate = null;
+        try {
+            clpRate = await fetchUsdClpFromOpenErApi();
+        } catch (primaryError) {
+            console.warn('ER-API (primario) falló, reusando la última tasa conocida si existe.', primaryError);
+            clpRate = (latestUsdClpRate && latestUsdClpRate > 0) ? latestUsdClpRate : null;
+        }
+        storeUsdClpRate(new Date(), clpRate);
         return clpRate;
     }
 
     async function fetchHistoricalUsdClpRate(date) {
-        const formatted = formatDateForCoinGecko(date);
-        const API_URL = `https://api.coingecko.com/api/v3/coins/usd/history?date=${formatted}`;
-        const response = await fetch(API_URL);
-        if (!response.ok) {
-            throw new Error(`Error de red: ${response.status}`);
+        // ER-API solo entrega la tasa actual; usamos la actual como mejor aproximación.
+        try {
+            return await fetchUsdClpFromOpenErApi();
+        } catch (error) {
+            if (latestUsdClpRate && latestUsdClpRate > 0) return latestUsdClpRate;
+            throw error;
         }
-        const data = await response.json();
-        const clpRate = data && data.market_data && data.market_data.current_price && data.market_data.current_price.clp;
-        if (typeof clpRate !== 'number' || !isFinite(clpRate)) {
-            throw new Error('Tasa CLP histórica no disponible en la respuesta.');
-        }
-        return clpRate;
     }
 
     async function fetchUsdClpRateForDate(date) {
@@ -1805,7 +1858,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (typeof clpRate !== 'number' || !isFinite(clpRate) || clpRate <= 0) {
                 throw new Error('Tasa CLP no disponible.');
             }
-            usdClpInfoLabel.textContent = `1 USD = ${clpRate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Fuente: CoinGecko)`;
+            usdClpInfoLabel.textContent = `1 USD = ${clpRate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Fuente: open.er-api.com)`;
         } catch (error) {
             console.warn('No se pudo actualizar el USD/CLP:', error);
             usdClpInfoLabel.innerHTML = `<b>1 USD = N/D</b> <small>(Error al obtener tasa)</small>`;
