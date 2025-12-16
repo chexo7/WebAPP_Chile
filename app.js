@@ -173,9 +173,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const USD_CLP_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 horas
     const USD_CLP_PERSISTENCE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
     const USD_CLP_FETCH_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos
+    const USD_CLP_RETRY_DELAY_MS = 30 * 1000; // 30 segundos para reintentos rápidos
     let latestUsdClpRate = null;
     let latestUsdClpRateTimestamp = null;
     let lastUsdClpFetchAttempt = 0;
+    let usdClpRetryTimeoutId = null;
 
     // --- BLOQUEO DE EDICIÓN ---
     let editLockAcquired = false;
@@ -1599,9 +1601,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return getISODateString(date);
     }
 
+    function isValidUsdClpRate(rate) {
+        return typeof rate === 'number' && isFinite(rate) && rate > 0;
+    }
+
     function persistLatestUsdClpRate(rate, timestamp = Date.now()) {
         if (typeof localStorage === 'undefined') return;
-        if (typeof rate !== 'number' || !isFinite(rate) || rate <= 0) return;
+        if (!isValidUsdClpRate(rate)) return;
         try {
             localStorage.setItem(USD_CLP_RATE_STORAGE_KEY, JSON.stringify({ rate, timestamp }));
         } catch (error) {
@@ -1609,24 +1615,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function restorePersistedUsdClpRate() {
-        if (typeof localStorage === 'undefined') return;
+    function getPersistedUsdClpRate({ allowStale = false } = {}) {
+        if (typeof localStorage === 'undefined') return null;
         try {
             const stored = localStorage.getItem(USD_CLP_RATE_STORAGE_KEY);
-            if (!stored) return;
+            if (!stored) return null;
             const parsed = JSON.parse(stored);
             const { rate, timestamp } = parsed || {};
-            const isValidRate = typeof rate === 'number' && isFinite(rate) && rate > 0;
-            const isFreshEnough = !timestamp || (Date.now() - timestamp <= USD_CLP_PERSISTENCE_MAX_AGE_MS);
-            if (isValidRate && isFreshEnough) {
-                latestUsdClpRate = rate;
-                latestUsdClpRateTimestamp = timestamp || Date.now();
-                const todayKey = getDateKey(new Date());
-                if (todayKey) usdClpRateCache[todayKey] = rate;
+            if (!isValidUsdClpRate(rate)) return null;
+            if (!allowStale && timestamp && (Date.now() - timestamp > USD_CLP_PERSISTENCE_MAX_AGE_MS)) {
+                return null;
             }
+            return { rate, timestamp };
         } catch (error) {
             console.warn('No se pudo restaurar la tasa USD/CLP desde localStorage:', error);
+            return null;
         }
+    }
+
+    function restorePersistedUsdClpRate() {
+        const persisted = getPersistedUsdClpRate({ allowStale: false });
+        if (!persisted) return;
+        const { rate, timestamp } = persisted;
+        latestUsdClpRate = rate;
+        latestUsdClpRateTimestamp = timestamp || Date.now();
+        const todayKey = getDateKey(new Date());
+        if (todayKey) usdClpRateCache[todayKey] = rate;
     }
 
     restorePersistedUsdClpRate();
@@ -1638,7 +1652,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function storeUsdClpRate(date, rate) {
-        if (typeof rate !== 'number' || !isFinite(rate) || rate <= 0) return;
+        if (!isValidUsdClpRate(rate)) return;
         const key = getDateKey(date);
         if (!key) return;
         usdClpRateCache[key] = rate;
@@ -1668,22 +1682,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchCurrentUsdClpRate() {
         const now = Date.now();
-        const hasRecentRate = latestUsdClpRate && latestUsdClpRateTimestamp && (now - latestUsdClpRateTimestamp < USD_CLP_CACHE_MAX_AGE_MS);
+        const hasRecentRate = isValidUsdClpRate(latestUsdClpRate) && latestUsdClpRateTimestamp && (now - latestUsdClpRateTimestamp < USD_CLP_CACHE_MAX_AGE_MS);
         if (hasRecentRate) {
             return latestUsdClpRate;
         }
-        if (now - lastUsdClpFetchAttempt < USD_CLP_FETCH_COOLDOWN_MS) {
+
+        if ((now - lastUsdClpFetchAttempt) < USD_CLP_FETCH_COOLDOWN_MS && isValidUsdClpRate(latestUsdClpRate)) {
             return latestUsdClpRate;
         }
+
         lastUsdClpFetchAttempt = now;
         let clpRate = null;
         try {
             clpRate = await fetchUsdClpFromOpenErApi();
         } catch (primaryError) {
             console.warn('ER-API (primario) falló, reusando la última tasa conocida si existe.', primaryError);
-            clpRate = (latestUsdClpRate && latestUsdClpRate > 0) ? latestUsdClpRate : null;
+            const persisted = getPersistedUsdClpRate({ allowStale: true });
+            clpRate = isValidUsdClpRate(persisted?.rate) ? persisted.rate : (isValidUsdClpRate(latestUsdClpRate) ? latestUsdClpRate : null);
         }
-        storeUsdClpRate(new Date(), clpRate);
+
+        if (isValidUsdClpRate(clpRate)) {
+            storeUsdClpRate(new Date(), clpRate);
+            return clpRate;
+        }
+
+        // Si la tasa es nula o inválida, permitir un reintento inmediato.
+        lastUsdClpFetchAttempt = 0;
         return clpRate;
     }
 
@@ -1692,7 +1716,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             return await fetchUsdClpFromOpenErApi();
         } catch (error) {
-            if (latestUsdClpRate && latestUsdClpRate > 0) return latestUsdClpRate;
+            if (isValidUsdClpRate(latestUsdClpRate)) return latestUsdClpRate;
             throw error;
         }
     }
@@ -1729,9 +1753,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 rate = latestUsdClpRate;
             }
 
-            if (typeof rate === 'number' && rate > 0) {
+            if (isValidUsdClpRate(rate)) {
                 storeUsdClpRate(date, rate);
-            } else if (latestUsdClpRate && latestUsdClpRate > 0) {
+            } else if (isValidUsdClpRate(latestUsdClpRate)) {
                 usdClpRateCache[key] = latestUsdClpRate;
                 rate = latestUsdClpRate;
             }
@@ -1775,9 +1799,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 reusableRate = await fetchCurrentUsdClpRate();
             } catch (error) {
                 console.warn('No se pudo obtener una tasa USD/CLP reutilizable en lote:', error);
-                reusableRate = (latestUsdClpRate && latestUsdClpRate > 0) ? latestUsdClpRate : null;
+                reusableRate = isValidUsdClpRate(latestUsdClpRate) ? latestUsdClpRate : null;
             }
-            if (typeof reusableRate === 'number' && isFinite(reusableRate) && reusableRate > 0) {
+            if (isValidUsdClpRate(reusableRate)) {
                 missingDates.forEach(({ date }) => storeUsdClpRate(date, reusableRate));
                 return;
             }
@@ -1792,11 +1816,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function getCachedUsdClpRate(date) {
         if (date instanceof Date && !isNaN(date.getTime())) {
             const key = getDateKey(date);
-            if (key && usdClpRateCache[key] && usdClpRateCache[key] > 0) {
+            if (key && isValidUsdClpRate(usdClpRateCache[key])) {
                 return usdClpRateCache[key];
             }
         }
-        return (latestUsdClpRate && latestUsdClpRate > 0) ? latestUsdClpRate : null;
+        return isValidUsdClpRate(latestUsdClpRate) ? latestUsdClpRate : null;
     }
 
     function convertAmountToUsd(amount, currency, date) {
@@ -1868,18 +1892,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchAndUpdateUSDCLPRate() {
         if (!usdClpInfoLabel) return;
+        clearUsdClpRetryTimeout();
         usdClpInfoLabel.innerHTML = `1 USD = $CLP (Obteniendo...) <span class="loading-dots"></span>`;
         const today = new Date();
         try {
             const clpRate = await fetchUsdClpRateForDate(today);
-            if (typeof clpRate !== 'number' || !isFinite(clpRate) || clpRate <= 0) {
+            if (!isValidUsdClpRate(clpRate)) {
                 throw new Error('Tasa CLP no disponible.');
             }
             usdClpInfoLabel.textContent = `1 USD = ${clpRate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Fuente: open.er-api.com)`;
+            return;
         } catch (error) {
             console.warn('No se pudo actualizar el USD/CLP:', error);
-            usdClpInfoLabel.innerHTML = `<b>1 USD = N/D</b> <small>(Error al obtener tasa)</small>`;
         }
+
+        const persisted = getPersistedUsdClpRate({ allowStale: true });
+        const fallbackRate = isValidUsdClpRate(latestUsdClpRate) ? latestUsdClpRate : (persisted ? persisted.rate : null);
+
+        if (isValidUsdClpRate(fallbackRate)) {
+            console.info('Usando tasa USD/CLP en caché como contingencia; se programará un reintento automático.', {
+                fallbackRate,
+                timestamp: persisted?.timestamp || latestUsdClpRateTimestamp
+            });
+            latestUsdClpRate = fallbackRate;
+            latestUsdClpRateTimestamp = persisted?.timestamp || latestUsdClpRateTimestamp || Date.now();
+            const todayKey = getDateKey(today);
+            if (todayKey) usdClpRateCache[todayKey] = fallbackRate;
+            usdClpInfoLabel.innerHTML = `1 USD = ${fallbackRate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })} <small>(en espera de actualización)</small>`;
+        } else {
+            console.info('Sin tasa USD/CLP vigente; en espera de actualización. Se programará un reintento automático.');
+            usdClpInfoLabel.innerHTML = `<b>1 USD = N/D</b> <small>(en espera de actualización)</small>`;
+        }
+
+        scheduleUsdClpRetry();
+    }
+
+    if (typeof window !== 'undefined') {
+        window.webappChileRetryUsdClpRate = () => {
+            console.info('Reintento manual de tasa USD/CLP solicitado.');
+            clearUsdClpRetryTimeout();
+            return fetchAndUpdateUSDCLPRate();
+        };
     }
 
 
@@ -2023,6 +2076,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 expenseStartDateInput.value = movValue;
             }
         }
+    }
+
+    function clearUsdClpRetryTimeout() {
+        if (usdClpRetryTimeoutId) {
+            clearTimeout(usdClpRetryTimeoutId);
+            usdClpRetryTimeoutId = null;
+        }
+    }
+
+    function scheduleUsdClpRetry(delay = USD_CLP_RETRY_DELAY_MS) {
+        clearUsdClpRetryTimeout();
+        usdClpRetryTimeoutId = setTimeout(() => {
+            usdClpRetryTimeoutId = null;
+            console.info(`Reintentando actualización USD/CLP después de contingencia (delay ${delay} ms).`);
+            fetchAndUpdateUSDCLPRate();
+        }, delay);
     }
     // usdClpRateInput.addEventListener('input', updateUsdClpInfoLabel); // No longer used
     // function updateUsdClpInfoLabel() { // No longer used, handled by fetchAndUpdateUSDCLPRate
