@@ -1637,14 +1637,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return keyA !== null && keyA === keyB;
     }
 
-    function formatDateForCoinGecko(date) {
-        const normalized = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-        const day = ('0' + normalized.getUTCDate()).slice(-2);
-        const month = ('0' + (normalized.getUTCMonth() + 1)).slice(-2);
-        const year = normalized.getUTCFullYear();
-        return `${day}-${month}-${year}`;
-    }
-
     function storeUsdClpRate(date, rate) {
         if (typeof rate !== 'number' || !isFinite(rate) || rate <= 0) return;
         const key = getDateKey(date);
@@ -1674,20 +1666,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return clpRate;
     }
 
-    async function fetchUsdClpFromCoinGecko() {
-        const API_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=clp';
-        const response = await fetch(API_URL);
-        if (!response.ok) {
-            throw new Error(`Error de red (CoinGecko): ${response.status}`);
-        }
-        const data = await response.json();
-        const clpRate = data && data.usd && data.usd.clp;
-        if (typeof clpRate !== 'number' || !isFinite(clpRate)) {
-            throw new Error('Tasa CLP no encontrada en la respuesta de CoinGecko.');
-        }
-        return clpRate;
-    }
-
     async function fetchCurrentUsdClpRate() {
         const now = Date.now();
         const hasRecentRate = latestUsdClpRate && latestUsdClpRateTimestamp && (now - latestUsdClpRateTimestamp < USD_CLP_CACHE_MAX_AGE_MS);
@@ -1702,26 +1680,21 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             clpRate = await fetchUsdClpFromOpenErApi();
         } catch (primaryError) {
-            console.warn('ER-API (primario) falló, intentando CoinGecko como respaldo.', primaryError);
-            clpRate = await fetchUsdClpFromCoinGecko();
+            console.warn('ER-API (primario) falló, reusando la última tasa conocida si existe.', primaryError);
+            clpRate = (latestUsdClpRate && latestUsdClpRate > 0) ? latestUsdClpRate : null;
         }
         storeUsdClpRate(new Date(), clpRate);
         return clpRate;
     }
 
     async function fetchHistoricalUsdClpRate(date) {
-        const formatted = formatDateForCoinGecko(date);
-        const API_URL = `https://api.coingecko.com/api/v3/coins/usd/history?date=${formatted}`;
-        const response = await fetch(API_URL);
-        if (!response.ok) {
-            throw new Error(`Error de red: ${response.status}`);
+        // ER-API solo entrega la tasa actual; usamos la actual como mejor aproximación.
+        try {
+            return await fetchUsdClpFromOpenErApi();
+        } catch (error) {
+            if (latestUsdClpRate && latestUsdClpRate > 0) return latestUsdClpRate;
+            throw error;
         }
-        const data = await response.json();
-        const clpRate = data && data.market_data && data.market_data.current_price && data.market_data.current_price.clp;
-        if (typeof clpRate !== 'number' || !isFinite(clpRate)) {
-            throw new Error('Tasa CLP histórica no disponible en la respuesta.');
-        }
-        return clpRate;
     }
 
     async function fetchUsdClpRateForDate(date) {
@@ -1885,7 +1858,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (typeof clpRate !== 'number' || !isFinite(clpRate) || clpRate <= 0) {
                 throw new Error('Tasa CLP no disponible.');
             }
-            usdClpInfoLabel.textContent = `1 USD = ${clpRate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Fuente: CoinGecko)`;
+            usdClpInfoLabel.textContent = `1 USD = ${clpRate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Fuente: open.er-api.com)`;
         } catch (error) {
             console.warn('No se pudo actualizar el USD/CLP:', error);
             usdClpInfoLabel.innerHTML = `<b>1 USD = N/D</b> <small>(Error al obtener tasa)</small>`;
