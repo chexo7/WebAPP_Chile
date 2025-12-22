@@ -3826,6 +3826,49 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function getDefaultChartRangeForPeriodicity(periodicity, periodDates) {
+        if (!Array.isArray(periodDates) || periodDates.length === 0) return null;
+        const today = new Date();
+        let startTarget;
+        let endTarget;
+        if (periodicity === 'Mensual') {
+            startTarget = addMonths(today, -3);
+            endTarget = addMonths(today, 8);
+        } else if (periodicity === 'Semanal') {
+            startTarget = addWeeks(today, -4);
+            endTarget = addWeeks(today, 20);
+        } else {
+            startTarget = addDays(today, -15);
+            endTarget = addDays(today, 30);
+        }
+        const start = getPeriodStartDate(startTarget, periodicity);
+        const end = getPeriodStartDate(endTarget, periodicity);
+        let startIdx = periodDates.findIndex(d => d >= start);
+        if (startIdx === -1) startIdx = 0;
+        let endIdx = periodDates.length - 1;
+        for (let i = periodDates.length - 1; i >= 0; i--) {
+            if (periodDates[i] <= end) {
+                endIdx = i;
+                break;
+            }
+        }
+        if (endIdx < startIdx) {
+            startIdx = 0;
+            endIdx = periodDates.length - 1;
+        }
+        return { startDate: periodDates[startIdx], endDate: periodDates[endIdx] };
+    }
+
+    function applyDefaultChartRange(periodicity, periodDates) {
+        if (!mobileChartStartInput || !mobileChartEndInput) return false;
+        const defaultRange = getDefaultChartRangeForPeriodicity(periodicity, periodDates);
+        if (!defaultRange) return false;
+        mobileChartStartInput.value = getISODateString(defaultRange.startDate);
+        mobileChartEndInput.value = getISODateString(defaultRange.endDate);
+        applyChartRange('default');
+        return true;
+    }
+
     function updateChartWindowLabelFromDates(dates = []) {
         if (!chartWindowLabel) return;
         if (!Array.isArray(dates) || dates.length === 0) {
@@ -3935,6 +3978,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 mobileChartStartInput.value = getISODateString(periodDates[0]);
                 mobileChartEndInput.value = getISODateString(periodDates[periodDates.length - 1]);
             }
+            const appliedDefault = applyDefaultChartRange(activeCashflowPeriodicity, periodDates);
+            if (appliedDefault) return;
         }
         if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
         if (!periodDates || periodDates.length === 0) { if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
