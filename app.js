@@ -228,9 +228,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ELEMENTOS PESTAÑA GRÁFICO ---
     const cashflowChartCanvas = document.getElementById('cashflow-chart');
     const chartMessage = document.getElementById('chart-message');
-    const mobileChartStartInput = document.getElementById('mobile-chart-start');
-    const mobileChartEndInput = document.getElementById('mobile-chart-end');
-    const applyMobileChartRangeButton = document.getElementById('apply-mobile-chart-range');
+    const chartRangeStartInput = document.getElementById('chart-range-start');
+    const chartRangeEndInput = document.getElementById('chart-range-end');
+    const chartRangeApplyButton = document.getElementById('chart-range-apply');
+    const chartRangeResetButton = document.getElementById('chart-range-reset');
+    const chartRangeLabel = document.getElementById('chart-range-label');
+    const chartQuickRangeButtons = Array.from(document.querySelectorAll('.chart-quick-range'));
+    const chartFocusTodayButton = document.getElementById('chart-focus-today');
     const chartSubtabs = document.getElementById('chart-subtabs');
     const graficoTitle = document.getElementById('grafico-title');
     const pieMonthInputs = [
@@ -272,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chartKpiCoverage = document.getElementById('chart-kpi-coverage');
     const resetChartZoomButton = document.getElementById('reset-chart-zoom-button');
     const exportChartButton = document.getElementById('export-chart-button');
+    const chartRefreshButton = document.getElementById('chart-refresh-button');
     let cashflowChartInstance = null;
     const pieMonthChartInstances = [null, null, null];
     const pieWeekChartInstances = [null, null, null];
@@ -3894,13 +3899,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCashflowChart(periodDates, incomes, totalExpenses, netFlows, endBalances, storeData = true) {
         if (storeData) {
             fullChartData = { periodDates, incomes, totalExpenses, netFlows, endBalances };
-            if (mobileChartStartInput && mobileChartEndInput && periodDates.length > 0) {
-                mobileChartStartInput.value = getISODateString(periodDates[0]);
-                mobileChartEndInput.value = getISODateString(periodDates[periodDates.length - 1]);
+            if (chartRangeStartInput && chartRangeEndInput && periodDates.length > 0) {
+                setChartRangeInputs(periodDates[0], periodDates[periodDates.length - 1]);
             }
         }
         if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
-        if (!periodDates || periodDates.length === 0) { if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
+        if (!periodDates || periodDates.length === 0) {
+            if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja.";
+            if (chartRangeLabel) chartRangeLabel.textContent = '—';
+            return;
+        }
         if (chartMessage) chartMessage.textContent = "";
         const labels = periodDates.map(date => {
             if (activeCashflowPeriodicity === 'Semanal') {
@@ -4029,6 +4037,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cashflowChartInstance.update();
         }
         updateChartKPIs(periodDates, incomes, totalExpenses, netFlows, endBalances);
+        updateChartRangeLabel(periodDates);
         cashflowChartCanvas.onclick = async (evt) => {
             if (!cashflowChartInstance) return;
             const points = cashflowChartInstance.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
@@ -4755,13 +4764,28 @@ function getMondayOfWeek(year, week) {
     // updateUsdClpInfoLabel(); // No longer needed here, called by activateTab or showMainContentScreen
     hideElement(incomeReimbursementCategoryContainer);
 
-    if (applyMobileChartRangeButton) {
-        applyMobileChartRangeButton.addEventListener('click', applyChartRange);
+    if (chartRangeApplyButton) {
+        chartRangeApplyButton.addEventListener('click', () => applyChartRange());
     }
-    [mobileChartStartInput, mobileChartEndInput].forEach(inp => {
+    if (chartRangeResetButton) {
+        chartRangeResetButton.addEventListener('click', () => resetChartRange());
+    }
+    [chartRangeStartInput, chartRangeEndInput].forEach(inp => {
         if (!inp) return;
         inp.addEventListener('change', () => applyChartRange());
     });
+    chartQuickRangeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const periods = parseInt(btn.dataset.periods, 10);
+            applyQuickRange(periods);
+        });
+    });
+    if (chartFocusTodayButton) {
+        chartFocusTodayButton.addEventListener('click', focusChartOnToday);
+    }
+    if (chartRefreshButton) {
+        chartRefreshButton.addEventListener('click', () => renderCashflowTable());
+    }
     chartDatasetToggles.forEach(toggle => {
         toggle.addEventListener('change', () => applyDatasetVisibilityFromToggles());
     });
@@ -4895,20 +4919,38 @@ function getMondayOfWeek(year, week) {
         if (chartMessage) chartMessage.textContent = 'Doble clic en el gráfico para activar el zoom.';
     }
 
-    function applyChartRange() {
+    function setChartRangeInputs(startDate, endDate) {
+        if (chartRangeStartInput && startDate instanceof Date) {
+            chartRangeStartInput.value = getISODateString(startDate);
+        }
+        if (chartRangeEndInput && endDate instanceof Date) {
+            chartRangeEndInput.value = getISODateString(endDate);
+        }
+    }
+
+    function updateChartRangeLabel(periodDates = []) {
+        if (!chartRangeLabel) return;
+        if (!periodDates.length) {
+            chartRangeLabel.textContent = '—';
+            return;
+        }
+        const first = periodDates[0];
+        const last = periodDates[periodDates.length - 1];
+        const label = `${formatChartPeriodLabel(first)} · ${formatChartPeriodLabel(last)}`;
+        chartRangeLabel.textContent = label;
+    }
+
+    function applyChartRange(customStart = null, customEnd = null) {
         if (!fullChartData) return;
-        const startStr = mobileChartStartInput ? mobileChartStartInput.value : '';
-        const endStr = mobileChartEndInput ? mobileChartEndInput.value : '';
-        if (!startStr || !endStr) {
-            renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
-            return;
+        let startDate = customStart || (chartRangeStartInput ? toUTCDate(chartRangeStartInput.value) : null);
+        let endDate = customEnd || (chartRangeEndInput ? toUTCDate(chartRangeEndInput.value) : null);
+
+        if (!startDate || !endDate || isNaN(startDate) || isNaN(endDate) || startDate > endDate) {
+            startDate = fullChartData.periodDates[0];
+            endDate = fullChartData.periodDates[fullChartData.periodDates.length - 1];
+            setChartRangeInputs(startDate, endDate);
         }
-        const startDate = toUTCDate(startStr);
-        const endDate = toUTCDate(endStr);
-        if (isNaN(startDate) || isNaN(endDate) || startDate > endDate) {
-            renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
-            return;
-        }
+
         const fDates = [];
         const fInc = [];
         const fExp = [];
@@ -4925,6 +4967,36 @@ function getMondayOfWeek(year, week) {
             }
         }
         renderCashflowChart(fDates, fInc, fExp, fNet, fEnd, false);
+    }
+
+    function resetChartRange() {
+        if (!fullChartData || !fullChartData.periodDates?.length) return;
+        const first = fullChartData.periodDates[0];
+        const last = fullChartData.periodDates[fullChartData.periodDates.length - 1];
+        setChartRangeInputs(first, last);
+        renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
+    }
+
+    function applyQuickRange(periodCount = 0) {
+        if (!fullChartData || !fullChartData.periodDates?.length || !periodCount) return;
+        const endIdx = fullChartData.periodDates.length - 1;
+        const startIdx = Math.max(0, endIdx - periodCount + 1);
+        const startDate = fullChartData.periodDates[startIdx];
+        const endDate = fullChartData.periodDates[endIdx];
+        setChartRangeInputs(startDate, endDate);
+        applyChartRange(startDate, endDate);
+    }
+
+    function focusChartOnToday() {
+        if (!fullChartData || !fullChartData.periodDates?.length) return;
+        const idx = findCurrentPeriodIndex(fullChartData.periodDates, activeCashflowPeriodicity);
+        if (idx === -1) return;
+        const startIdx = Math.max(0, idx - 3);
+        const endIdx = Math.min(fullChartData.periodDates.length - 1, idx + 3);
+        const startDate = fullChartData.periodDates[startIdx];
+        const endDate = fullChartData.periodDates[endIdx];
+        setChartRangeInputs(startDate, endDate);
+        applyChartRange(startDate, endDate);
     }
 
     function openChartModal(title, rows) {
