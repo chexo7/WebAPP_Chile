@@ -831,8 +831,8 @@ td.reimbursement-income {
 
 .multi-pie-container .chart-container {
     flex: 1 1 250px;
-    max-width: 300px;
-    height: 40vh;
+    max-width: 320px;
+    height: 38vh;
     margin: 10px;
 }
 
@@ -866,48 +866,62 @@ td.reimbursement-income {
 }
 
 /* Estilos para Pestaña Gráfico */
-.chart-container {
-    width: 100%;
-    max-width: 95%; /* Changed from 800px */
-    height: 60vh;   /* Changed from 400px */
-    margin: 20px auto;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    padding: 10px;
-}
-
-.chart-container canvas {
-    display: block;
-    width: 100%;
-    max-width: 600px;
-    margin: 0 auto;
-}
-
-#cashflow-chart {
-    width: 100%;
-    max-width: none;
-}
-
-.chart-section {
+.chart-shell {
     display: flex;
     flex-direction: column;
     gap: 14px;
+    padding: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
-.eyebrow {
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 0.8rem;
-    color: var(--light-text);
-    margin: 0 0 4px 0;
-}
-
-.chart-header {
+.chart-top {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 20px;
     flex-wrap: wrap;
+}
+
+.chart-toolbar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    align-items: start;
+    border: 1px dashed var(--border-color);
+    padding: 12px;
+    border-radius: var(--radius);
+    background-color: #fbfcff;
+}
+
+.toolbar-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pill-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.pill-group button {
+    border: 1px solid var(--border-color);
+    background: #fff;
+    padding: 8px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.pill-group button.active,
+.pill-group button:focus {
+    background: #e8f0ff;
+    border-color: var(--primary-color);
+    color: var(--primary-color);
 }
 
 .chart-actions {
@@ -929,6 +943,71 @@ td.reimbursement-income {
 
 .chart-subtitle {
     margin-top: 6px;
+    color: var(--light-text);
+}
+
+.chart-legend-panel {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-color);
+    background: #f9fbff;
+}
+
+.chart-toggle-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.chart-toggle-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.chart-toggle-group.chip-group label {
+    background: #fff;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    padding: 6px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.chart-toggle-group input[type="checkbox"] {
+    accent-color: var(--primary-color);
+}
+
+.chart-line-style select,
+.chart-range-inputs input,
+.chart-range-inputs button {
+    width: 100%;
+    max-width: 100%;
+}
+
+.chart-range-inputs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+    align-items: center;
+}
+
+.chart-range-inputs.compact label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.9rem;
+    color: var(--light-text);
+}
+
+.chart-range-hint {
+    margin: 0;
+    font-size: 0.85rem;
     color: var(--light-text);
 }
 
@@ -963,90 +1042,111 @@ td.reimbursement-income {
     color: var(--light-text);
 }
 
-.chart-control-panel {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
-    align-items: center;
-    border: 1px dashed var(--border-color);
-    padding: 12px;
-    border-radius: var(--radius);
-    background-color: #fbfcff;
-}
-
-.control-title {
-    margin: 0 0 8px 0;
-    font-weight: 600;
-    color: var(--text-color);
-}
-
-.chart-toggle-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.chart-toggle-group label {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 8px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background-color: #fff;
-}
-
-.chart-line-style select,
-.chart-range-inputs input,
-.chart-range-inputs button {
+.chart-container {
     width: 100%;
     max-width: 100%;
+    height: 52vh;
+    margin: 10px auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 10px;
+    background: #fff;
 }
 
-.chart-range-group {
+.chart-container canvas {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+#cashflow-chart {
+    width: 100%;
+    max-width: none;
+}
+
+.chart-container.wide {
+    height: 65vh;
+}
+
+.chart-wrapper {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-.chart-range-inputs {
+.chart-secondary-grid {
+    margin-top: 16px;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 8px;
-    align-items: center;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
 }
 
-.chart-range-hint {
+.chart-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 12px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.chart-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.chart-card .chart-container {
+    max-width: 100%;
+    height: 32vh;
     margin: 0;
-    font-size: 0.85rem;
+}
+
+.multi-pie-container.compact {
+    gap: 12px;
+}
+
+.chart-period-selector.compact input {
+    min-width: 140px;
+}
+
+.quick-range-group .chart-quick-range {
+    padding: 8px 12px;
+}
+
+.chart-quick-range.active {
+    background: #e8f0ff;
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.8rem;
+    color: var(--light-text);
+    margin: 0 0 4px 0;
+}
+
+.centered-text {
+    text-align: center;
+    margin-top: 6px;
     color: var(--light-text);
 }
 
-.chart-container.wide {
-    max-width: 100%;
-    height: 65vh;
-}
-
-.mobile-chart-range {
-    display: none;
-    justify-content: center;
-    gap: 8px;
-    margin-top: 10px;
-    flex-wrap: wrap;
+.muted {
+    color: var(--light-text);
 }
 
 @media (pointer: coarse) {
     #cashflow-chart {
         touch-action: none;
     }
-    .mobile-chart-range {
-        display: flex;
-    }
-}
-.centered-text {
-    text-align: center;
-    margin-top: 20px;
-    color: var(--light-text);
 }
 
 
@@ -1651,4 +1751,3 @@ td.reimbursement-income {
     padding: 0;
 }
 .breakdown-popup li { margin: 2px 0; }
-
