@@ -263,6 +263,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const chartModalTableBody = document.querySelector('#chart-modal-table tbody');
     const chartDatasetToggles = Array.from(document.querySelectorAll('.chart-dataset-toggle'));
     const chartLineStyleSelect = document.getElementById('chart-line-style');
+    const chartQuickRangeButtons = Array.from(document.querySelectorAll('.chart-quick-range-button'));
+    const chartRangeSummary = document.getElementById('chart-range-summary');
     const chartKpiBalance = document.getElementById('chart-kpi-balance');
     const chartKpiPeriod = document.getElementById('chart-kpi-period');
     const chartKpiAvgNet = document.getElementById('chart-kpi-avg-net');
@@ -3858,6 +3860,60 @@ document.addEventListener('DOMContentLoaded', () => {
         chartKpiCoverage.textContent = isFinite(coverage) ? `${coverage.toFixed(1)}x` : '—';
     }
 
+    function getSelectedLineStyle() {
+        if (!chartLineStyleSelect) return 'smooth';
+        if (chartLineStyleSelect.tagName && chartLineStyleSelect.tagName.toLowerCase() === 'select') {
+            return chartLineStyleSelect.value || 'smooth';
+        }
+        const active = chartLineStyleSelect.querySelector('.pill.active[data-style]');
+        return active ? active.dataset.style : 'smooth';
+    }
+
+    function highlightQuickRangeButton(activeButton = null) {
+        chartQuickRangeButtons.forEach(btn => btn.classList.toggle('active', btn === activeButton));
+    }
+
+    function updateChartRangeSummary(startDate, endDate) {
+        if (!chartRangeSummary) return;
+        if (!(startDate instanceof Date) || !(endDate instanceof Date) || isNaN(startDate) || isNaN(endDate)) {
+            chartRangeSummary.textContent = 'Vista completa';
+            return;
+        }
+        const fmt = (d) => `${('0' + d.getUTCDate()).slice(-2)}/${('0' + (d.getUTCMonth() + 1)).slice(-2)}/${d.getUTCFullYear()}`;
+        chartRangeSummary.textContent = `De ${fmt(startDate)} a ${fmt(endDate)}`;
+    }
+
+    function setChartRangeAndApply(startDate, endDate, sourceButton = null) {
+        if (mobileChartStartInput && startDate) {
+            mobileChartStartInput.value = getISODateString(startDate);
+        }
+        if (mobileChartEndInput && endDate) {
+            mobileChartEndInput.value = getISODateString(endDate);
+        }
+        highlightQuickRangeButton(sourceButton);
+        applyChartRange();
+    }
+
+    function applyQuickRangePreset(presetKey, sourceButton = null) {
+        if (!fullChartData || !Array.isArray(fullChartData.periodDates) || fullChartData.periodDates.length === 0) return;
+        const dates = fullChartData.periodDates;
+        const last = dates[dates.length - 1];
+        let start = dates[0];
+        if (presetKey === '3') {
+            start = dates[Math.max(0, dates.length - 3)];
+        } else if (presetKey === '6') {
+            start = dates[Math.max(0, dates.length - 6)];
+        } else if (presetKey === '12') {
+            start = dates[Math.max(0, dates.length - 12)];
+        } else if (presetKey === 'ytd') {
+            const idx = dates.findIndex(d => d.getUTCFullYear() === last.getUTCFullYear());
+            if (idx !== -1) start = dates[idx];
+        } else if (presetKey === 'all') {
+            start = dates[0];
+        }
+        setChartRangeAndApply(start, last, sourceButton);
+    }
+
     function applyDatasetVisibilityFromToggles(shouldUpdate = true) {
         if (!cashflowChartInstance || !Array.isArray(cashflowChartInstance.data.datasets)) return;
         chartDatasetToggles.forEach(toggle => {
@@ -3870,12 +3926,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function applyLineStylePreference(shouldUpdate = true) {
         if (!cashflowChartInstance || !Array.isArray(cashflowChartInstance.data.datasets)) return;
-        const mode = chartLineStyleSelect ? chartLineStyleSelect.value : 'smooth';
-        const balanceDataset = cashflowChartInstance.data.datasets[0];
-        if (balanceDataset) {
-            balanceDataset.stepped = mode === 'stepped';
-            balanceDataset.tension = mode === 'smooth' ? 0.35 : 0;
-        }
+        const mode = getSelectedLineStyle();
+        cashflowChartInstance.data.datasets.forEach(dataset => {
+            if (dataset.type === 'line') {
+                dataset.stepped = mode === 'stepped';
+                dataset.tension = mode === 'smooth' ? 0.35 : 0;
+            }
+        });
         if (shouldUpdate) cashflowChartInstance.update();
     }
 
@@ -3894,9 +3951,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCashflowChart(periodDates, incomes, totalExpenses, netFlows, endBalances, storeData = true) {
         if (storeData) {
             fullChartData = { periodDates, incomes, totalExpenses, netFlows, endBalances };
-            if (mobileChartStartInput && mobileChartEndInput && periodDates.length > 0) {
-                mobileChartStartInput.value = getISODateString(periodDates[0]);
-                mobileChartEndInput.value = getISODateString(periodDates[periodDates.length - 1]);
+            if (periodDates.length > 0) {
+                if (mobileChartStartInput && mobileChartEndInput) {
+                    mobileChartStartInput.value = getISODateString(periodDates[0]);
+                    mobileChartEndInput.value = getISODateString(periodDates[periodDates.length - 1]);
+                }
+                updateChartRangeSummary(periodDates[0], periodDates[periodDates.length - 1]);
+            } else {
+                updateChartRangeSummary(null, null);
             }
         }
         if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
@@ -3958,11 +4020,65 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }] : [];
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
-            type: 'line',
-            data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Saldo Final Estimado',
+                        data: endBalances,
+                        type: 'line',
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                        tension: 0.35,
+                        fill: false,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#2563eb',
+                        borderWidth: 2,
+                        order: 1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Ingreso Total Neto',
+                        data: incomes,
+                        backgroundColor: 'rgba(16, 185, 129, 0.65)',
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        borderWidth: 1.5,
+                        order: 2,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Gasto Total',
+                        data: totalExpenses.map(e => -e),
+                        backgroundColor: 'rgba(239, 68, 68, 0.65)',
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        borderWidth: 1.5,
+                        order: 2,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Flujo Neto del Período',
+                        data: netFlows,
+                        type: 'line',
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                        tension: 0.35,
+                        fill: false,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#f59e0b',
+                        borderWidth: 2,
+                        order: 1,
+                        yAxisID: 'y'
+                    }
+                ]
+            },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
                 scales: {
                     x: xScaleOptions,
                     y: {
@@ -4760,13 +4876,29 @@ function getMondayOfWeek(year, week) {
     }
     [mobileChartStartInput, mobileChartEndInput].forEach(inp => {
         if (!inp) return;
-        inp.addEventListener('change', () => applyChartRange());
+        inp.addEventListener('change', () => {
+            highlightQuickRangeButton(null);
+            applyChartRange();
+        });
+    });
+    chartQuickRangeButtons.forEach(btn => {
+        btn.addEventListener('click', () => applyQuickRangePreset(btn.dataset.range, btn));
     });
     chartDatasetToggles.forEach(toggle => {
         toggle.addEventListener('change', () => applyDatasetVisibilityFromToggles());
     });
     if (chartLineStyleSelect) {
-        chartLineStyleSelect.addEventListener('change', () => applyLineStylePreference());
+        if (chartLineStyleSelect.tagName && chartLineStyleSelect.tagName.toLowerCase() === 'select') {
+            chartLineStyleSelect.addEventListener('change', () => applyLineStylePreference());
+        } else {
+            chartLineStyleSelect.addEventListener('click', (event) => {
+                const target = event.target.closest('.pill[data-style]');
+                if (!target) return;
+                chartLineStyleSelect.querySelectorAll('.pill').forEach(pill => pill.classList.remove('active'));
+                target.classList.add('active');
+                applyLineStylePreference();
+            });
+        }
     }
     if (resetChartZoomButton) {
         resetChartZoomButton.addEventListener('click', () => {
@@ -4900,15 +5032,20 @@ function getMondayOfWeek(year, week) {
         const startStr = mobileChartStartInput ? mobileChartStartInput.value : '';
         const endStr = mobileChartEndInput ? mobileChartEndInput.value : '';
         if (!startStr || !endStr) {
+            highlightQuickRangeButton(null);
+            updateChartRangeSummary(fullChartData.periodDates[0], fullChartData.periodDates[fullChartData.periodDates.length - 1]);
             renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
             return;
         }
         const startDate = toUTCDate(startStr);
         const endDate = toUTCDate(endStr);
         if (isNaN(startDate) || isNaN(endDate) || startDate > endDate) {
+            highlightQuickRangeButton(null);
+            updateChartRangeSummary(fullChartData.periodDates[0], fullChartData.periodDates[fullChartData.periodDates.length - 1]);
             renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
             return;
         }
+        highlightQuickRangeButton(null);
         const fDates = [];
         const fInc = [];
         const fExp = [];
@@ -4924,7 +5061,13 @@ function getMondayOfWeek(year, week) {
                 fEnd.push(fullChartData.endBalances[i]);
             }
         }
-        renderCashflowChart(fDates, fInc, fExp, fNet, fEnd, false);
+        if (fDates.length === 0) {
+            updateChartRangeSummary(fullChartData.periodDates[0], fullChartData.periodDates[fullChartData.periodDates.length - 1]);
+            renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, false);
+        } else {
+            updateChartRangeSummary(fDates[0], fDates[fDates.length - 1]);
+            renderCashflowChart(fDates, fInc, fExp, fNet, fEnd, false);
+        }
     }
 
     function openChartModal(title, rows) {

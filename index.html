@@ -419,24 +419,79 @@
             </div>
 
             <div id="grafico" class="tab-content">
-                <div class="chart-section">
-                    <div class="subtabs-container" id="chart-subtabs">
-                        <button class="subtab-button active" data-parent="chart" data-period="Mensual">Mensual</button>
-                        <button class="subtab-button" data-parent="chart" data-period="Semanal">Semanal</button>
-                        <button class="subtab-button" data-parent="chart" data-period="Diario">Diario</button>
-                    </div>
+                <div class="chart-revamp">
                     <div class="chart-header">
                         <div>
                             <p class="eyebrow">Análisis visual</p>
                             <h2 id="grafico-title">Gráfico de Flujo de Caja</h2>
-                            <p class="chart-subtitle">Comparativo de saldo, ingresos, gastos y flujo neto con controles rápidos de visualización.</p>
+                            <p class="chart-subtitle">Panel rediseñado para cambiar de período, capas y rango en segundos.</p>
                         </div>
                         <div class="chart-actions">
                             <button id="reset-chart-zoom-button" class="ghost">Restablecer zoom</button>
                             <button id="export-chart-button" class="accent">Exportar imagen</button>
                         </div>
                     </div>
-                    <div class="chart-kpi-grid">
+
+                    <div class="chart-toolbar-grid">
+                        <div class="chart-toolbar-card">
+                            <p class="control-title">Periodicidad</p>
+                            <div class="segmented-control" id="chart-subtabs">
+                                <button class="subtab-button active" data-parent="chart" data-period="Mensual">Mensual</button>
+                                <button class="subtab-button" data-parent="chart" data-period="Semanal">Semanal</button>
+                                <button class="subtab-button" data-parent="chart" data-period="Diario">Diario</button>
+                            </div>
+                            <p class="chart-range-hint">Cambia la granularidad sin perder el contexto actual.</p>
+                        </div>
+                        <div class="chart-toolbar-card">
+                            <p class="control-title">Capas visibles</p>
+                            <div class="chip-toggle-grid">
+                                <label class="chip-toggle">
+                                    <input type="checkbox" class="chart-dataset-toggle" data-target="Saldo Final Estimado" checked>
+                                    <span>Saldo</span>
+                                </label>
+                                <label class="chip-toggle">
+                                    <input type="checkbox" class="chart-dataset-toggle" data-target="Ingreso Total Neto" checked>
+                                    <span>Ingresos</span>
+                                </label>
+                                <label class="chip-toggle">
+                                    <input type="checkbox" class="chart-dataset-toggle" data-target="Gasto Total" checked>
+                                    <span>Gastos</span>
+                                </label>
+                                <label class="chip-toggle">
+                                    <input type="checkbox" class="chart-dataset-toggle" data-target="Flujo Neto del Período" checked>
+                                    <span>Flujo neto</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="chart-toolbar-card">
+                            <p class="control-title">Rango dinámico</p>
+                            <div class="chart-quick-range">
+                                <button class="chart-quick-range-button" data-range="3">Últimos 3</button>
+                                <button class="chart-quick-range-button" data-range="6">Últimos 6</button>
+                                <button class="chart-quick-range-button" data-range="12">Últimos 12</button>
+                                <button class="chart-quick-range-button" data-range="ytd">Año actual</button>
+                                <button class="chart-quick-range-button" data-range="all">Todo</button>
+                            </div>
+                            <div class="chart-range-inputs compact">
+                                <label for="mobile-chart-start">Desde</label>
+                                <input type="date" id="mobile-chart-start">
+                                <label for="mobile-chart-end">Hasta</label>
+                                <input type="date" id="mobile-chart-end">
+                                <button id="apply-mobile-chart-range">Aplicar</button>
+                            </div>
+                        </div>
+                        <div class="chart-toolbar-card">
+                            <p class="control-title">Estilo de línea</p>
+                            <div class="line-style-pills" id="chart-line-style">
+                                <button type="button" class="pill active" data-style="smooth">Suavizado</button>
+                                <button type="button" class="pill" data-style="linear">Lineal</button>
+                                <button type="button" class="pill" data-style="stepped">Escalonado</button>
+                            </div>
+                            <p class="chart-range-hint">Aplicado al saldo y flujo neto.</p>
+                        </div>
+                    </div>
+
+                    <div class="chart-kpi-grid chart-kpi-modern">
                         <div class="kpi-card">
                             <p>Saldo final proyectado</p>
                             <strong id="chart-kpi-balance">—</strong>
@@ -458,81 +513,70 @@
                             <span class="kpi-meta">Saldo / gasto promedio</span>
                         </div>
                     </div>
-                    <div class="chart-control-panel">
-                        <div>
-                            <p class="control-title">Capas visibles</p>
-                            <div class="chart-toggle-group">
-                                <label><input type="checkbox" class="chart-dataset-toggle" data-target="Saldo Final Estimado" checked> Saldo</label>
-                                <label><input type="checkbox" class="chart-dataset-toggle" data-target="Ingreso Total Neto" checked> Ingresos</label>
-                                <label><input type="checkbox" class="chart-dataset-toggle" data-target="Gasto Total" checked> Gastos</label>
-                                <label><input type="checkbox" class="chart-dataset-toggle" data-target="Flujo Neto del Período" checked> Flujo neto</label>
-                            </div>
+
+                    <div class="chart-canvas-card">
+                        <div class="chart-meta-row">
+                            <div class="chart-range-chip" id="chart-range-summary">Vista completa</div>
+                            <p id="chart-message" class="chart-message-inline">Doble clic en el gráfico para activar el zoom.</p>
                         </div>
-                        <div class="chart-line-style">
-                            <p class="control-title">Perfil de línea</p>
-                            <select id="chart-line-style">
-                                <option value="smooth" selected>Suavizado</option>
-                                <option value="linear">Lineal</option>
-                                <option value="stepped">Escalonado</option>
-                            </select>
-                        </div>
-                        <div class="chart-range-group">
-                            <p class="control-title">Rango a mostrar</p>
-                            <div class="chart-range-inputs">
-                                <label for="mobile-chart-start">Desde:</label>
-                                <input type="date" id="mobile-chart-start">
-                                <label for="mobile-chart-end">Hasta:</label>
-                                <input type="date" id="mobile-chart-end">
-                                <button id="apply-mobile-chart-range">Aplicar</button>
-                            </div>
-                            <p class="chart-range-hint">El rango se adapta a la periodicidad seleccionada.</p>
+                        <div class="chart-container wide modern">
+                            <canvas id="cashflow-chart"></canvas>
                         </div>
                     </div>
-                    <div class="chart-container wide">
-                        <canvas id="cashflow-chart"></canvas>
-                    </div>
-                    <p id="chart-message" class="centered-text">Doble clic en el gráfico para activar el zoom.</p>
-                </div>
-                <div id="pie-month-container">
-                    <h3>Distribución de Gastos por Categoría - Mensual</h3>
-                    <div class="chart-period-selector multi-input">
-                        <input type="month" id="pie-month-input-1">
-                        <input type="month" id="pie-month-input-2">
-                        <input type="month" id="pie-month-input-3">
-                    </div>
-                    <div class="multi-pie-container">
-                        <div class="chart-container">
-                            <canvas id="pie-chart-month-1"></canvas>
-                        </div>
-                        <div class="chart-container">
-                            <canvas id="pie-chart-month-2"></canvas>
-                        </div>
-                        <div class="chart-container">
-                            <canvas id="pie-chart-month-3"></canvas>
-                        </div>
-                    </div>
-                    <div id="pie-month-legend" class="shared-legend"></div>
                 </div>
 
-                <div id="pie-week-container" style="display:none;">
-                    <h3>Distribución de Gastos por Categoría - Semanal</h3>
-                    <div class="chart-period-selector multi-input">
-                        <input type="week" id="pie-week-input-1">
-                        <input type="week" id="pie-week-input-2">
-                        <input type="week" id="pie-week-input-3">
+                <div class="chart-splits">
+                    <div id="pie-month-container" class="chart-card">
+                        <div class="chart-card-header">
+                            <div>
+                                <p class="eyebrow">Gastos por categoría</p>
+                                <h3>Comparativo Mensual</h3>
+                            </div>
+                        </div>
+                        <div class="chart-period-selector multi-input">
+                            <input type="month" id="pie-month-input-1">
+                            <input type="month" id="pie-month-input-2">
+                            <input type="month" id="pie-month-input-3">
+                        </div>
+                        <div class="multi-pie-container">
+                            <div class="chart-container">
+                                <canvas id="pie-chart-month-1"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="pie-chart-month-2"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="pie-chart-month-3"></canvas>
+                            </div>
+                        </div>
+                        <div id="pie-month-legend" class="shared-legend"></div>
                     </div>
-                    <div class="multi-pie-container">
-                        <div class="chart-container">
-                            <canvas id="pie-chart-week-1"></canvas>
+
+                    <div id="pie-week-container" class="chart-card" style="display:none;">
+                        <div class="chart-card-header">
+                            <div>
+                                <p class="eyebrow">Gastos por categoría</p>
+                                <h3>Comparativo Semanal</h3>
+                            </div>
                         </div>
-                        <div class="chart-container">
-                            <canvas id="pie-chart-week-2"></canvas>
+                        <div class="chart-period-selector multi-input">
+                            <input type="week" id="pie-week-input-1">
+                            <input type="week" id="pie-week-input-2">
+                            <input type="week" id="pie-week-input-3">
                         </div>
-                        <div class="chart-container">
-                            <canvas id="pie-chart-week-3"></canvas>
+                        <div class="multi-pie-container">
+                            <div class="chart-container">
+                                <canvas id="pie-chart-week-1"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="pie-chart-week-2"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="pie-chart-week-3"></canvas>
+                            </div>
                         </div>
+                        <div id="pie-week-legend" class="shared-legend"></div>
                     </div>
-                    <div id="pie-week-legend" class="shared-legend"></div>
                 </div>
             </div>
 
