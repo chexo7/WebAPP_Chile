@@ -263,13 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chartModalTableBody = document.querySelector('#chart-modal-table tbody');
     const chartDatasetToggles = Array.from(document.querySelectorAll('.chart-dataset-toggle'));
     const chartLineStyleSelect = document.getElementById('chart-line-style');
-    const chartKpiBalance = document.getElementById('chart-kpi-balance');
-    const chartKpiPeriod = document.getElementById('chart-kpi-period');
-    const chartKpiAvgNet = document.getElementById('chart-kpi-avg-net');
-    const chartKpiAvgNetDetail = document.getElementById('chart-kpi-avg-net-detail');
-    const chartKpiMaxExpense = document.getElementById('chart-kpi-max-expense');
-    const chartKpiMaxExpensePeriod = document.getElementById('chart-kpi-max-expense-period');
-    const chartKpiCoverage = document.getElementById('chart-kpi-coverage');
+    const chartLowBalanceList = document.getElementById('chart-lowest-balance-list');
     const resetChartZoomButton = document.getElementById('reset-chart-zoom-button');
     const exportChartButton = document.getElementById('export-chart-button');
     let cashflowChartInstance = null;
@@ -3811,51 +3805,86 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
     }
 
-    function updateChartKPIs(periodDates = [], incomes = [], totalExpenses = [], netFlows = [], endBalances = []) {
-        const symbol = currentBackupData?.display_currency_symbol || '$';
-        if (!chartKpiBalance || !chartKpiPeriod || !chartKpiAvgNet || !chartKpiMaxExpense || !chartKpiCoverage) return;
-        if (!periodDates.length || !endBalances.length) {
-            chartKpiBalance.textContent = '—';
-            chartKpiPeriod.textContent = '—';
-            if (chartKpiAvgNet) chartKpiAvgNet.textContent = '—';
-            if (chartKpiAvgNetDetail) chartKpiAvgNetDetail.textContent = '—';
-            if (chartKpiMaxExpense) chartKpiMaxExpense.textContent = '—';
-            if (chartKpiMaxExpensePeriod) chartKpiMaxExpensePeriod.textContent = '—';
-            chartKpiCoverage.textContent = '—';
-            return;
-        }
-        const lastIdx = Math.max(0, endBalances.length - 1);
-        const lastLabel = formatChartPeriodLabel(periodDates[lastIdx]);
-        chartKpiBalance.textContent = formatCurrencyJS(endBalances[lastIdx], symbol);
-        chartKpiPeriod.textContent = `Hasta ${lastLabel}`;
+    async function computeDailyProjectionForHorizon(monthsAhead = 6) {
+        if (!currentBackupData) return null;
+        let baseStartDate = currentBackupData.analysis_start_date;
+        if (typeof baseStartDate === 'string') baseStartDate = toUTCDate(baseStartDate);
+        if (!(baseStartDate instanceof Date) || isNaN(baseStartDate)) return null;
 
-        if (chartKpiAvgNet) {
-            const avgNet = netFlows.length ? netFlows.reduce((acc, n) => acc + n, 0) / netFlows.length : 0;
-            chartKpiAvgNet.textContent = formatCurrencyJS(avgNet, symbol);
-            if (chartKpiAvgNetDetail) chartKpiAvgNetDetail.textContent = `${netFlows.length} períodos ${activeCashflowPeriodicity.toLowerCase()}`;
+        const monthAlignedStart = new Date(Date.UTC(baseStartDate.getUTCFullYear(), baseStartDate.getUTCMonth(), 1));
+        const analysisStart = getPeriodStartDate(monthAlignedStart, 'Diario');
+        const horizonStart = getPeriodStartDate(new Date(), 'Diario');
+        const horizonEnd = getPeriodEndDate(addMonths(horizonStart, monthsAhead - 1), 'Mensual');
+
+        let duration = 0;
+        let cursor = new Date(analysisStart.getTime());
+        while (cursor <= horizonEnd) { duration++; cursor = addDays(cursor, 1); }
+
+        const tempCalcData = {
+            ...currentBackupData,
+            analysis_start_date: analysisStart,
+            analysis_duration: duration,
+            analysis_periodicity: 'Diario',
+            incomes: (currentBackupData.incomes || []).map(inc => ({
+                ...inc,
+                start_date: inc.start_date ? new Date(inc.start_date) : null,
+                end_date: inc.end_date ? new Date(inc.end_date) : null
+            })),
+            expenses: (currentBackupData.expenses || []).map(exp => ({
+                ...exp,
+                start_date: exp.start_date ? new Date(exp.start_date) : null,
+                end_date: exp.end_date ? new Date(exp.end_date) : null
+            }))
+        };
+
+        const rateDateCandidates = [];
+        let periodCursor = new Date(analysisStart.getTime());
+        for (let i = 0; i < duration; i++) {
+            const periodStart = getPeriodStartDate(periodCursor, 'Diario');
+            const periodEnd = getPeriodEndDate(periodCursor, 'Diario');
+            rateDateCandidates.push(
+                ...collectUsdRateDatesForExpenses(tempCalcData.expenses, periodStart, periodEnd, tempCalcData.use_instant_expenses)
+            );
+            rateDateCandidates.push(
+                ...collectUsdRateDatesForIncomes(tempCalcData.incomes, periodStart, periodEnd, 'Diario')
+            );
+            periodCursor = advancePeriodStart(periodStart, 'Diario');
         }
 
-        if (chartKpiMaxExpense) {
-            let maxExpense = -Infinity;
-            let maxIdx = -1;
-            totalExpenses.forEach((v, idx) => {
-                if (v > maxExpense) {
-                    maxExpense = v;
-                    maxIdx = idx;
-                }
-            });
-            if (maxIdx >= 0) {
-                chartKpiMaxExpense.textContent = formatCurrencyJS(totalExpenses[maxIdx], symbol);
-                if (chartKpiMaxExpensePeriod) chartKpiMaxExpensePeriod.textContent = formatChartPeriodLabel(periodDates[maxIdx]);
-            } else {
-                chartKpiMaxExpense.textContent = '—';
-                if (chartKpiMaxExpensePeriod) chartKpiMaxExpensePeriod.textContent = '—';
+        await ensureUsdClpRatesForDates(rateDateCandidates);
+        const projection = calculateCashFlowData(tempCalcData);
+        return { ...projection, horizonStart, horizonEnd };
+    }
+
+    async function updateChartKPIs() {
+        if (!chartLowBalanceList) return;
+        chartLowBalanceList.innerHTML = '<li>Calculando alertas...</li>';
+        try {
+            const projection = await computeDailyProjectionForHorizon(6);
+            if (!projection || !projection.periodDates?.length) {
+                chartLowBalanceList.innerHTML = '<li>No hay datos para mostrar.</li>';
+                return;
             }
-        }
 
-        const avgExpense = totalExpenses.length ? totalExpenses.reduce((acc, n) => acc + n, 0) / totalExpenses.length : 0;
-        const coverage = avgExpense !== 0 ? endBalances[lastIdx] / avgExpense : 0;
-        chartKpiCoverage.textContent = isFinite(coverage) ? `${coverage.toFixed(1)}x` : '—';
+            const { periodDates, end_bal_p: endBalances, horizonStart, horizonEnd } = projection;
+            const symbol = currentBackupData?.display_currency_symbol || '$';
+            const windowBalances = periodDates.map((date, idx) => ({ date, balance: endBalances[idx] }))
+                .filter(({ date }) => date >= horizonStart && date <= horizonEnd);
+
+            if (!windowBalances.length) {
+                chartLowBalanceList.innerHTML = '<li>No hay datos proyectados para los próximos 6 meses.</li>';
+                return;
+            }
+
+            const criticalDays = windowBalances.sort((a, b) => a.balance - b.balance).slice(0, 10);
+            chartLowBalanceList.innerHTML = criticalDays.map(({ date, balance }) => {
+                const label = `${DATE_DAY_FORMAT(date)} ${date.getUTCFullYear()}`;
+                return `<li><span class="kpi-date">${label}</span> <span class="kpi-value">${formatCurrencyJS(balance, symbol)}</span></li>`;
+            }).join('');
+        } catch (error) {
+            console.error('Error al actualizar los indicadores universales:', error);
+            chartLowBalanceList.innerHTML = '<li>Error al calcular los indicadores.</li>';
+        }
     }
 
     function applyDatasetVisibilityFromToggles(shouldUpdate = true) {
@@ -4028,7 +4057,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             cashflowChartInstance.update();
         }
-        updateChartKPIs(periodDates, incomes, totalExpenses, netFlows, endBalances);
+        updateChartKPIs();
         cashflowChartCanvas.onclick = async (evt) => {
             if (!cashflowChartInstance) return;
             const points = cashflowChartInstance.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
