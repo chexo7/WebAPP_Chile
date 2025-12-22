@@ -866,32 +866,10 @@ td.reimbursement-income {
 }
 
 /* Estilos para Pestaña Gráfico */
-.chart-container {
-    width: 100%;
-    max-width: 95%; /* Changed from 800px */
-    height: 60vh;   /* Changed from 400px */
-    margin: 20px auto;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    padding: 10px;
-}
-
-.chart-container canvas {
-    display: block;
-    width: 100%;
-    max-width: 600px;
-    margin: 0 auto;
-}
-
-#cashflow-chart {
-    width: 100%;
-    max-width: none;
-}
-
-.chart-section {
+.chart-revamp {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
 }
 
 .eyebrow {
@@ -932,10 +910,155 @@ td.reimbursement-income {
     color: var(--light-text);
 }
 
+.chart-toolbar-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.chart-toolbar-card {
+    background: linear-gradient(135deg, #ffffff, #f8faff);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--primary-color);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.control-title {
+    margin: 0;
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+.chart-range-hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--light-text);
+}
+
+.segmented-control {
+    display: inline-flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.segmented-control .subtab-button {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+}
+
+.segmented-control .subtab-button.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+    box-shadow: 0 6px 14px rgba(13, 110, 253, 0.18);
+}
+
+.chip-toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+}
+
+.chip-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+    padding: 8px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chip-toggle:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 10px rgba(13, 110, 253, 0.08);
+}
+
+.chip-toggle input {
+    accent-color: var(--primary-color);
+}
+
+.chart-quick-range {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.chart-quick-range button {
+    border: 1px solid var(--border-color);
+    background: #fff;
+    padding: 8px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.chart-quick-range button.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+    box-shadow: 0 6px 14px rgba(13, 110, 253, 0.18);
+}
+
+.chart-range-inputs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+    align-items: center;
+}
+
+.chart-range-inputs.compact input,
+.chart-range-inputs.compact button {
+    width: 100%;
+}
+
+.line-style-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.line-style-pills .pill {
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.line-style-pills .pill.active {
+    background: #0f172a;
+    color: #fff;
+    border-color: #0f172a;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
+}
+
 .chart-kpi-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px;
+}
+
+.chart-kpi-modern .kpi-card {
+    background: #0f172a;
+    color: #e5e7eb;
+    border: none;
+}
+
+.chart-kpi-modern .kpi-card strong {
+    color: #fff;
 }
 
 .kpi-card {
@@ -963,68 +1086,90 @@ td.reimbursement-income {
     color: var(--light-text);
 }
 
-.chart-control-panel {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
-    align-items: center;
-    border: 1px dashed var(--border-color);
-    padding: 12px;
-    border-radius: var(--radius);
-    background-color: #fbfcff;
-}
-
-.control-title {
-    margin: 0 0 8px 0;
-    font-weight: 600;
-    color: var(--text-color);
-}
-
-.chart-toggle-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.chart-toggle-group label {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 8px;
+.chart-canvas-card {
     border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background-color: #fff;
+    border-radius: 14px;
+    padding: 12px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.chart-line-style select,
-.chart-range-inputs input,
-.chart-range-inputs button {
-    width: 100%;
-    max-width: 100%;
-}
-
-.chart-range-group {
+.chart-meta-row {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.chart-range-inputs {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 8px;
     align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
 }
 
-.chart-range-hint {
+.chart-range-chip {
+    background: #eef2ff;
+    color: var(--primary-color);
+    padding: 8px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--primary-color);
+    font-weight: 600;
+}
+
+.chart-message-inline {
     margin: 0;
-    font-size: 0.85rem;
     color: var(--light-text);
+    font-size: 0.95rem;
+}
+
+.chart-container {
+    width: 100%;
+    max-width: 95%;
+    height: 60vh;
+    margin: 0 auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 10px;
+    background: #f9fbff;
 }
 
 .chart-container.wide {
     max-width: 100%;
     height: 65vh;
+}
+
+.chart-container.wide.modern {
+    border-style: dashed;
+    background: radial-gradient(circle at 20% 20%, rgba(13, 110, 253, 0.05), transparent 35%), #ffffff;
+}
+
+.chart-container canvas {
+    display: block;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+#cashflow-chart {
+    width: 100%;
+    max-width: none;
+}
+
+.chart-splits {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 14px;
+}
+
+.chart-card {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.chart-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
 }
 
 .mobile-chart-range {
@@ -1042,11 +1187,6 @@ td.reimbursement-income {
     .mobile-chart-range {
         display: flex;
     }
-}
-.centered-text {
-    text-align: center;
-    margin-top: 20px;
-    color: var(--light-text);
 }
 
 
@@ -1651,4 +1791,3 @@ td.reimbursement-income {
     padding: 0;
 }
 .breakdown-popup li { margin: 2px 0; }
-
