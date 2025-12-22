@@ -3973,6 +3973,41 @@ document.addEventListener('DOMContentLoaded', () => {
         if (shouldUpdate) cashflowChartInstance.update();
     }
 
+    function computeDefaultChartRange(periodDates = [], periodicity = activeCashflowPeriodicity) {
+        if (!Array.isArray(periodDates) || periodDates.length === 0) return null;
+        const today = new Date();
+        const earliest = periodDates[0];
+        const latest = periodDates[periodDates.length - 1];
+        let startTarget;
+        let endTarget;
+
+        if (periodicity === 'Mensual') {
+            const currentMonthStart = getPeriodStartDate(today, 'Mensual');
+            startTarget = getPeriodStartDate(addMonths(currentMonthStart, -3), 'Mensual');
+            endTarget = getPeriodStartDate(addMonths(currentMonthStart, 8), 'Mensual');
+        } else if (periodicity === 'Semanal') {
+            const currentWeekStart = getPeriodStartDate(today, 'Semanal');
+            startTarget = addWeeks(currentWeekStart, -4);
+            endTarget = addWeeks(currentWeekStart, 20);
+        } else if (periodicity === 'Diario') {
+            const currentDayStart = getPeriodStartDate(today, 'Diario');
+            startTarget = addDays(currentDayStart, -15);
+            endTarget = addDays(currentDayStart, 30);
+        } else {
+            return null;
+        }
+
+        let startDate = startTarget < earliest ? earliest : startTarget;
+        let endDate = endTarget > latest ? latest : endTarget;
+
+        if (startDate > endDate) {
+            startDate = earliest;
+            endDate = latest;
+        }
+
+        return { startDate, endDate };
+    }
+
     function exportChartAsImage() {
         if (!cashflowChartInstance) return;
         const url = cashflowChartInstance.toBase64Image('image/png', 1);
@@ -3994,8 +4029,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (storeData) {
             fullChartData = { periodDates, incomes, totalExpenses, netFlows, endBalances, dailyLine };
             if (mobileChartStartInput && mobileChartEndInput && periodDates.length > 0) {
-                mobileChartStartInput.value = getISODateString(periodDates[0]);
-                mobileChartEndInput.value = getISODateString(periodDates[periodDates.length - 1]);
+                const defaultRange = computeDefaultChartRange(periodDates, activeCashflowPeriodicity);
+                const rangeToUse = defaultRange || { startDate: periodDates[0], endDate: periodDates[periodDates.length - 1] };
+                mobileChartStartInput.value = getISODateString(rangeToUse.startDate);
+                mobileChartEndInput.value = getISODateString(rangeToUse.endDate);
+                if (defaultRange) {
+                    applyChartRange('default');
+                    return;
+                }
             }
         }
         if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
@@ -4941,6 +4982,16 @@ function getMondayOfWeek(year, week) {
     updateAnalysisDurationLabel();
     // updateUsdClpInfoLabel(); // No longer needed here, called by activateTab or showMainContentScreen
     hideElement(incomeReimbursementCategoryContainer);
+
+    if (chartDatasetToggles.length) {
+        chartDatasetToggles.forEach(toggle => {
+            const targetLabel = toggle.getAttribute('data-target');
+            toggle.checked = targetLabel === 'Saldo Final Estimado';
+        });
+    }
+    if (chartLineStyleSelect) {
+        chartLineStyleSelect.value = 'stepped';
+    }
 
     if (applyMobileChartRangeButton) {
         applyMobileChartRangeButton.addEventListener('click', () => applyChartRange('manual'));
