@@ -4020,6 +4020,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const incomePoints = periodDates.map((date, idx) => ({ x: date.getTime(), y: incomes[idx] }));
         const expensePoints = periodDates.map((date, idx) => ({ x: date.getTime(), y: -totalExpenses[idx] }));
         const netFlowPoints = periodDates.map((date, idx) => ({ x: date.getTime(), y: netFlows[idx] }));
+        const periodStartTimes = activeCashflowPeriodicity !== 'Diario' ? new Set(periodDates.map(d => d.getTime())) : new Set();
         const currentPeriodIndex = findCurrentPeriodIndex(periodDates, activeCashflowPeriodicity);
         const xScaleOptions = {
             type: 'linear',
@@ -4073,9 +4074,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     tension: 0,
                     stepped: true,
                     fill: false,
-                    pointRadius: 1,
-                    pointHitRadius: 6,
-                    pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                    pointRadius: (ctx) => {
+                        const rawX = ctx.raw && typeof ctx.raw.x === 'number' ? ctx.raw.x : null;
+                        return rawX !== null && periodStartTimes.has(rawX) ? 6 : 0;
+                    },
+                    pointHoverRadius: (ctx) => {
+                        const rawX = ctx.raw && typeof ctx.raw.x === 'number' ? ctx.raw.x : null;
+                        return rawX !== null && periodStartTimes.has(rawX) ? 8 : 0;
+                    },
+                    pointHitRadius: 8,
+                    pointBackgroundColor: (ctx) => {
+                        const rawX = ctx.raw && typeof ctx.raw.x === 'number' ? ctx.raw.x : null;
+                        return rawX !== null && periodStartTimes.has(rawX) ? 'rgba(54, 162, 235, 1)' : 'transparent';
+                    },
                     borderWidth: 2,
                     order: 1,
                 }, {
