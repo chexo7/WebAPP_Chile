@@ -262,6 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chartModalTitle = document.getElementById('chart-modal-title');
     const chartModalTableBody = document.querySelector('#chart-modal-table tbody');
     const chartDatasetToggles = Array.from(document.querySelectorAll('.chart-dataset-toggle'));
+    const chartQuickRangeButtons = Array.from(document.querySelectorAll('.chart-quick-range'));
     const chartLineStyleSelect = document.getElementById('chart-line-style');
     const chartKpiBalance = document.getElementById('chart-kpi-balance');
     const chartKpiPeriod = document.getElementById('chart-kpi-period');
@@ -3879,6 +3880,44 @@ document.addEventListener('DOMContentLoaded', () => {
         if (shouldUpdate) cashflowChartInstance.update();
     }
 
+    function updateQuickRangeActive(presetKey = null) {
+        chartQuickRangeButtons.forEach(btn => {
+            const isActive = presetKey && btn.dataset.range === presetKey;
+            btn.classList.toggle('active', Boolean(isActive));
+            if (isActive) {
+                btn.setAttribute('aria-pressed', 'true');
+            } else {
+                btn.setAttribute('aria-pressed', 'false');
+            }
+        });
+    }
+
+    function applyQuickRangePreset(presetKey) {
+        if (!fullChartData || !Array.isArray(fullChartData.periodDates) || !fullChartData.periodDates.length) return;
+        const dates = fullChartData.periodDates;
+        let startDate = dates[0];
+        let endDate = dates[dates.length - 1];
+        const lastIndex = dates.length - 1;
+        if (presetKey === '6') {
+            startDate = dates[Math.max(0, lastIndex - 5)];
+        } else if (presetKey === '12') {
+            startDate = dates[Math.max(0, lastIndex - 11)];
+        } else if (presetKey === 'current') {
+            const idx = findCurrentPeriodIndex(dates, activeCashflowPeriodicity);
+            if (idx !== -1) {
+                startDate = dates[Math.max(0, idx - 2)];
+                endDate = dates[Math.min(lastIndex, idx + 6)];
+            }
+        } else if (presetKey === 'all') {
+            startDate = dates[0];
+            endDate = dates[lastIndex];
+        }
+        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(startDate);
+        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(endDate);
+        updateQuickRangeActive(presetKey);
+        applyChartRange(presetKey);
+    }
+
     function exportChartAsImage() {
         if (!cashflowChartInstance) return;
         const url = cashflowChartInstance.toBase64Image('image/png', 1);
@@ -3898,6 +3937,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 mobileChartStartInput.value = getISODateString(periodDates[0]);
                 mobileChartEndInput.value = getISODateString(periodDates[periodDates.length - 1]);
             }
+            updateQuickRangeActive(null);
         }
         if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
         if (!periodDates || periodDates.length === 0) { if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
@@ -4765,6 +4805,9 @@ function getMondayOfWeek(year, week) {
     chartDatasetToggles.forEach(toggle => {
         toggle.addEventListener('change', () => applyDatasetVisibilityFromToggles());
     });
+    chartQuickRangeButtons.forEach(btn => {
+        btn.addEventListener('click', () => applyQuickRangePreset(btn.dataset.range));
+    });
     if (chartLineStyleSelect) {
         chartLineStyleSelect.addEventListener('change', () => applyLineStylePreference());
     }
@@ -4895,8 +4938,9 @@ function getMondayOfWeek(year, week) {
         if (chartMessage) chartMessage.textContent = 'Doble clic en el gráfico para activar el zoom.';
     }
 
-    function applyChartRange() {
+    function applyChartRange(quickRangeKey = null) {
         if (!fullChartData) return;
+        if (!quickRangeKey) updateQuickRangeActive(null);
         const startStr = mobileChartStartInput ? mobileChartStartInput.value : '';
         const endStr = mobileChartEndInput ? mobileChartEndInput.value : '';
         if (!startStr || !endStr) {
