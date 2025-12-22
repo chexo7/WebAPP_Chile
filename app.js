@@ -288,6 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let activePaymentsPeriodicity = 'Mensual';
     const cashflowPeriodDatesMap = { Mensual: [], Semanal: [], Diario: [] };
     const cashflowCategoryTotalsMap = { Mensual: [], Semanal: [], Diario: [] };
+    const cashflowSeriesMap = { Mensual: null, Semanal: null, Diario: null };
     const breakdownPopup = document.getElementById('cashflow-breakdown-popup');
     let hoverTimer = null;
     let hoverStartX = 0;
@@ -3466,9 +3467,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function renderCashflowTable() {
         try {
             updateAnalysisModeLabels();
-            await renderCashflowTableFor('Mensual', cashflowMensualTableHead, cashflowMensualTableBody, cashflowMensualTitle);
-            await renderCashflowTableFor('Semanal', cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle);
             await renderCashflowTableFor('Diario', cashflowDiarioTableHead, cashflowDiarioTableBody, cashflowDiarioTitle);
+            await renderCashflowTableFor('Semanal', cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle);
+            await renderCashflowTableFor('Mensual', cashflowMensualTableHead, cashflowMensualTableBody, cashflowMensualTitle);
             refreshBudgetSummaryIfReady();
         } catch (error) {
             console.error('Error al renderizar el flujo de caja:', error);
@@ -3539,6 +3540,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData);
         cashflowPeriodDatesMap[periodicity] = periodDates;
         cashflowCategoryTotalsMap[periodicity] = expenses_by_cat_p;
+        cashflowSeriesMap[periodicity] = {
+            periodDates,
+            incomes: income_p,
+            expenses: fixed_exp_p.map((val, idx) => val + var_exp_p[idx]),
+            netFlows: net_flow_p,
+            endBalances: end_bal_p
+        };
 
         if (!periodDates || periodDates.length === 0) {
             tableBodyEl.innerHTML = '<tr><td colspan="2">No hay datos para el período.</td></tr>';
@@ -3941,11 +3949,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function applyLineStylePreference(shouldUpdate = true) {
         if (!cashflowChartInstance || !Array.isArray(cashflowChartInstance.data.datasets)) return;
-        const mode = chartLineStyleSelect ? chartLineStyleSelect.value : 'smooth';
         const balanceDataset = cashflowChartInstance.data.datasets[0];
         if (balanceDataset) {
-            balanceDataset.stepped = mode === 'stepped';
-            balanceDataset.tension = mode === 'smooth' ? 0.35 : 0;
+            balanceDataset.stepped = true;
+            balanceDataset.tension = 0;
+            if (chartLineStyleSelect) chartLineStyleSelect.value = 'stepped';
         }
         if (shouldUpdate) cashflowChartInstance.update();
     }
@@ -3962,7 +3970,7 @@ document.addEventListener('DOMContentLoaded', () => {
         link.remove();
     }
 
-    function renderCashflowChart(periodDates, incomes, totalExpenses, netFlows, endBalances, storeData = true, rangeKey = null) {
+    function renderCashflowChart(periodDates, incomes, totalExpenses, netFlows, endBalances, storeData = true, rangeKey = null, rangeStart = null, rangeEnd = null) {
         if (rangeKey !== null) {
             lastChartRangeKey = rangeKey;
         } else if (storeData) {
@@ -3975,52 +3983,55 @@ document.addEventListener('DOMContentLoaded', () => {
                 mobileChartEndInput.value = getISODateString(periodDates[periodDates.length - 1]);
             }
         }
-        if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
+        if (!cashflowChartCanvas) return;
+        if (cashflowChartInstance) cashflowChartInstance.destroy();
         if (!periodDates || periodDates.length === 0) { if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
         if (chartMessage) chartMessage.textContent = "";
-        const labels = periodDates.map(date => {
-            if (activeCashflowPeriodicity === 'Semanal') {
-                const [year, week] = getWeekNumber(date);
-                return `Sem ${week} ${year}`;
-            }
-            if (activeCashflowPeriodicity === 'Diario') {
-                return `${DATE_DAY_FORMAT(date)} ${date.getUTCFullYear()}`;
-            }
-            return `${MONTH_NAMES_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
-        });
+
+        const unitByPeriodicity = { Mensual: 'month', Semanal: 'week', Diario: 'day' };
+        const xTimeUnit = unitByPeriodicity[activeCashflowPeriodicity] || 'day';
+
         const currentPeriodIndex = findCurrentPeriodIndex(periodDates, activeCashflowPeriodicity);
-        const xScaleOptions = { type: 'category' };
+        const currentPeriodDate = currentPeriodIndex !== -1 ? periodDates[currentPeriodIndex] : null;
+
+        const xScaleOptions = { type: 'time', time: { unit: xTimeUnit } };
         if (currentPeriodIndex !== -1) {
             const lookaheadByPeriod = { Mensual: 6, Semanal: 16, Diario: 30 };
             const lookaheadCount = lookaheadByPeriod[activeCashflowPeriodicity] || 0;
             const minIndex = Math.max(0, currentPeriodIndex - 4);
             const maxIndex = Math.min(periodDates.length - 1, currentPeriodIndex + lookaheadCount);
             if (minIndex <= maxIndex) {
-                xScaleOptions.min = labels[minIndex];
-                xScaleOptions.max = labels[maxIndex];
+                xScaleOptions.min = periodDates[minIndex];
+                xScaleOptions.max = periodDates[maxIndex];
             }
         }
-        const currentPeriodHighlight = currentPeriodIndex !== -1 ? {
-            linePointRadius: labels.map((_, idx) => idx === currentPeriodIndex ? 8 : 4),
-            linePointHoverRadius: labels.map((_, idx) => idx === currentPeriodIndex ? 10 : 6),
-            linePointBackground: labels.map((_, idx) => idx === currentPeriodIndex ? '#0d6efd' : 'rgba(54, 162, 235, 1)'),
-            linePointBorder: labels.map((_, idx) => idx === currentPeriodIndex ? '#083b92' : 'rgba(54, 162, 235, 1)'),
-            linePointBorderWidth: labels.map((_, idx) => idx === currentPeriodIndex ? 3 : 1.5),
-            scatterRadius: labels.map((_, idx) => idx === currentPeriodIndex ? 8 : 6),
-            scatterHoverRadius: labels.map((_, idx) => idx === currentPeriodIndex ? 10 : 8)
-        } : null;
-        const highlightCurrentPeriodPlugin = currentPeriodIndex !== -1 ? [{
+
+        const dailySeries = cashflowSeriesMap['Diario'];
+        const lineData = [];
+        if (dailySeries && Array.isArray(dailySeries.periodDates) && Array.isArray(dailySeries.endBalances)) {
+            dailySeries.periodDates.forEach((d, idx) => {
+                if (rangeStart && d < rangeStart) return;
+                if (rangeEnd && d > rangeEnd) return;
+                lineData.push({ x: d, y: dailySeries.endBalances[idx] });
+            });
+        } else {
+            periodDates.forEach((d, idx) => lineData.push({ x: d, y: endBalances[idx] }));
+        }
+
+        const scatterRadius = currentPeriodIndex !== -1 ? periodDates.map((_, idx) => idx === currentPeriodIndex ? 8 : 6) : null;
+        const scatterHoverRadius = currentPeriodIndex !== -1 ? periodDates.map((_, idx) => idx === currentPeriodIndex ? 10 : 8) : null;
+
+        const highlightCurrentPeriodPlugin = currentPeriodDate ? [{
             id: 'highlightCurrentPeriod',
             afterDatasetsDraw(chart, args, pluginOptions) {
                 const { ctx, chartArea, scales } = chart;
                 if (!chartArea || !scales || !scales.x) return;
-                const index = pluginOptions?.currentIndex ?? -1;
-                if (index < 0 || index >= chart.data.labels.length) return;
                 const xScale = scales.x;
-                const label = chart.data.labels[index];
+                const targetDate = pluginOptions?.currentDate;
+                if (!targetDate) return;
                 const xPos = typeof xScale.getPixelForValue === 'function'
-                    ? xScale.getPixelForValue(label, index)
-                    : xScale.getPixelForTick(index);
+                    ? xScale.getPixelForValue(targetDate)
+                    : xScale.getPixelForTick(currentPeriodIndex);
                 if (!isFinite(xPos)) return;
                 ctx.save();
                 ctx.setLineDash([6, 4]);
@@ -4033,9 +4044,62 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.restore();
             }
         }] : [];
+
         cashflowChartInstance = new Chart(cashflowChartCanvas, {
             type: 'line',
-            data: { labels: labels, datasets: [{ label: 'Saldo Final Estimado', data: endBalances, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: false, pointRadius: 4, pointBackgroundColor: 'rgba(54, 162, 235, 1)', borderWidth: 2, order: 1, }, { label: 'Ingreso Total Neto', data: incomes, borderColor: 'rgba(75, 192, 192, 1)', backgroundColor: 'rgba(75, 192, 192, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'circle', order: 2, }, { label: 'Gasto Total', data: totalExpenses.map(e => -e), borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'rectRot', order: 2, }, { label: 'Flujo Neto del Período', data: netFlows, borderColor: 'rgba(255, 206, 86, 1)', backgroundColor: 'rgba(255, 206, 86, 1)', type: 'scatter', showLine: false, pointRadius: 6, pointStyle: 'triangle', order: 2, }] },
+            data: {
+                labels: periodDates,
+                datasets: [
+                    {
+                        label: 'Saldo Final Estimado',
+                        data: lineData,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        fill: false,
+                        pointRadius: 0,
+                        borderWidth: 2,
+                        stepped: true,
+                        tension: 0,
+                        order: 1,
+                    },
+                    {
+                        label: 'Ingreso Total Neto',
+                        data: periodDates.map((d, idx) => ({ x: d, y: incomes[idx] })),
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 1)',
+                        type: 'scatter',
+                        showLine: false,
+                        pointRadius: scatterRadius || 6,
+                        pointHoverRadius: scatterHoverRadius || 8,
+                        pointStyle: 'circle',
+                        order: 2,
+                    },
+                    {
+                        label: 'Gasto Total',
+                        data: periodDates.map((d, idx) => ({ x: d, y: -totalExpenses[idx] })),
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 1)',
+                        type: 'scatter',
+                        showLine: false,
+                        pointRadius: scatterRadius || 6,
+                        pointHoverRadius: scatterHoverRadius || 8,
+                        pointStyle: 'rectRot',
+                        order: 2,
+                    },
+                    {
+                        label: 'Flujo Neto del Período',
+                        data: periodDates.map((d, idx) => ({ x: d, y: netFlows[idx] })),
+                        borderColor: 'rgba(255, 206, 86, 1)',
+                        backgroundColor: 'rgba(255, 206, 86, 1)',
+                        type: 'scatter',
+                        showLine: false,
+                        pointRadius: scatterRadius || 6,
+                        pointHoverRadius: scatterHoverRadius || 8,
+                        pointStyle: 'triangle',
+                        order: 2,
+                    }
+                ]
+            },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -4051,6 +4115,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 plugins: {
                     tooltip: {
                         callbacks: {
+                            title: function (tooltipItems) {
+                                if (!tooltipItems || !tooltipItems.length) return '';
+                                const dateVal = tooltipItems[0].parsed.x;
+                                return formatChartPeriodLabel(new Date(dateVal));
+                            },
                             label: function (context) {
                                 let label = context.dataset.label || '';
                                 if (label) label += ': ';
@@ -4080,7 +4149,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             mode: 'xy',
                         }
                     },
-                    highlightCurrentPeriod: currentPeriodIndex !== -1 ? { currentIndex: currentPeriodIndex } : undefined
+                    highlightCurrentPeriod: currentPeriodDate ? { currentDate: currentPeriodDate } : undefined
                 }
             },
             plugins: highlightCurrentPeriodPlugin
@@ -4088,22 +4157,6 @@ document.addEventListener('DOMContentLoaded', () => {
         applyLineStylePreference(false);
         applyDatasetVisibilityFromToggles(false);
         cashflowChartInstance.update();
-        if (currentPeriodHighlight) {
-            const [saldoDataset, ingresosDataset, gastosDataset, flujoDataset] = cashflowChartInstance.data.datasets;
-            if (saldoDataset) {
-                saldoDataset.pointRadius = currentPeriodHighlight.linePointRadius;
-                saldoDataset.pointHoverRadius = currentPeriodHighlight.linePointHoverRadius;
-                saldoDataset.pointBackgroundColor = currentPeriodHighlight.linePointBackground;
-                saldoDataset.pointBorderColor = currentPeriodHighlight.linePointBorder;
-                saldoDataset.pointBorderWidth = currentPeriodHighlight.linePointBorderWidth;
-            }
-            [ingresosDataset, gastosDataset, flujoDataset].forEach(dataset => {
-                if (!dataset) return;
-                dataset.pointRadius = currentPeriodHighlight.scatterRadius;
-                dataset.pointHoverRadius = currentPeriodHighlight.scatterHoverRadius;
-            });
-            cashflowChartInstance.update();
-        }
         updateChartKPIs(periodDates, incomes, totalExpenses, netFlows, endBalances);
         updateChartWindowLabelFromDates(periodDates);
         setQuickRangeActive(lastChartRangeKey);
@@ -4119,7 +4172,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (points.length) {
                 const idx = points[0].index;
                 const rows = await gatherPeriodTransactions(periodDates[idx], activeCashflowPeriodicity);
-                openChartModal(`Transacciones - ${labels[idx]}`, rows);
+                const titleLabel = formatChartPeriodLabel(periodDates[idx]);
+                openChartModal(`Transacciones - ${titleLabel}`, rows);
             }
         };
         if (isTouchDevice) {
@@ -5024,7 +5078,7 @@ function getMondayOfWeek(year, week) {
                 fEnd.push(fullChartData.endBalances[i]);
             }
         }
-        renderCashflowChart(fDates, fInc, fExp, fNet, fEnd, false, rangeKey);
+        renderCashflowChart(fDates, fInc, fExp, fNet, fEnd, false, rangeKey, startDate, endDate);
     }
 
     function applyQuickRangeSelection(key) {
