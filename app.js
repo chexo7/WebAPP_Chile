@@ -280,6 +280,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const pieMonthChartInstances = [null, null, null];
     const pieWeekChartInstances = [null, null, null];
     let chartZoomMode = false;
+    const DEFAULT_CHART_RANGE_OFFSETS = {
+        Mensual: { past: 3, future: 8 },
+        Semanal: { past: 4, future: 20 },
+        Diario: { past: 15, future: 30 }
+    };
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
     let fullChartData = null;
     let lastChartRangeKey = 'all';
@@ -3935,6 +3940,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 mobileChartStartInput.value = getISODateString(periodDates[0]);
                 mobileChartEndInput.value = getISODateString(periodDates[periodDates.length - 1]);
             }
+            if (!rangeKey) {
+                const appliedDefault = applyDefaultChartRangeFromToday(periodDates);
+                if (appliedDefault) return;
+            }
         }
         if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
         if (!periodDates || periodDates.length === 0) { if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
@@ -3951,7 +3960,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const currentPeriodIndex = findCurrentPeriodIndex(periodDates, activeCashflowPeriodicity);
         const xScaleOptions = { type: 'category' };
-        if (currentPeriodIndex !== -1) {
+        const defaultRange = rangeKey === 'default' ? getDefaultRangeIndices(periodDates, activeCashflowPeriodicity) : null;
+        if (defaultRange) {
+            xScaleOptions.min = labels[defaultRange.startIdx];
+            xScaleOptions.max = labels[defaultRange.endIdx];
+        } else if (currentPeriodIndex !== -1) {
             const lookaheadByPeriod = { Mensual: 6, Semanal: 16, Diario: 30 };
             const lookaheadCount = lookaheadByPeriod[activeCashflowPeriodicity] || 0;
             const minIndex = Math.max(0, currentPeriodIndex - 4);
@@ -4674,6 +4687,22 @@ function getMondayOfWeek(year, week) {
         return -1;
     }
 
+    function getDefaultRangeIndices(periodDates, periodicity) {
+        if (!Array.isArray(periodDates) || periodDates.length === 0) return null;
+        const offsets = DEFAULT_CHART_RANGE_OFFSETS[periodicity] || DEFAULT_CHART_RANGE_OFFSETS.Mensual;
+        const currentIdx = findCurrentPeriodIndex(periodDates, periodicity);
+        const windowSize = (offsets.past || 0) + (offsets.future || 0) + 1;
+        if (currentIdx !== -1) {
+            return {
+                startIdx: Math.max(0, currentIdx - offsets.past),
+                endIdx: Math.min(periodDates.length - 1, currentIdx + offsets.future)
+            };
+        }
+        const endIdx = periodDates.length - 1;
+        const startIdx = Math.max(0, endIdx - (windowSize - 1));
+        return { startIdx, endIdx };
+    }
+
     function highlightCurrentPeriodColumn(periodicity, headEl, bodyEl, periodDates) {
         const idx = findCurrentPeriodIndex(periodDates, periodicity);
         if (idx === -1) return;
@@ -4980,6 +5009,15 @@ function getMondayOfWeek(year, week) {
             }
         }
         renderCashflowChart(fDates, fInc, fExp, fNet, fEnd, false, rangeKey);
+    }
+
+    function applyDefaultChartRangeFromToday(periodDates) {
+        const range = getDefaultRangeIndices(periodDates, activeCashflowPeriodicity);
+        if (!range || !periodDates[range.startIdx] || !periodDates[range.endIdx]) return false;
+        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(periodDates[range.startIdx]);
+        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(periodDates[range.endIdx]);
+        applyChartRange('default');
+        return true;
     }
 
     function applyQuickRangeSelection(key) {
