@@ -282,6 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let chartZoomMode = false;
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
     let fullChartData = null;
+    let pendingDefaultChartRange = null;
     let lastChartRangeKey = 'all';
     let activeCashflowPeriodicity = 'Mensual';
     let activePaymentsPeriodicity = 'Mensual';
@@ -1569,6 +1570,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (periodicity === 'Mensual' && typeof updatePieMonthChart === 'function') updatePieMonthChart();
             if (periodicity === 'Semanal' && typeof updatePieWeekChart === 'function') updatePieWeekChart();
+            pendingDefaultChartRange = periodicity;
             renderCashflowTable();
         }
     }
@@ -3826,6 +3828,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function getTodayUTC() {
+        const now = new Date();
+        return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    }
+
+    function computeDefaultChartRange(periodicity) {
+        const today = getTodayUTC();
+        let start = null;
+        let end = null;
+        if (periodicity === 'Mensual') {
+            const startAnchor = addMonths(today, -3);
+            const endAnchor = addMonths(today, 8);
+            start = getPeriodStartDate(startAnchor, 'Mensual');
+            end = getPeriodEndDate(endAnchor, 'Mensual');
+        } else if (periodicity === 'Semanal') {
+            const startAnchor = addWeeks(today, -4);
+            const endAnchor = addWeeks(today, 20);
+            start = getPeriodStartDate(startAnchor, 'Semanal');
+            end = getPeriodEndDate(endAnchor, 'Semanal');
+        } else if (periodicity === 'Diario') {
+            const startAnchor = addDays(today, -15);
+            const endAnchor = addDays(today, 30);
+            start = getPeriodStartDate(startAnchor, 'Diario');
+            end = getPeriodEndDate(endAnchor, 'Diario');
+        }
+        return { start, end };
+    }
+
+    function applyDefaultChartRangeForPeriodicity(periodicity) {
+        if (!fullChartData || !mobileChartStartInput || !mobileChartEndInput) return;
+        const { start, end } = computeDefaultChartRange(periodicity);
+        if (!(start instanceof Date) || isNaN(start) || !(end instanceof Date) || isNaN(end)) return;
+        mobileChartStartInput.value = getISODateString(start);
+        mobileChartEndInput.value = getISODateString(end);
+        applyChartRange('default');
+    }
+
     function updateChartWindowLabelFromDates(dates = []) {
         if (!chartWindowLabel) return;
         if (!Array.isArray(dates) || dates.length === 0) {
@@ -4068,6 +4107,12 @@ document.addEventListener('DOMContentLoaded', () => {
         updateChartKPIs(periodDates, incomes, totalExpenses, netFlows, endBalances);
         updateChartWindowLabelFromDates(periodDates);
         setQuickRangeActive(lastChartRangeKey);
+        if (storeData && pendingDefaultChartRange && pendingDefaultChartRange === activeCashflowPeriodicity) {
+            const targetPeriodicity = pendingDefaultChartRange;
+            pendingDefaultChartRange = null;
+            applyDefaultChartRangeForPeriodicity(targetPeriodicity);
+            return;
+        }
         cashflowChartCanvas.onclick = async (evt) => {
             if (!cashflowChartInstance) return;
             const points = cashflowChartInstance.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
