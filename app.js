@@ -3464,6 +3464,67 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function buildCalcDataForPeriodicity(baseData, periodicity, analysisStart, duration) {
+        return {
+            ...baseData,
+            analysis_start_date: analysisStart instanceof Date ? analysisStart : toUTCDate(analysisStart, new Date()),
+            analysis_duration: duration,
+            analysis_periodicity: periodicity,
+            incomes: (baseData.incomes || []).map(inc => ({
+                ...inc,
+                start_date: inc.start_date ? new Date(inc.start_date) : null,
+                end_date: inc.end_date ? new Date(inc.end_date) : null
+            })),
+            expenses: (baseData.expenses || []).map(exp => ({
+                ...exp,
+                start_date: exp.start_date ? new Date(exp.start_date) : null,
+                end_date: exp.end_date ? new Date(exp.end_date) : null,
+                movement_date: exp.movement_date ? new Date(exp.movement_date) : null
+            }))
+        };
+    }
+
+    function computeChartSpan(periodicity) {
+        const baseStartRaw = currentBackupData?.analysis_start_date ? toUTCDate(currentBackupData.analysis_start_date) : new Date();
+        const alignedStart = getPeriodStartDate(baseStartRaw, periodicity);
+        const baseHorizon = addMonths(new Date(baseStartRaw), Math.max((currentBackupData?.analysis_duration || 12) - 1, 0));
+        const fallbackEnd = baseHorizon && !isNaN(baseHorizon) ? baseHorizon : alignedStart;
+        let maxDate = fallbackEnd;
+
+        const toDateOrNull = (val) => {
+            const d = toUTCDate(val, null);
+            return (d instanceof Date && !isNaN(d)) ? d : null;
+        };
+
+        (currentBackupData?.incomes || []).forEach(inc => {
+            const start = toDateOrNull(inc.start_date);
+            if (!start) return;
+            let end = toDateOrNull(inc.end_date);
+            if (inc.frequency === 'Único') end = start;
+            if (!end) end = fallbackEnd;
+            if (end > maxDate) maxDate = end;
+        });
+
+        (currentBackupData?.expenses || []).forEach(exp => {
+            const { normalizedExpense } = buildExpenseOccurrenceContext(exp, currentBackupData.use_instant_expenses);
+            const start = toDateOrNull(normalizedExpense.start_date);
+            if (!start) return;
+            let end = toDateOrNull(normalizedExpense.end_date);
+            if (!end) end = fallbackEnd;
+            if (end < start) end = start;
+            if (end > maxDate) maxDate = end;
+        });
+
+        const alignedEnd = getPeriodEndDate(maxDate, periodicity);
+        let duration = 0;
+        let cursor = new Date(alignedStart.getTime());
+        while (cursor <= alignedEnd) {
+            duration++;
+            cursor = advancePeriodStart(cursor, periodicity);
+        }
+        return { start: alignedStart, end: alignedEnd, duration: Math.max(duration, 1) };
+    }
+
     // --- LÓGICA PESTAÑA FLUJO DE CAJA ---
     async function renderCashflowTable() {
         try {
@@ -3505,22 +3566,7 @@ document.addEventListener('DOMContentLoaded', () => {
             while (d <= endOfLastMonth) { duration++; d = addDays(d, 1); }
         }
 
-        const tempCalcData = {
-            ...currentBackupData,
-            analysis_start_date: analysisStart,
-            analysis_duration: duration,
-            analysis_periodicity: periodicity,
-            incomes: (currentBackupData.incomes || []).map(inc => ({
-                ...inc,
-                start_date: inc.start_date ? new Date(inc.start_date) : null,
-                end_date: inc.end_date ? new Date(inc.end_date) : null
-            })),
-            expenses: (currentBackupData.expenses || []).map(exp => ({
-                ...exp,
-                start_date: exp.start_date ? new Date(exp.start_date) : null,
-                end_date: exp.end_date ? new Date(exp.end_date) : null
-            }))
-        };
+        const tempCalcData = buildCalcDataForPeriodicity(currentBackupData, periodicity, analysisStart, duration);
 
         const rateDateCandidates = [];
         let periodCursor = new Date(analysisStart.getTime());
@@ -3642,8 +3688,32 @@ document.addEventListener('DOMContentLoaded', () => {
         attachCashflowCellListeners(tableBodyEl);
 
         if (periodicity === activeCashflowPeriodicity) {
-            const dailyLine = buildDailyBalanceLine(tempCalcData, periodDates[0], getPeriodEndDate(periodDates[periodDates.length - 1], periodicity));
-            renderCashflowChart(periodDates, income_p, fixed_exp_p.map((val, idx) => val + var_exp_p[idx]), net_flow_p, end_bal_p, dailyLine);
+            const { start: chartStart, end: chartEnd, duration: chartDuration } = computeChartSpan(periodicity);
+            const chartCalcData = buildCalcDataForPeriodicity(currentBackupData, periodicity, chartStart, chartDuration);
+            const chartRateDateCandidates = [];
+            let chartCursor = new Date(chartStart.getTime());
+            for (let i = 0; i < chartDuration; i++) {
+                const periodStart = getPeriodStartDate(chartCursor, periodicity);
+                const periodEnd = getPeriodEndDate(chartCursor, periodicity);
+                chartRateDateCandidates.push(
+                    ...collectUsdRateDatesForExpenses(chartCalcData.expenses, periodStart, periodEnd, chartCalcData.use_instant_expenses)
+                );
+                chartRateDateCandidates.push(
+                    ...collectUsdRateDatesForIncomes(chartCalcData.incomes, periodStart, periodEnd, periodicity)
+                );
+                chartCursor = advancePeriodStart(periodStart, periodicity);
+            }
+            await ensureUsdClpRatesForDates(chartRateDateCandidates);
+            const chartResult = calculateCashFlowData(chartCalcData);
+            const chartDailyLine = buildDailyBalanceLine(chartCalcData, chartResult.periodDates[0], getPeriodEndDate(chartResult.periodDates[chartResult.periodDates.length - 1], periodicity));
+            renderCashflowChart(
+                chartResult.periodDates,
+                chartResult.income_p,
+                chartResult.fixed_exp_p.map((val, idx) => val + chartResult.var_exp_p[idx]),
+                chartResult.net_flow_p,
+                chartResult.end_bal_p,
+                chartDailyLine
+            );
         }
 
         renderBudgetSummaryTableForSelectedPeriod();
@@ -5188,13 +5258,7 @@ function getMondayOfWeek(year, week) {
     function resetChartViewToDefault(rangeKey = 'default') {
         if (!fullChartData || !chartDataDomain) return;
         const defaultWindow = computeDefaultChartRange(activeCashflowPeriodicity);
-        const clamped = clampViewWindowToDomain(defaultWindow.start, defaultWindow.end, chartDataDomain.min, chartDataDomain.max);
-        chartViewWindow = clamped;
-        lastChartRangeKey = rangeKey;
-        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(clamped.start);
-        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(clamped.end);
-        applyViewportToChart(clamped);
-        setQuickRangeActive(rangeKey);
+        applyChartRange(rangeKey, defaultWindow);
     }
 
     // --- CONFIGURAR ZOOM EN EL GRÁFICO ---
@@ -5230,31 +5294,39 @@ function getMondayOfWeek(year, week) {
         if (chartMessage) chartMessage.textContent = 'Arrastra con el botón izquierdo para moverte en el eje X. El zoom está deshabilitado.';
     }
 
-    function applyChartRange(rangeKey = 'manual') {
+    function applyChartRange(rangeKey = 'manual', windowOverride = null) {
         if (!fullChartData || !chartDataDomain) return;
-        const startStr = mobileChartStartInput ? mobileChartStartInput.value : '';
-        const endStr = mobileChartEndInput ? mobileChartEndInput.value : '';
-        let targetWindow = null;
-        if (startStr && endStr) {
-            const startDate = toUTCDate(startStr);
-            const endDate = toUTCDate(endStr);
-            if (!isNaN(startDate) && !isNaN(endDate) && startDate <= endDate) {
-                targetWindow = clampViewWindowToDomain(startDate, endDate, chartDataDomain.min, chartDataDomain.max);
+        let targetWindow = windowOverride;
+
+        if (!targetWindow && mobileChartStartInput && mobileChartEndInput) {
+            const startStr = mobileChartStartInput.value;
+            const endStr = mobileChartEndInput.value;
+            if (startStr && endStr) {
+                const startDate = toUTCDate(startStr);
+                const endDate = toUTCDate(endStr);
+                if (!isNaN(startDate) && !isNaN(endDate) && startDate <= endDate) {
+                    targetWindow = { start: startDate, end: endDate };
+                }
             }
         }
+
         if (!targetWindow) {
-            targetWindow = clampViewWindowToDomain(new Date(chartDataDomain.min), new Date(chartDataDomain.max), chartDataDomain.min, chartDataDomain.max);
+            targetWindow = rangeKey === 'default'
+                ? computeDefaultChartRange(activeCashflowPeriodicity)
+                : { start: new Date(chartDataDomain.min), end: new Date(chartDataDomain.max) };
         }
-        chartViewWindow = targetWindow;
+
+        const clamped = clampViewWindowToDomain(targetWindow.start, targetWindow.end, chartDataDomain.min, chartDataDomain.max);
+        chartViewWindow = clamped;
         lastChartRangeKey = rangeKey;
-        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(targetWindow.start);
-        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(targetWindow.end);
-        applyViewportToChart(targetWindow);
+        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(clamped.start);
+        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(clamped.end);
+        applyViewportToChart(clamped);
         setQuickRangeActive(rangeKey);
     }
 
     function applyQuickRangeSelection(key) {
-        if (!fullChartData || !Array.isArray(fullChartData.periodDates) || fullChartData.periodDates.length === 0) return;
+        if (!fullChartData || !chartDataDomain || !Array.isArray(fullChartData.periodDates) || fullChartData.periodDates.length === 0) return;
         const dates = fullChartData.periodDates;
         let startIdx = 0;
         let endIdx = dates.length - 1;
@@ -5272,9 +5344,10 @@ function getMondayOfWeek(year, week) {
         }
         const startDate = dates[startIdx];
         const endDate = dates[endIdx];
-        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(startDate);
-        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(endDate);
-        applyChartRange(key);
+        const targetWindow = clampViewWindowToDomain(startDate, endDate, chartDataDomain.min, chartDataDomain.max);
+        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(targetWindow.start);
+        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(targetWindow.end);
+        applyChartRange(key, targetWindow);
     }
 
     function openChartModal(title, rows) {
