@@ -282,6 +282,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let chartZoomMode = false;
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
     let fullChartData = null;
+    let chartDataDomain = null;
+    let chartViewWindow = null;
     let pendingDefaultChartRange = null;
     let lastChartRangeKey = 'all';
     let activeCashflowPeriodicity = 'Mensual';
@@ -3880,12 +3882,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyDefaultChartRangeForPeriodicity(periodicity) {
-        if (!fullChartData || !mobileChartStartInput || !mobileChartEndInput) return;
+        if (!fullChartData || !mobileChartStartInput || !mobileChartEndInput || !chartDataDomain) return;
         const { start, end } = computeDefaultChartRange(periodicity);
         if (!(start instanceof Date) || isNaN(start) || !(end instanceof Date) || isNaN(end)) return;
-        mobileChartStartInput.value = getISODateString(start);
-        mobileChartEndInput.value = getISODateString(end);
-        applyChartRange('default');
+        const clamped = clampViewWindowToDomain(start, end, chartDataDomain.min, chartDataDomain.max);
+        mobileChartStartInput.value = getISODateString(clamped.start);
+        mobileChartEndInput.value = getISODateString(clamped.end);
+        chartViewWindow = clamped;
+        lastChartRangeKey = 'default';
+        applyViewportToChart(clamped);
+        setQuickRangeActive('default');
     }
 
     function updateChartWindowLabelFromDates(dates = []) {
@@ -3897,6 +3903,95 @@ document.addEventListener('DOMContentLoaded', () => {
         const first = formatChartPeriodLabel(dates[0]);
         const last = formatChartPeriodLabel(dates[dates.length - 1]);
         chartWindowLabel.textContent = dates.length === 1 ? first : `${first} → ${last}`;
+    }
+
+    function clampViewWindowToDomain(startDate, endDate, domainStartMs, domainEndMs) {
+        const domainStart = Math.min(domainStartMs, domainEndMs);
+        const domainEnd = Math.max(domainStartMs, domainEndMs);
+        const startMs = startDate instanceof Date ? startDate.getTime() : domainStart;
+        const endMs = endDate instanceof Date ? endDate.getTime() : domainEnd;
+        const clampedStart = Math.min(Math.max(startMs, domainStart), domainEnd);
+        const clampedEnd = Math.max(Math.min(endMs, domainEnd), domainStart);
+        const finalStart = Math.min(clampedStart, clampedEnd);
+        const finalEnd = Math.max(clampedStart, clampedEnd);
+        return { start: new Date(finalStart), end: new Date(finalEnd) };
+    }
+
+    function getVisibleDatesForWindow(dates = [], startDate = null, endDate = null) {
+        if (!Array.isArray(dates) || dates.length === 0) return [];
+        if (!(startDate instanceof Date) || isNaN(startDate)) return dates;
+        if (!(endDate instanceof Date) || isNaN(endDate)) return dates;
+        return dates.filter(d => d >= startDate && d <= endDate);
+    }
+
+    function computeYAxisBoundsFromSeries(seriesList = [], viewStartMs = null, viewEndMs = null) {
+        const yValues = [];
+        seriesList.forEach(series => {
+            if (!Array.isArray(series)) return;
+            series.forEach(point => {
+                const x = point && typeof point.x === 'number' ? point.x : null;
+                const y = point && typeof point.y === 'number' ? point.y : null;
+                if (!isFinite(y)) return;
+                if (viewStartMs !== null && x !== null && x < viewStartMs) return;
+                if (viewEndMs !== null && x !== null && x > viewEndMs) return;
+                yValues.push(y);
+            });
+        });
+        if (!yValues.length) return null;
+        const minY = Math.min(...yValues);
+        const maxY = Math.max(...yValues);
+        const span = maxY - minY;
+        const padding = span === 0 ? Math.max(Math.abs(minY) * 0.1, 1) : span * 0.05;
+        return { min: minY - padding, max: maxY + padding };
+    }
+
+    function computeYAxisBoundsFromDatasets(datasets = [], viewStartMs = null, viewEndMs = null) {
+        const seriesList = datasets.map(ds => (ds && ds.hidden) ? [] : (Array.isArray(ds?.data) ? ds.data : []));
+        return computeYAxisBoundsFromSeries(seriesList, viewStartMs, viewEndMs);
+    }
+
+    function refreshYAxisFromCurrentScale(chartInstance = cashflowChartInstance, shouldUpdate = true) {
+        if (!chartInstance || !chartInstance.options?.scales) return;
+        const xScale = chartInstance.scales?.x;
+        const bounds = computeYAxisBoundsFromDatasets(chartInstance.data?.datasets || [], xScale?.min ?? null, xScale?.max ?? null);
+        if (bounds && chartInstance.options.scales.y) {
+            chartInstance.options.scales.y.min = bounds.min;
+            chartInstance.options.scales.y.max = bounds.max;
+            if (shouldUpdate) {
+                chartInstance.update();
+            }
+        }
+    }
+
+    function syncViewWindowFromScale(chartInstance = cashflowChartInstance) {
+        if (!chartInstance || !chartInstance.scales?.x) return;
+        const { min, max } = chartInstance.scales.x;
+        if (!isFinite(min) || !isFinite(max)) return;
+        chartViewWindow = { start: new Date(min), end: new Date(max) };
+        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(chartViewWindow.start);
+        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(chartViewWindow.end);
+        const datesForLabel = fullChartData?.periodDates
+            ? getVisibleDatesForWindow(fullChartData.periodDates, chartViewWindow.start, chartViewWindow.end)
+            : [];
+        updateChartWindowLabelFromDates(datesForLabel.length ? datesForLabel : (fullChartData?.periodDates || []));
+    }
+
+    function applyViewportToChart(viewWindow = null, shouldUpdate = true) {
+        if (!cashflowChartInstance || !cashflowChartInstance.options?.scales) return;
+        const xScale = cashflowChartInstance.options.scales.x;
+        const domainStart = chartDataDomain ? chartDataDomain.min : null;
+        const domainEnd = chartDataDomain ? chartDataDomain.max : null;
+        const start = viewWindow?.start instanceof Date ? viewWindow.start : (domainStart ? new Date(domainStart) : null);
+        const end = viewWindow?.end instanceof Date ? viewWindow.end : (domainEnd ? new Date(domainEnd) : null);
+        if (xScale && start && end) {
+            xScale.min = start.getTime();
+            xScale.max = end.getTime();
+        }
+        refreshYAxisFromCurrentScale(cashflowChartInstance, false);
+        syncViewWindowFromScale(cashflowChartInstance);
+        if (shouldUpdate) {
+            cashflowChartInstance.update();
+        }
     }
 
     function updateChartKPIs(periodDates = [], incomes = [], totalExpenses = [], netFlows = [], endBalances = []) {
@@ -3948,8 +4043,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function syncChartZoomToggle() {
         if (!chartZoomToggle) return;
-        chartZoomToggle.classList.toggle('active', chartZoomMode);
-        chartZoomToggle.textContent = chartZoomMode ? '🔍 Zoom activo' : '🔍 Activar zoom';
+        chartZoomToggle.classList.add('active');
+        chartZoomToggle.textContent = '↔️ Recentrar vista';
+        chartZoomToggle.title = 'Arrastra sobre el gráfico para desplazar la vista en el eje X';
     }
 
     function applyDatasetVisibilityFromToggles(shouldUpdate = true) {
@@ -3959,7 +4055,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const dataset = cashflowChartInstance.data.datasets.find(ds => ds.label === targetLabel);
             if (dataset) dataset.hidden = !toggle.checked;
         });
-        if (shouldUpdate) cashflowChartInstance.update();
+        if (shouldUpdate) {
+            applyViewportToChart(chartViewWindow, true);
+        }
     }
 
     function applyLineStylePreference(shouldUpdate = true) {
@@ -3986,23 +4084,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderCashflowChart(periodDates, incomes, totalExpenses, netFlows, endBalances, dailyLine = null, storeData = true, rangeKey = null) {
-        if (rangeKey !== null) {
-            lastChartRangeKey = rangeKey;
-        } else if (storeData) {
-            lastChartRangeKey = 'all';
-        }
+        if (!cashflowChartCanvas) return;
+        if (!periodDates || periodDates.length === 0) { if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
+        if (cashflowChartInstance) cashflowChartInstance.destroy();
+        if (chartMessage) chartMessage.textContent = "";
         if (storeData) {
             fullChartData = { periodDates, incomes, totalExpenses, netFlows, endBalances, dailyLine };
-            if (mobileChartStartInput && mobileChartEndInput && periodDates.length > 0) {
-                mobileChartStartInput.value = getISODateString(periodDates[0]);
-                mobileChartEndInput.value = getISODateString(periodDates[periodDates.length - 1]);
-            }
         }
-        if (!cashflowChartCanvas) return; if (cashflowChartInstance) cashflowChartInstance.destroy();
-        if (!periodDates || periodDates.length === 0) { if (chartMessage) chartMessage.textContent = "El gráfico se generará después de calcular el flujo de caja."; return; }
-        if (chartMessage) chartMessage.textContent = "";
+        if (rangeKey !== null) {
+            lastChartRangeKey = rangeKey;
+        } else if (storeData && !lastChartRangeKey) {
+            lastChartRangeKey = 'all';
+        }
         const chartStartDate = getPeriodStartDate(periodDates[0], activeCashflowPeriodicity);
         const chartEndDate = getPeriodEndDate(periodDates[periodDates.length - 1], activeCashflowPeriodicity);
+        const domainStartMs = chartStartDate.getTime();
+        const domainEndMs = getPeriodEndDate(chartEndDate, 'Diario').getTime();
+        chartDataDomain = { min: domainStartMs, max: domainEndMs };
+
+        let desiredView = chartViewWindow;
+        if (pendingDefaultChartRange && pendingDefaultChartRange === activeCashflowPeriodicity) {
+            desiredView = computeDefaultChartRange(activeCashflowPeriodicity);
+            pendingDefaultChartRange = null;
+        }
+        if (!desiredView) {
+            desiredView = computeDefaultChartRange(activeCashflowPeriodicity);
+        }
+        const resolvedView = clampViewWindowToDomain(desiredView?.start, desiredView?.end, domainStartMs, domainEndMs);
+        chartViewWindow = resolvedView;
+        if (mobileChartStartInput && mobileChartEndInput) {
+            mobileChartStartInput.value = getISODateString(chartViewWindow.start);
+            mobileChartEndInput.value = getISODateString(chartViewWindow.end);
+        }
         const baseLabels = periodDates.map(date => {
             if (activeCashflowPeriodicity === 'Semanal') {
                 const [year, week] = getWeekNumber(date);
@@ -4022,10 +4135,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const netFlowPoints = periodDates.map((date, idx) => ({ x: date.getTime(), y: netFlows[idx] }));
         const periodStartTimes = activeCashflowPeriodicity !== 'Diario' ? new Set(periodDates.map(d => d.getTime())) : new Set();
         const currentPeriodIndex = findCurrentPeriodIndex(periodDates, activeCashflowPeriodicity);
+        const yAxisBounds = computeYAxisBoundsFromSeries(
+            [balanceSeries, incomePoints, expensePoints, netFlowPoints],
+            chartViewWindow?.start?.getTime() ?? resolvedView.start.getTime(),
+            chartViewWindow?.end?.getTime() ?? resolvedView.end.getTime()
+        );
         const xScaleOptions = {
             type: 'linear',
-            min: chartStartDate.getTime(),
-            max: getPeriodEndDate(chartEndDate, 'Diario').getTime(),
+            min: resolvedView.start.getTime(),
+            max: resolvedView.end.getTime(),
             ticks: {
                 callback: (value) => {
                     const date = new Date(value);
@@ -4130,7 +4248,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         type: 'linear',
                         display: true,
                         position: 'left',
-                        title: { display: true, text: `Saldo / Flujos (${currentBackupData.display_currency_symbol || '$'})` }
+                        title: { display: true, text: `Saldo / Flujos (${currentBackupData.display_currency_symbol || '$'})` },
+                        min: yAxisBounds ? yAxisBounds.min : undefined,
+                        max: yAxisBounds ? yAxisBounds.max : undefined
                     }
                 },
                 plugins: {
@@ -4153,22 +4273,34 @@ document.addEventListener('DOMContentLoaded', () => {
                     legend: { position: 'top' },
                     zoom: {
                         pan: {
-                            enabled: isTouchDevice ? true : chartZoomMode,
-                            mode: 'xy',
-                            modifierKey: isTouchDevice ? null : 'ctrl',
+                            enabled: true,
+                            mode: 'x',
+                            modifierKey: null
                         },
                         zoom: {
                             wheel: {
-                                enabled: isTouchDevice ? false : chartZoomMode,
+                                enabled: false,
                             },
                             pinch: {
-                                enabled: isTouchDevice ? true : chartZoomMode
+                                enabled: false
                             },
                             drag: {
-                                enabled: isTouchDevice ? false : chartZoomMode,
-                                backgroundColor: 'rgba(0,123,255,0.25)'
+                                enabled: false
                             },
-                            mode: 'xy',
+                            mode: 'x'
+                        },
+                        limits: {
+                            x: { min: domainStartMs, max: domainEndMs }
+                        },
+                        onPanComplete({ chart }) {
+                            refreshYAxisFromCurrentScale(chart, false);
+                            syncViewWindowFromScale(chart);
+                            chart.update();
+                        },
+                        onZoomComplete({ chart }) {
+                            refreshYAxisFromCurrentScale(chart, false);
+                            syncViewWindowFromScale(chart);
+                            chart.update();
                         }
                     },
                     highlightCurrentPeriod: currentPeriodIndex !== -1 ? { currentIndex: currentPeriodIndex } : undefined
@@ -4179,6 +4311,7 @@ document.addEventListener('DOMContentLoaded', () => {
         applyLineStylePreference(false);
         applyDatasetVisibilityFromToggles(false);
         cashflowChartInstance.update();
+        applyViewportToChart(chartViewWindow);
         if (currentPeriodHighlight) {
             const [, ingresosDataset, gastosDataset, flujoDataset] = cashflowChartInstance.data.datasets;
             [ingresosDataset, gastosDataset, flujoDataset].forEach(dataset => {
@@ -4189,14 +4322,10 @@ document.addEventListener('DOMContentLoaded', () => {
             cashflowChartInstance.update();
         }
         updateChartKPIs(periodDates, incomes, totalExpenses, netFlows, endBalances);
-        updateChartWindowLabelFromDates(periodDates);
+        const visibleDates = getVisibleDatesForWindow(periodDates, chartViewWindow.start, chartViewWindow.end);
+        updateChartWindowLabelFromDates(visibleDates.length ? visibleDates : periodDates);
         setQuickRangeActive(lastChartRangeKey);
-        if (storeData && pendingDefaultChartRange && pendingDefaultChartRange === activeCashflowPeriodicity) {
-            const targetPeriodicity = pendingDefaultChartRange;
-            pendingDefaultChartRange = null;
-            applyDefaultChartRangeForPeriodicity(targetPeriodicity);
-            return;
-        }
+        syncChartZoomToggle();
         cashflowChartCanvas.onclick = async (evt) => {
             if (!cashflowChartInstance) return;
             const points = cashflowChartInstance.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
@@ -4210,12 +4339,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 openChartModal(`Transacciones - ${baseLabels[targetIdx]}`, rows);
             }
         };
-        if (isTouchDevice) {
-            enableChartZoom();
-            if (chartMessage) chartMessage.textContent = 'Usa dos dedos para hacer zoom y mover el gráfico. Doble tap fuera del gráfico para salir.';
-        } else {
-            if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'zoom-in';
-            if (chartMessage) chartMessage.textContent = 'Doble clic o el botón 🔍 activan el zoom.';
+        if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'grab';
+        if (chartMessage) {
+            chartMessage.textContent = isTouchDevice
+                ? 'Arrastra con un dedo para moverte por el tiempo. El zoom está deshabilitado.'
+                : 'Arrastra con el botón izquierdo para desplazarte en el eje X. El zoom está deshabilitado.';
         }
     }
 
@@ -4961,19 +5089,13 @@ function getMondayOfWeek(year, week) {
         });
     }
     if (resetChartZoomButton) {
-        resetChartZoomButton.addEventListener('click', () => {
-            disableChartZoom();
-            applyChartRange(lastChartRangeKey || 'all');
-        });
+        resetChartZoomButton.addEventListener('click', () => resetChartViewToDefault('default'));
     }
     if (exportChartButton) {
         exportChartButton.addEventListener('click', exportChartAsImage);
     }
     if (chartZoomToggle) {
-        chartZoomToggle.addEventListener('click', () => {
-            if (chartZoomMode) disableChartZoom();
-            else enableChartZoom();
-        });
+        chartZoomToggle.addEventListener('click', () => resetChartViewToDefault(lastChartRangeKey || 'default'));
     }
     if (chartRefreshButton) {
         chartRefreshButton.addEventListener('click', () => renderCashflowTable());
@@ -5061,85 +5183,74 @@ function getMondayOfWeek(year, week) {
     pieWeekInputs.forEach(inp => inp && inp.addEventListener('change', updatePieWeekCharts));
 
     updatePieMonthCharts();
-        updatePieWeekCharts();
+    updatePieWeekCharts();
+
+    function resetChartViewToDefault(rangeKey = 'default') {
+        if (!fullChartData || !chartDataDomain) return;
+        const defaultWindow = computeDefaultChartRange(activeCashflowPeriodicity);
+        const clamped = clampViewWindowToDomain(defaultWindow.start, defaultWindow.end, chartDataDomain.min, chartDataDomain.max);
+        chartViewWindow = clamped;
+        lastChartRangeKey = rangeKey;
+        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(clamped.start);
+        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(clamped.end);
+        applyViewportToChart(clamped);
+        setQuickRangeActive(rangeKey);
+    }
 
     // --- CONFIGURAR ZOOM EN EL GRÁFICO ---
     function enableChartZoom() {
         if (!cashflowChartInstance) return;
-        chartZoomMode = true;
+        chartZoomMode = false;
         syncChartZoomToggle();
-        if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'move';
+        if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'grab';
         cashflowChartInstance.options.plugins.zoom.pan.enabled = true;
-        cashflowChartInstance.options.plugins.zoom.pan.modifierKey = isTouchDevice ? null : 'ctrl';
-        cashflowChartInstance.options.plugins.zoom.zoom.wheel.enabled = !isTouchDevice;
-        cashflowChartInstance.options.plugins.zoom.zoom.pinch.enabled = true;
-        cashflowChartInstance.options.plugins.zoom.zoom.drag.enabled = !isTouchDevice;
+        cashflowChartInstance.options.plugins.zoom.pan.mode = 'x';
+        cashflowChartInstance.options.plugins.zoom.pan.modifierKey = null;
+        cashflowChartInstance.options.plugins.zoom.zoom.wheel.enabled = false;
+        cashflowChartInstance.options.plugins.zoom.zoom.pinch.enabled = false;
+        cashflowChartInstance.options.plugins.zoom.zoom.drag.enabled = false;
         cashflowChartInstance.update();
         if (chartMessage) {
-            if (isTouchDevice) {
-                chartMessage.textContent = 'Modo zoom activo. Usa dos dedos para hacer zoom o mover el gráfico. Doble tap fuera del gráfico para salir.';
-            } else {
-                chartMessage.textContent = 'Modo zoom activo. Doble clic fuera del gráfico para salir.';
-            }
+            chartMessage.textContent = isTouchDevice
+                ? 'Arrastra con un dedo para moverte. El zoom está deshabilitado.'
+                : 'Arrastra con el botón izquierdo para moverte en el eje X. El zoom está deshabilitado.';
         }
     }
 
     function disableChartZoom() {
         if (!cashflowChartInstance) return;
-        cashflowChartInstance.resetZoom && cashflowChartInstance.resetZoom();
-        cashflowChartInstance.options.plugins.zoom.pan.enabled = false;
+        cashflowChartInstance.options.plugins.zoom.pan.enabled = true;
         cashflowChartInstance.options.plugins.zoom.zoom.wheel.enabled = false;
         cashflowChartInstance.options.plugins.zoom.zoom.pinch.enabled = false;
         cashflowChartInstance.options.plugins.zoom.zoom.drag.enabled = false;
-        cashflowChartInstance.update();
-        if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'zoom-in';
+        applyViewportToChart(chartViewWindow);
+        if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'grab';
         chartZoomMode = false;
         syncChartZoomToggle();
-        if (chartMessage) chartMessage.textContent = 'Doble clic en el gráfico o usa 🔍 para activar el zoom.';
+        if (chartMessage) chartMessage.textContent = 'Arrastra con el botón izquierdo para moverte en el eje X. El zoom está deshabilitado.';
     }
 
     function applyChartRange(rangeKey = 'manual') {
-        if (!fullChartData) return;
+        if (!fullChartData || !chartDataDomain) return;
         const startStr = mobileChartStartInput ? mobileChartStartInput.value : '';
         const endStr = mobileChartEndInput ? mobileChartEndInput.value : '';
-        if (!startStr || !endStr) {
-            renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, fullChartData.dailyLine, false, 'all');
-            return;
-        }
-        const startDate = toUTCDate(startStr);
-        const endDate = toUTCDate(endStr);
-        if (isNaN(startDate) || isNaN(endDate) || startDate > endDate) {
-            renderCashflowChart(fullChartData.periodDates, fullChartData.incomes, fullChartData.totalExpenses, fullChartData.netFlows, fullChartData.endBalances, fullChartData.dailyLine, false, 'all');
-            return;
-        }
-        const fDates = [];
-        const fInc = [];
-        const fExp = [];
-        const fNet = [];
-        const fEnd = [];
-        const fDaily = fullChartData.dailyLine && Array.isArray(fullChartData.dailyLine.dates) && Array.isArray(fullChartData.dailyLine.balances)
-            ? { dates: [], balances: [] }
-            : null;
-        for (let i = 0; i < fullChartData.periodDates.length; i++) {
-            const d = fullChartData.periodDates[i];
-            if (d >= startDate && d <= endDate) {
-                fDates.push(d);
-                fInc.push(fullChartData.incomes[i]);
-                fExp.push(fullChartData.totalExpenses[i]);
-                fNet.push(fullChartData.netFlows[i]);
-                fEnd.push(fullChartData.endBalances[i]);
+        let targetWindow = null;
+        if (startStr && endStr) {
+            const startDate = toUTCDate(startStr);
+            const endDate = toUTCDate(endStr);
+            if (!isNaN(startDate) && !isNaN(endDate) && startDate <= endDate) {
+                targetWindow = clampViewWindowToDomain(startDate, endDate, chartDataDomain.min, chartDataDomain.max);
             }
         }
-        if (fDaily) {
-            for (let i = 0; i < fullChartData.dailyLine.dates.length; i++) {
-                const d = fullChartData.dailyLine.dates[i];
-                if (d >= startDate && d <= endDate) {
-                    fDaily.dates.push(d);
-                    fDaily.balances.push(fullChartData.dailyLine.balances[i]);
-                }
-            }
+        if (!targetWindow) {
+            targetWindow = clampViewWindowToDomain(new Date(chartDataDomain.min), new Date(chartDataDomain.max), chartDataDomain.min, chartDataDomain.max);
         }
-        renderCashflowChart(fDates, fInc, fExp, fNet, fEnd, fDaily, false, rangeKey);
+        chartViewWindow = targetWindow;
+        lastChartRangeKey = rangeKey;
+        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(targetWindow.start);
+        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(targetWindow.end);
+        applyViewportToChart(targetWindow);
+        setQuickRangeActive(rangeKey);
     }
 
     function applyQuickRangeSelection(key) {
@@ -5428,7 +5539,7 @@ function getMondayOfWeek(year, week) {
     if (cashflowChartCanvas) {
         cashflowChartCanvas.addEventListener('dblclick', (e) => {
             e.stopPropagation();
-            if (!chartZoomMode) enableChartZoom();
+            resetChartViewToDefault('default');
         });
         if (isTouchDevice) {
             cashflowChartCanvas.addEventListener('touchstart', (e) => {
@@ -5439,15 +5550,9 @@ function getMondayOfWeek(year, week) {
         }
     }
 
-    document.addEventListener('dblclick', (e) => {
-        if (chartZoomMode && cashflowChartCanvas && !cashflowChartCanvas.contains(e.target)) {
-            disableChartZoom();
-        }
-    });
-
     // Trigger change event on expense frequency select to apply initial state
     expenseFrequencySelect.dispatchEvent(new Event('change'));
-    if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'zoom-in';
+    if (cashflowChartCanvas) cashflowChartCanvas.style.cursor = 'grab';
 
     window.addEventListener('beforeunload', (e) => {
         if (hasUnsavedChanges()) {
