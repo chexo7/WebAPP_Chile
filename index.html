@@ -483,16 +483,6 @@
                                     <option value="stepped" selected>Escalonado</option>
                                 </select>
                             </div>
-                            <div class="control-card">
-                                <p class="control-title">Rango personalizado</p>
-                                <div class="chart-range-inputs compact">
-                                    <label for="mobile-chart-start">Desde</label>
-                                    <input type="date" id="mobile-chart-start">
-                                    <label for="mobile-chart-end">Hasta</label>
-                                    <input type="date" id="mobile-chart-end">
-                                    <button id="apply-mobile-chart-range" class="ghost">Aplicar</button>
-                                </div>
-                            </div>
                             <div class="control-card note-card">
                                 <p class="control-title">Tips rápidos</p>
                                 <ul class="chart-hints">
@@ -514,6 +504,11 @@
                                 <canvas id="cashflow-chart"></canvas>
                             </div>
                             <p id="chart-message" class="chart-help-text">Selecciona un período para ver sus movimientos.</p>
+                            <div class="chart-slider-row">
+                                <label for="chart-pan-slider">Posición del rango</label>
+                                <input type="range" id="chart-pan-slider" min="0" max="100" value="0" step="1">
+                                <span id="chart-pan-value" class="slider-value">0%</span>
+                            </div>
                         </div>
                     </div>
                 </div>
