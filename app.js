@@ -228,9 +228,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ELEMENTOS PESTAÑA GRÁFICO ---
     const cashflowChartCanvas = document.getElementById('cashflow-chart');
     const chartMessage = document.getElementById('chart-message');
-    const mobileChartStartInput = document.getElementById('mobile-chart-start');
-    const mobileChartEndInput = document.getElementById('mobile-chart-end');
-    const applyMobileChartRangeButton = document.getElementById('apply-mobile-chart-range');
     const chartSubtabs = document.getElementById('chart-subtabs');
     const graficoTitle = document.getElementById('grafico-title');
     const pieMonthInputs = [
@@ -3882,12 +3879,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyDefaultChartRangeForPeriodicity(periodicity) {
-        if (!fullChartData || !mobileChartStartInput || !mobileChartEndInput || !chartDataDomain) return;
+        if (!fullChartData || !chartDataDomain) return;
         const { start, end } = computeDefaultChartRange(periodicity);
         if (!(start instanceof Date) || isNaN(start) || !(end instanceof Date) || isNaN(end)) return;
         const clamped = clampViewWindowToDomain(start, end, chartDataDomain.min, chartDataDomain.max);
-        mobileChartStartInput.value = getISODateString(clamped.start);
-        mobileChartEndInput.value = getISODateString(clamped.end);
         chartViewWindow = clamped;
         lastChartRangeKey = 'default';
         applyViewportToChart(clamped);
@@ -3968,8 +3963,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const { min, max } = chartInstance.scales.x;
         if (!isFinite(min) || !isFinite(max)) return;
         chartViewWindow = { start: new Date(min), end: new Date(max) };
-        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(chartViewWindow.start);
-        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(chartViewWindow.end);
         const datesForLabel = fullChartData?.periodDates
             ? getVisibleDatesForWindow(fullChartData.periodDates, chartViewWindow.start, chartViewWindow.end)
             : [];
@@ -4112,10 +4105,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const resolvedView = clampViewWindowToDomain(desiredView?.start, desiredView?.end, domainStartMs, domainEndMs);
         chartViewWindow = resolvedView;
-        if (mobileChartStartInput && mobileChartEndInput) {
-            mobileChartStartInput.value = getISODateString(chartViewWindow.start);
-            mobileChartEndInput.value = getISODateString(chartViewWindow.end);
-        }
         const baseLabels = periodDates.map(date => {
             if (activeCashflowPeriodicity === 'Semanal') {
                 const [year, week] = getWeekNumber(date);
@@ -5070,13 +5059,6 @@ function getMondayOfWeek(year, week) {
     // updateUsdClpInfoLabel(); // No longer needed here, called by activateTab or showMainContentScreen
     hideElement(incomeReimbursementCategoryContainer);
 
-    if (applyMobileChartRangeButton) {
-        applyMobileChartRangeButton.addEventListener('click', () => applyChartRange('manual'));
-    }
-    [mobileChartStartInput, mobileChartEndInput].forEach(inp => {
-        if (!inp) return;
-        inp.addEventListener('change', () => applyChartRange('manual'));
-    });
     chartDatasetToggles.forEach(toggle => {
         toggle.addEventListener('change', () => applyDatasetVisibilityFromToggles());
     });
@@ -5191,8 +5173,6 @@ function getMondayOfWeek(year, week) {
         const clamped = clampViewWindowToDomain(defaultWindow.start, defaultWindow.end, chartDataDomain.min, chartDataDomain.max);
         chartViewWindow = clamped;
         lastChartRangeKey = rangeKey;
-        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(clamped.start);
-        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(clamped.end);
         applyViewportToChart(clamped);
         setQuickRangeActive(rangeKey);
     }
@@ -5230,25 +5210,16 @@ function getMondayOfWeek(year, week) {
         if (chartMessage) chartMessage.textContent = 'Arrastra con el botón izquierdo para moverte en el eje X. El zoom está deshabilitado.';
     }
 
-    function applyChartRange(rangeKey = 'manual') {
+    function applyChartRange(rangeKey = 'manual', startDate = null, endDate = null) {
         if (!fullChartData || !chartDataDomain) return;
-        const startStr = mobileChartStartInput ? mobileChartStartInput.value : '';
-        const endStr = mobileChartEndInput ? mobileChartEndInput.value : '';
-        let targetWindow = null;
-        if (startStr && endStr) {
-            const startDate = toUTCDate(startStr);
-            const endDate = toUTCDate(endStr);
-            if (!isNaN(startDate) && !isNaN(endDate) && startDate <= endDate) {
-                targetWindow = clampViewWindowToDomain(startDate, endDate, chartDataDomain.min, chartDataDomain.max);
-            }
-        }
-        if (!targetWindow) {
-            targetWindow = clampViewWindowToDomain(new Date(chartDataDomain.min), new Date(chartDataDomain.max), chartDataDomain.min, chartDataDomain.max);
-        }
+        const targetWindow = clampViewWindowToDomain(
+            startDate instanceof Date ? startDate : new Date(chartDataDomain.min),
+            endDate instanceof Date ? endDate : new Date(chartDataDomain.max),
+            chartDataDomain.min,
+            chartDataDomain.max
+        );
         chartViewWindow = targetWindow;
         lastChartRangeKey = rangeKey;
-        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(targetWindow.start);
-        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(targetWindow.end);
         applyViewportToChart(targetWindow);
         setQuickRangeActive(rangeKey);
     }
@@ -5272,9 +5243,7 @@ function getMondayOfWeek(year, week) {
         }
         const startDate = dates[startIdx];
         const endDate = dates[endIdx];
-        if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(startDate);
-        if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(endDate);
-        applyChartRange(key);
+        applyChartRange(key, startDate, endDate);
     }
 
     function openChartModal(title, rows) {
