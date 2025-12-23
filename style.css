@@ -1050,25 +1050,9 @@ td.reimbursement-income {
     width: 16px;
     height: 16px;
 }
-.chart-line-style select,
-.chart-range-inputs input,
-.chart-range-inputs button {
+.chart-line-style select {
     width: 100%;
     max-width: 100%;
-}
-.chart-range-inputs {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 8px;
-    align-items: center;
-}
-.chart-range-inputs.compact button {
-    min-height: 40px;
-}
-.chart-range-hint {
-    margin: 0;
-    font-size: 0.85rem;
-    color: var(--light-text);
 }
 .note-card .chart-hints {
     margin: 0;
