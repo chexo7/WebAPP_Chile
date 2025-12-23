@@ -483,16 +483,6 @@
                                     <option value="stepped" selected>Escalonado</option>
                                 </select>
                             </div>
-                            <div class="control-card">
-                                <p class="control-title">Rango personalizado</p>
-                                <div class="chart-range-inputs compact">
-                                    <label for="mobile-chart-start">Desde</label>
-                                    <input type="date" id="mobile-chart-start">
-                                    <label for="mobile-chart-end">Hasta</label>
-                                    <input type="date" id="mobile-chart-end">
-                                    <button id="apply-mobile-chart-range" class="ghost">Aplicar</button>
-                                </div>
-                            </div>
                             <div class="control-card note-card">
                                 <p class="control-title">Tips rápidos</p>
                                 <ul class="chart-hints">
@@ -503,19 +493,24 @@
                                 </ul>
                             </div>
                         </div>
-                        <div class="chart-visual-card">
-                            <div class="chart-legend-inline">
-                                <span class="legend-dot saldo"></span>Saldo
-                                <span class="legend-dot ingreso"></span>Ingresos
-                                <span class="legend-dot gasto"></span>Gastos
-                                <span class="legend-dot flujo"></span>Flujo neto
+                            <div class="chart-visual-card">
+                                <div class="chart-legend-inline">
+                                    <span class="legend-dot saldo"></span>Saldo
+                                    <span class="legend-dot ingreso"></span>Ingresos
+                                    <span class="legend-dot gasto"></span>Gastos
+                                    <span class="legend-dot flujo"></span>Flujo neto
+                                </div>
+                                <div class="chart-container wide">
+                                    <canvas id="cashflow-chart"></canvas>
+                                </div>
+                                <p id="chart-message" class="chart-help-text">Selecciona un período para ver sus movimientos.</p>
+                                <div class="chart-slider-row">
+                                    <label for="chart-range-slider">Mover rango visible</label>
+                                    <input type="range" id="chart-range-slider" min="0" max="0" value="0" step="1">
+                                    <span class="chart-slider-hint">Arrastra para desplazarte en el tiempo</span>
+                                </div>
                             </div>
-                            <div class="chart-container wide">
-                                <canvas id="cashflow-chart"></canvas>
-                            </div>
-                            <p id="chart-message" class="chart-help-text">Selecciona un período para ver sus movimientos.</p>
                         </div>
-                    </div>
                 </div>
 
                 <div id="pie-month-container">
