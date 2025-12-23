@@ -424,7 +424,7 @@
                         <div class="chart-top-left">
                             <p class="eyebrow">Panel interactivo</p>
                             <h2 id="grafico-title">Gráfico de Flujo de Caja</h2>
-                            <p class="chart-subtitle">Nueva experiencia: controles rápidos, lectura clara y zoom guiado.</p>
+                            <p class="chart-subtitle">Nueva experiencia: controles rápidos, lectura clara y paneo horizontal inmediato.</p>
                             <div class="pill-subtabs" id="chart-subtabs">
                                 <button class="subtab-button pill active" data-parent="chart" data-period="Mensual">Mensual</button>
                                 <button class="subtab-button pill" data-parent="chart" data-period="Semanal">Semanal</button>
@@ -433,8 +433,8 @@
                         </div>
                         <div class="chart-action-stack">
                             <button id="chart-refresh-button" class="ghost icon-left">↻ Recalcular</button>
-                            <button id="toggle-chart-zoom" class="ghost icon-left">🔍 Activar zoom</button>
-                            <button id="reset-chart-zoom-button" class="ghost icon-left">⟲ Limpiar vista</button>
+                            <button id="toggle-chart-zoom" class="ghost icon-left">🔍 Zoom deshabilitado</button>
+                            <button id="reset-chart-zoom-button" class="ghost icon-left">⟲ Vista sugerida</button>
                             <button id="export-chart-button" class="accent icon-left">⬇ Exportar imagen</button>
                         </div>
                     </div>
@@ -497,7 +497,8 @@
                                 <p class="control-title">Tips rápidos</p>
                                 <ul class="chart-hints">
                                     <li>Un clic abre el detalle del período.</li>
-                                    <li>Doble clic o el botón 🔍 activan el zoom.</li>
+                                    <li>Arrastra con el botón izquierdo para desplazarte en el tiempo.</li>
+                                    <li>Doble clic restablece el rango sugerido.</li>
                                     <li>Los atajos de rango no alteran los datos, solo la vista.</li>
                                 </ul>
                             </div>
