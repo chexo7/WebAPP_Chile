@@ -1110,6 +1110,16 @@ td.reimbursement-income {
     max-width: 100%;
     height: 65vh;
 }
+.chart-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0 0;
+    font-size: 0.95rem;
+}
+.chart-slider-row input[type="range"] {
+    flex: 1;
+}
 .chart-help-text {
     text-align: center;
     color: var(--light-text);
