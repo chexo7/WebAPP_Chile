@@ -1115,6 +1115,24 @@ td.reimbursement-income {
     color: var(--light-text);
     margin: 0;
 }
+
+.chart-slider-row {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.chart-slider-row input[type="range"] {
+    flex: 1;
+    min-width: 180px;
+}
+
+.chart-slider-row .chart-slider-hint {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
 .chart-action-stack .ghost.active {
     background-color: #e8f1ff;
     color: var(--primary-color);

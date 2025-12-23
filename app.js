@@ -276,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chartWindowLabel = document.getElementById('chart-window-label');
     const chartZoomToggle = document.getElementById('toggle-chart-zoom');
     const chartRefreshButton = document.getElementById('chart-refresh-button');
+    const chartRangeSlider = document.getElementById('chart-range-slider');
     let cashflowChartInstance = null;
     const pieMonthChartInstances = [null, null, null];
     const pieWeekChartInstances = [null, null, null];
@@ -3964,6 +3965,26 @@ document.addEventListener('DOMContentLoaded', () => {
         return { min: Math.min(...xs), max: Math.max(...xs) };
     }
 
+    function updateChartSliderLimits() {
+        if (!chartRangeSlider || !chartDataDomain || chartViewSpanMs === null) return;
+        const domainSpan = chartDataDomain.max - chartDataDomain.min;
+        const available = Math.max(0, domainSpan - chartViewSpanMs);
+        chartRangeSlider.min = 0;
+        chartRangeSlider.max = available;
+        chartRangeSlider.step = 1;
+        chartRangeSlider.disabled = available <= 0;
+    }
+
+    function updateChartSliderPosition() {
+        if (!chartRangeSlider || !chartDataDomain || !chartViewWindow) return;
+        const domainSpan = chartDataDomain.max - chartDataDomain.min;
+        const available = Math.max(0, domainSpan - chartViewSpanMs);
+        const startMs = chartViewWindow.start?.getTime?.() ?? chartDataDomain.min;
+        const offset = Math.max(0, Math.min(available, startMs - chartDataDomain.min));
+        chartRangeSlider.value = offset;
+        chartRangeSlider.disabled = available <= 0;
+    }
+
     function refreshYAxisFromCurrentScale(chartInstance = cashflowChartInstance, shouldUpdate = true) {
         if (!chartInstance || !chartInstance.options?.scales) return;
         const xScale = chartInstance.scales?.x;
@@ -3998,6 +4019,8 @@ document.addEventListener('DOMContentLoaded', () => {
         chartViewSpanMs = endMs - startMs;
         if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(chartViewWindow.start);
         if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(chartViewWindow.end);
+        updateChartSliderLimits();
+        updateChartSliderPosition();
         const datesForLabel = fullChartData?.periodDates
             ? getVisibleDatesForWindow(fullChartData.periodDates, chartViewWindow.start, chartViewWindow.end)
             : [];
@@ -4018,6 +4041,8 @@ document.addEventListener('DOMContentLoaded', () => {
         chartViewSpanMs = (end && start) ? (end.getTime() - start.getTime()) : chartViewSpanMs;
         refreshYAxisFromCurrentScale(cashflowChartInstance, false);
         syncViewWindowFromScale(cashflowChartInstance);
+        updateChartSliderLimits();
+        updateChartSliderPosition();
         if (shouldUpdate) {
             cashflowChartInstance.update();
         }
@@ -4161,6 +4186,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const resolvedView = clampViewWindowToDomain(desiredView?.start, desiredView?.end, domainStartMs, domainEndMs);
         chartViewWindow = resolvedView;
         chartViewSpanMs = chartViewWindow.end.getTime() - chartViewWindow.start.getTime();
+        updateChartSliderLimits();
+        updateChartSliderPosition();
         if (mobileChartStartInput && mobileChartEndInput) {
             mobileChartStartInput.value = getISODateString(chartViewWindow.start);
             mobileChartEndInput.value = getISODateString(chartViewWindow.end);
@@ -5132,6 +5159,24 @@ function getMondayOfWeek(year, week) {
     if (chartRefreshButton) {
         chartRefreshButton.addEventListener('click', () => renderCashflowTable());
     }
+    if (chartRangeSlider) {
+        chartRangeSlider.addEventListener('input', () => {
+            if (!chartDataDomain || chartViewSpanMs === null) return;
+            const domainSpan = chartDataDomain.max - chartDataDomain.min;
+            const available = Math.max(0, domainSpan - chartViewSpanMs);
+            const rawValue = parseInt(chartRangeSlider.value, 10);
+            const clampedOffset = isNaN(rawValue) ? 0 : Math.max(0, Math.min(available, rawValue));
+            const startMs = chartDataDomain.min + clampedOffset;
+            const endMs = Math.min(chartDataDomain.max, startMs + chartViewSpanMs);
+            const view = { start: new Date(startMs), end: new Date(endMs) };
+            chartViewWindow = view;
+            lastChartRangeKey = 'manual';
+            if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(view.start);
+            if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(view.end);
+            applyViewportToChart(view);
+            setQuickRangeActive('manual');
+        });
+    }
 
     pieMonthInputs.forEach(inp => { if (inp) inp.value = today.toISOString().slice(0,7); });
     if (pieWeekInputs[0]) {
@@ -5284,6 +5329,8 @@ function getMondayOfWeek(year, week) {
         lastChartRangeKey = rangeKey;
         if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(clamped.start);
         if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(clamped.end);
+        updateChartSliderLimits();
+        updateChartSliderPosition();
         applyViewportToChart(clamped);
         setQuickRangeActive(rangeKey);
     }
@@ -5310,6 +5357,8 @@ function getMondayOfWeek(year, week) {
         const targetWindow = clampViewWindowToDomain(startDate, endDate, chartDataDomain.min, chartDataDomain.max);
         if (mobileChartStartInput) mobileChartStartInput.value = getISODateString(targetWindow.start);
         if (mobileChartEndInput) mobileChartEndInput.value = getISODateString(targetWindow.end);
+        updateChartSliderLimits();
+        updateChartSliderPosition();
         applyChartRange(key, targetWindow);
     }
 
