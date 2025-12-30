@@ -3893,7 +3893,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const symbol = currentBackupData?.display_currency_symbol || '$';
         const monthLabels = selectedMonths.map(date => `${MONTH_NAMES_FULL_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`);
         const initialBalanceBase = parseFloat(currentBackupData?.analysis_initial_balance) || 0;
         const perMonthData = selectedMonths.map(month => computeMonthlyExportData(exportData, month, initialBalanceBase));
@@ -3901,6 +3900,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const wb = XLSX.utils.book_new();
 
         const buildSheet = (rows) => XLSX.utils.aoa_to_sheet(rows);
+        const applyNumberFormatToSheet = (sheet, format = '#,##0.00') => {
+            if (!sheet || !sheet['!ref']) return;
+            const range = XLSX.utils.decode_range(sheet['!ref']);
+            for (let row = range.s.r; row <= range.e.r; row++) {
+                for (let col = range.s.c; col <= range.e.c; col++) {
+                    const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
+                    const cell = sheet[cellRef];
+                    if (cell && typeof cell.v === 'number') {
+                        cell.z = format;
+                    }
+                }
+            }
+        };
 
         const summaryRows = [['Indicador', ...monthLabels]];
         const summaryMetrics = [
@@ -3914,11 +3926,13 @@ document.addEventListener('DOMContentLoaded', () => {
         summaryMetrics.forEach(metric => {
             const row = [metric.label];
             perMonthData.forEach(data => {
-                row.push(formatCurrencyJS(data.totals[metric.key], symbol));
+                row.push(data.totals[metric.key]);
             });
             summaryRows.push(row);
         });
-        XLSX.utils.book_append_sheet(wb, buildSheet(summaryRows), 'Resumen');
+        const summarySheet = buildSheet(summaryRows);
+        applyNumberFormatToSheet(summarySheet);
+        XLSX.utils.book_append_sheet(wb, summarySheet, 'Resumen');
 
         const dailyRows = [['DIA', 'INGRESOS', 'GASTOS FIJOS', 'GASTOS VARIABLES', 'FLUJO NETO', 'SALDO FINAL']];
         perMonthData.forEach(data => {
@@ -3926,30 +3940,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dateLabel = `${String(row.date.getUTCMonth() + 1).padStart(2, '0')}/${String(row.date.getUTCDate()).padStart(2, '0')}/${row.date.getUTCFullYear()}`;
                 dailyRows.push([
                     dateLabel,
-                    formatCurrencyJS(row.income, symbol),
-                    formatCurrencyJS(row.fixed, symbol),
-                    formatCurrencyJS(row.variable, symbol),
-                    formatCurrencyJS(row.net, symbol),
-                    formatCurrencyJS(row.balance, symbol)
+                    row.income,
+                    row.fixed,
+                    row.variable,
+                    row.net,
+                    row.balance
                 ]);
             });
         });
-        XLSX.utils.book_append_sheet(wb, buildSheet(dailyRows), 'Diario');
+        const dailySheet = buildSheet(dailyRows);
+        applyNumberFormatToSheet(dailySheet);
+        XLSX.utils.book_append_sheet(wb, dailySheet, 'Diario');
 
         const weeklyRows = [['SEMANA', 'INGRESOS', 'GASTOS FIJOS', 'GASTOS VARIABLES', 'FLUJO NETO', 'SALDO FINAL']];
         perMonthData.forEach(data => {
             data.weeklyRows.forEach(row => {
                 weeklyRows.push([
                     `Semana ${row.weekNumber} ${row.weekYear}`,
-                    formatCurrencyJS(row.income, symbol),
-                    formatCurrencyJS(row.fixed, symbol),
-                    formatCurrencyJS(row.variable, symbol),
-                    formatCurrencyJS(row.net, symbol),
-                    formatCurrencyJS(row.balance, symbol)
+                    row.income,
+                    row.fixed,
+                    row.variable,
+                    row.net,
+                    row.balance
                 ]);
             });
         });
-        XLSX.utils.book_append_sheet(wb, buildSheet(weeklyRows), 'Semanal');
+        const weeklySheet = buildSheet(weeklyRows);
+        applyNumberFormatToSheet(weeklySheet);
+        XLSX.utils.book_append_sheet(wb, weeklySheet, 'Semanal');
 
         const expenseCategories = currentBackupData?.expense_categories || {};
         const fixedCategories = Object.keys(expenseCategories).filter(cat => expenseCategories[cat] === 'Fijo').sort();
@@ -3960,11 +3978,13 @@ document.addEventListener('DOMContentLoaded', () => {
             categories.forEach(cat => {
                 const row = [cat];
                 perMonthData.forEach(data => {
-                    row.push(formatCurrencyJS(data.categoryTotals[cat] || 0, symbol));
+                    row.push(data.categoryTotals[cat] || 0);
                 });
                 rows.push(row);
             });
-            XLSX.utils.book_append_sheet(wb, buildSheet(rows), sheetName);
+            const sheet = buildSheet(rows);
+            applyNumberFormatToSheet(sheet);
+            XLSX.utils.book_append_sheet(wb, sheet, sheetName);
         };
 
         buildCategorySheet(fixedCategories, 'Gastos Fijos');
