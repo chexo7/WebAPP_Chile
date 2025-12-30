@@ -48,6 +48,7 @@
                 <button class="tab-button" data-tab="ingresos">Ingresos</button>
                 <button class="tab-button" data-tab="flujo-caja">Flujo de Caja</button>
                 <button class="tab-button" data-tab="grafico">Gráfico</button>
+                <button class="tab-button" data-tab="exportacion">Exportación</button>
                 <button class="tab-button" data-tab="registro-pagos">Registro Pagos</button>
                 <button class="tab-button" data-tab="recordatorios">Recordatorios</button>
                 <button class="tab-button" data-tab="presupuestos">Presupuestos</button>
@@ -553,6 +554,89 @@
                         </div>
                     </div>
                     <div id="pie-week-legend" class="shared-legend"></div>
+                </div>
+            </div>
+
+            <div id="exportacion" class="tab-content">
+                <h2>Exportación de Reportes Mensuales</h2>
+                <p class="section-subtitle">Selecciona un mes para obtener el flujo diario, el análisis semanal y el resumen de gastos familiares.</p>
+                <div class="form-container export-form">
+                    <label for="export-month-input">Mes a reportar</label>
+                    <input type="month" id="export-month-input">
+                    <button id="export-generate-button" class="accent">Generar reporte</button>
+                    <p id="export-status-message" class="small-text" style="display:none;"></p>
+                </div>
+
+                <div id="export-report-container" class="export-report" style="display:none;">
+                    <div class="export-kpi-grid">
+                        <div class="kpi-card">
+                            <p>Ingresos del mes</p>
+                            <strong id="export-kpi-income">—</strong>
+                        </div>
+                        <div class="kpi-card">
+                            <p>Gastos del mes</p>
+                            <strong id="export-kpi-expense">—</strong>
+                        </div>
+                        <div class="kpi-card">
+                            <p>Flujo neto</p>
+                            <strong id="export-kpi-net">—</strong>
+                        </div>
+                        <div class="kpi-card">
+                            <p>Saldo final estimado</p>
+                            <strong id="export-kpi-balance">—</strong>
+                        </div>
+                    </div>
+
+                    <div class="export-summary-grid">
+                        <div class="export-card">
+                            <h3>Gastos fijos del mes</h3>
+                            <p class="export-total" id="export-fixed-total">—</p>
+                            <ul id="export-fixed-list" class="export-list"></ul>
+                        </div>
+                        <div class="export-card">
+                            <h3>Gastos variables del mes</h3>
+                            <p class="export-total" id="export-variable-total">—</p>
+                            <ul id="export-variable-list" class="export-list"></ul>
+                        </div>
+                    </div>
+
+                    <div class="export-table-section">
+                        <h3>Análisis semanal</h3>
+                        <div class="table-responsive">
+                            <table id="export-weekly-table">
+                                <thead>
+                                    <tr>
+                                        <th>Semana</th>
+                                        <th>Ingresos</th>
+                                        <th>Gastos fijos</th>
+                                        <th>Gastos variables</th>
+                                        <th>Flujo neto</th>
+                                        <th>Saldo final</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="export-table-section">
+                        <h3>Flujo diario completo</h3>
+                        <div class="table-responsive">
+                            <table id="export-daily-table">
+                                <thead>
+                                    <tr>
+                                        <th>Día</th>
+                                        <th>Ingresos</th>
+                                        <th>Gastos fijos</th>
+                                        <th>Gastos variables</th>
+                                        <th>Flujo neto</th>
+                                        <th>Saldo final</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
 

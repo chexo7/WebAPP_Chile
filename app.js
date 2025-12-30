@@ -298,6 +298,22 @@ document.addEventListener('DOMContentLoaded', () => {
     let hoverStartY = 0;
     let hoveredCell = null;
 
+    // --- ELEMENTOS PESTAÑA EXPORTACIÓN ---
+    const exportMonthInput = document.getElementById('export-month-input');
+    const exportGenerateButton = document.getElementById('export-generate-button');
+    const exportStatusMessage = document.getElementById('export-status-message');
+    const exportReportContainer = document.getElementById('export-report-container');
+    const exportKpiIncome = document.getElementById('export-kpi-income');
+    const exportKpiExpense = document.getElementById('export-kpi-expense');
+    const exportKpiNet = document.getElementById('export-kpi-net');
+    const exportKpiBalance = document.getElementById('export-kpi-balance');
+    const exportFixedTotal = document.getElementById('export-fixed-total');
+    const exportVariableTotal = document.getElementById('export-variable-total');
+    const exportFixedList = document.getElementById('export-fixed-list');
+    const exportVariableList = document.getElementById('export-variable-list');
+    const exportWeeklyTableBody = document.querySelector('#export-weekly-table tbody');
+    const exportDailyTableBody = document.querySelector('#export-daily-table tbody');
+
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
 
@@ -1531,6 +1547,7 @@ document.addEventListener('DOMContentLoaded', () => {
             populateSettingsForm();
             fetchAndUpdateUSDCLPRate(); // Fetch rate when adjustments tab is activated
         }
+        if (tabId === 'exportacion') { initializeExportTab(); }
         if (tabId === 'log') renderLogTab();
     }
     tabsContainer.addEventListener('click', (event) => {
@@ -1604,6 +1621,9 @@ document.addEventListener('DOMContentLoaded', () => {
         paymentsSubtabs.addEventListener('click', (e) => {
             if (e.target.classList.contains('subtab-button')) setPaymentPeriodicity(e.target.dataset.period);
         });
+    }
+    if (exportGenerateButton) {
+        exportGenerateButton.addEventListener('click', () => renderExportReport());
     }
 
     // --- LÓGICA PESTAÑA AJUSTES ---
@@ -3649,6 +3669,212 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         renderBudgetSummaryTableForSelectedPeriod();
+    }
+
+    // --- LÓGICA PESTAÑA EXPORTACIÓN ---
+    function getMonthInputValue(date) {
+        const year = date.getUTCFullYear();
+        const month = `${date.getUTCMonth() + 1}`.padStart(2, '0');
+        return `${year}-${month}`;
+    }
+
+    function parseMonthInputValue(value) {
+        if (!value || typeof value !== 'string') return null;
+        const parts = value.split('-').map(part => parseInt(part, 10));
+        if (parts.length !== 2 || parts.some(num => Number.isNaN(num))) return null;
+        const [year, month] = parts;
+        if (year < 1900 || month < 1 || month > 12) return null;
+        return { year, monthIndex: month - 1 };
+    }
+
+    function buildCalcDataForPeriod(baseData, startDate, duration, periodicity) {
+        return {
+            ...baseData,
+            analysis_start_date: startDate,
+            analysis_duration: duration,
+            analysis_periodicity: periodicity,
+            incomes: (baseData.incomes || []).map(inc => ({
+                ...inc,
+                start_date: inc.start_date ? new Date(inc.start_date) : null,
+                end_date: inc.end_date ? new Date(inc.end_date) : null
+            })),
+            expenses: (baseData.expenses || []).map(exp => ({
+                ...exp,
+                start_date: exp.start_date ? new Date(exp.start_date) : null,
+                end_date: exp.end_date ? new Date(exp.end_date) : null
+            }))
+        };
+    }
+
+    function setExportStatus(message = '', show = false) {
+        if (!exportStatusMessage) return;
+        exportStatusMessage.textContent = message;
+        setElementDisplay(exportStatusMessage, show ? 'block' : 'none');
+    }
+
+    function clearExportLists() {
+        if (exportFixedList) exportFixedList.innerHTML = '';
+        if (exportVariableList) exportVariableList.innerHTML = '';
+    }
+
+    function renderCategoryList(listEl, categories, expensesMap, symbol) {
+        if (!listEl) return;
+        listEl.innerHTML = '';
+        if (!categories.length) {
+            const emptyItem = document.createElement('li');
+            emptyItem.textContent = 'Sin registros.';
+            listEl.appendChild(emptyItem);
+            return;
+        }
+        categories.forEach(cat => {
+            const item = document.createElement('li');
+            const amount = expensesMap?.[cat] || 0;
+            item.innerHTML = `<span>${cat}</span><strong>${formatCurrencyJS(amount, symbol)}</strong>`;
+            listEl.appendChild(item);
+        });
+    }
+
+    function renderExportTables(dailyResult, monthStart, monthEnd, symbol) {
+        if (!exportDailyTableBody || !exportWeeklyTableBody) return;
+        exportDailyTableBody.innerHTML = '';
+        exportWeeklyTableBody.innerHTML = '';
+
+        if (!dailyResult || !Array.isArray(dailyResult.periodDates) || dailyResult.periodDates.length === 0) {
+            const row = exportDailyTableBody.insertRow();
+            const cell = row.insertCell();
+            cell.colSpan = 6;
+            cell.textContent = 'No hay datos para este mes.';
+            cell.style.textAlign = 'center';
+
+            const rowWeek = exportWeeklyTableBody.insertRow();
+            const cellWeek = rowWeek.insertCell();
+            cellWeek.colSpan = 6;
+            cellWeek.textContent = 'No hay datos para este mes.';
+            cellWeek.style.textAlign = 'center';
+            return;
+        }
+
+        dailyResult.periodDates.forEach((date, idx) => {
+            if (!(date instanceof Date)) return;
+            if (date < monthStart || date > monthEnd) return;
+            const row = exportDailyTableBody.insertRow();
+            row.insertCell().textContent = `${DATE_DAY_FORMAT(date)} ${MONTH_NAMES_ES[date.getUTCMonth()]}`;
+            row.insertCell().textContent = formatCurrencyJS(dailyResult.income_p[idx], symbol);
+            row.insertCell().textContent = formatCurrencyJS(dailyResult.fixed_exp_p[idx], symbol);
+            row.insertCell().textContent = formatCurrencyJS(dailyResult.var_exp_p[idx], symbol);
+            row.insertCell().textContent = formatCurrencyJS(dailyResult.net_flow_p[idx], symbol);
+            row.insertCell().textContent = formatCurrencyJS(dailyResult.end_bal_p[idx], symbol);
+        });
+
+        const weeklyMap = new Map();
+        dailyResult.periodDates.forEach((date, idx) => {
+            if (!(date instanceof Date)) return;
+            if (date < monthStart || date > monthEnd) return;
+            const weekStart = getPeriodStartDate(date, 'Semanal');
+            const key = getISODateString(weekStart);
+            if (!weeklyMap.has(key)) {
+                weeklyMap.set(key, {
+                    weekStart,
+                    weekEnd: date,
+                    income: 0,
+                    fixed: 0,
+                    variable: 0,
+                    net: 0,
+                    endBalance: dailyResult.end_bal_p[idx]
+                });
+            }
+            const entry = weeklyMap.get(key);
+            entry.weekEnd = date;
+            entry.income += dailyResult.income_p[idx];
+            entry.fixed += dailyResult.fixed_exp_p[idx];
+            entry.variable += dailyResult.var_exp_p[idx];
+            entry.net += dailyResult.net_flow_p[idx];
+            entry.endBalance = dailyResult.end_bal_p[idx];
+        });
+
+        Array.from(weeklyMap.values())
+            .sort((a, b) => a.weekStart - b.weekStart)
+            .forEach(entry => {
+                const row = exportWeeklyTableBody.insertRow();
+                const [year, week] = getWeekNumber(entry.weekStart);
+                const rangeLabel = `${DATE_DAY_FORMAT(entry.weekStart)}-${DATE_DAY_FORMAT(entry.weekEnd)}`;
+                row.insertCell().textContent = `Sem ${week} (${rangeLabel}) ${year}`;
+                row.insertCell().textContent = formatCurrencyJS(entry.income, symbol);
+                row.insertCell().textContent = formatCurrencyJS(entry.fixed, symbol);
+                row.insertCell().textContent = formatCurrencyJS(entry.variable, symbol);
+                row.insertCell().textContent = formatCurrencyJS(entry.net, symbol);
+                row.insertCell().textContent = formatCurrencyJS(entry.endBalance, symbol);
+            });
+    }
+
+    async function renderExportReport() {
+        if (!exportMonthInput || !exportReportContainer) return;
+        if (!currentBackupData) {
+            setExportStatus('Carga una versión de datos para generar reportes.', true);
+            setElementDisplay(exportReportContainer, 'none');
+            return;
+        }
+
+        const selection = parseMonthInputValue(exportMonthInput.value);
+        if (!selection) {
+            setExportStatus('Selecciona un mes válido para generar el reporte.', true);
+            setElementDisplay(exportReportContainer, 'none');
+            return;
+        }
+
+        const { year, monthIndex } = selection;
+        const monthStart = new Date(Date.UTC(year, monthIndex, 1));
+        const monthEnd = new Date(Date.UTC(year, monthIndex + 1, 0));
+        const daysInMonth = getDaysInMonth(year, monthIndex);
+        const symbol = currentBackupData.display_currency_symbol || '$';
+
+        setExportStatus('Calculando reporte...', true);
+
+        const dailyCalcData = buildCalcDataForPeriod(currentBackupData, monthStart, daysInMonth, 'Diario');
+        const rateCandidates = [
+            ...collectUsdRateDatesForExpenses(dailyCalcData.expenses, monthStart, monthEnd, dailyCalcData.use_instant_expenses),
+            ...collectUsdRateDatesForIncomes(dailyCalcData.incomes, monthStart, monthEnd, 'Diario')
+        ];
+        await ensureUsdClpRatesForDates(rateCandidates);
+
+        const dailyResult = calculateCashFlowData(dailyCalcData);
+        const monthlyCalcData = buildCalcDataForPeriod(currentBackupData, monthStart, 1, 'Mensual');
+        const monthlyResult = calculateCashFlowData(monthlyCalcData);
+
+        const monthlyIncome = monthlyResult.income_p?.[0] ?? 0;
+        const monthlyFixed = monthlyResult.fixed_exp_p?.[0] ?? 0;
+        const monthlyVariable = monthlyResult.var_exp_p?.[0] ?? 0;
+        const monthlyExpenses = monthlyFixed + monthlyVariable;
+        const monthlyNet = monthlyResult.net_flow_p?.[0] ?? 0;
+        const monthlyBalance = monthlyResult.end_bal_p?.[0] ?? 0;
+
+        if (exportKpiIncome) exportKpiIncome.textContent = formatCurrencyJS(monthlyIncome, symbol);
+        if (exportKpiExpense) exportKpiExpense.textContent = formatCurrencyJS(monthlyExpenses, symbol);
+        if (exportKpiNet) exportKpiNet.textContent = formatCurrencyJS(monthlyNet, symbol);
+        if (exportKpiBalance) exportKpiBalance.textContent = formatCurrencyJS(monthlyBalance, symbol);
+        if (exportFixedTotal) exportFixedTotal.textContent = formatCurrencyJS(monthlyFixed, symbol);
+        if (exportVariableTotal) exportVariableTotal.textContent = formatCurrencyJS(monthlyVariable, symbol);
+
+        const expenseCategories = currentBackupData.expense_categories || {};
+        const fixedCategories = Object.keys(expenseCategories).filter(cat => expenseCategories[cat] === 'Fijo').sort();
+        const variableCategories = Object.keys(expenseCategories).filter(cat => expenseCategories[cat] === 'Variable').sort();
+        const expensesByCategory = monthlyResult.expenses_by_cat_p?.[0] || {};
+
+        renderCategoryList(exportFixedList, fixedCategories, expensesByCategory, symbol);
+        renderCategoryList(exportVariableList, variableCategories, expensesByCategory, symbol);
+        renderExportTables(dailyResult, monthStart, monthEnd, symbol);
+
+        setExportStatus('', false);
+        setElementDisplay(exportReportContainer, 'block');
+    }
+
+    function initializeExportTab() {
+        if (!exportMonthInput) return;
+        if (!exportMonthInput.value) {
+            const today = new Date();
+            exportMonthInput.value = getMonthInputValue(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)));
+        }
+        renderExportReport();
     }
 
     function buildExpenseOccurrenceContext(expense, useInstant) {
