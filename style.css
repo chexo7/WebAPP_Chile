@@ -327,7 +327,11 @@ button.button-large {
 #expenses-table-view,
 #budgets-table-view,
 #payments-table-view,
-#budget-summary-table {
+#budget-summary-table,
+#export-daily-table,
+#export-weekly-table,
+#export-fixed-table,
+#export-variable-table {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
@@ -345,7 +349,15 @@ button.button-large {
 #payments-table-view th,
 #payments-table-view td,
 #budget-summary-table th,
-#budget-summary-table td {
+#budget-summary-table td,
+#export-daily-table th,
+#export-daily-table td,
+#export-weekly-table th,
+#export-weekly-table td,
+#export-fixed-table th,
+#export-fixed-table td,
+#export-variable-table th,
+#export-variable-table td {
     padding: 10px 12px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
@@ -376,7 +388,11 @@ button.button-large {
 #expenses-table-view thead th,
 #budgets-table-view thead th,
 #payments-table-view thead th,
-#budget-summary-table thead th {
+#budget-summary-table thead th,
+#export-daily-table thead th,
+#export-weekly-table thead th,
+#export-fixed-table thead th,
+#export-variable-table thead th {
     background-color: var(--header-bg);
     color: var(--primary-color);
     font-weight: 600;
@@ -390,7 +406,11 @@ button.button-large {
 #expenses-table-view tbody tr:hover td,
 #budgets-table-view tbody tr:hover td,
 #payments-table-view tbody tr:hover td,
-#budget-summary-table tbody tr:hover td {
+#budget-summary-table tbody tr:hover td,
+#export-daily-table tbody tr:hover td,
+#export-weekly-table tbody tr:hover td,
+#export-fixed-table tbody tr:hover td,
+#export-variable-table tbody tr:hover td {
     background-color: var(--row-hover-bg);
 }
 
@@ -422,7 +442,15 @@ button.button-large {
     #payments-table-view th,
     #payments-table-view td,
     #budget-summary-table th,
-    #budget-summary-table td {
+    #budget-summary-table td,
+    #export-daily-table th,
+    #export-daily-table td,
+    #export-weekly-table th,
+    #export-weekly-table td,
+    #export-fixed-table th,
+    #export-fixed-table td,
+    #export-variable-table th,
+    #export-variable-table td {
         padding: 8px 10px;
         font-size: 0.85rem;
     }
@@ -446,6 +474,78 @@ button.button-large {
         flex: 1 1 calc(50% - 4px);
         min-width: 110px;
     }
+}
+
+/* Exportación */
+.export-help {
+  color: var(--light-text);
+  margin-bottom: 16px;
+}
+
+.export-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+
+.export-field-wide {
+  flex: 2 1 320px;
+}
+
+.export-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.export-field select[multiple] {
+  min-height: 180px;
+}
+
+.export-field {
+  min-width: 160px;
+  flex: 1 1 180px;
+}
+
+.export-report {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.export-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.export-card {
+  background: var(--header-bg);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+
+.export-value {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.export-table-scroll {
+  max-height: 420px;
+}
+
+.export-category-section table {
+  width: 100%;
+}
+
+.export-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
 }
 
 /* Ajuste de ancho y scroll para columna Nombre en Gastos */
