@@ -1138,6 +1138,74 @@ td.reimbursement-income {
     color: var(--primary-color);
     border: 1px solid var(--primary-color);
 }
+
+/* Exportación mensual */
+.export-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.export-controls input[type="month"] {
+    min-width: 180px;
+}
+.export-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+}
+.summary-card {
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.summary-card p {
+    margin: 0 0 6px 0;
+    color: var(--light-text);
+}
+.summary-card strong {
+    font-size: 1.1rem;
+    color: var(--primary-color);
+}
+.export-section {
+    margin-top: 24px;
+}
+.export-two-column {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+}
+.export-list-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background: #fff;
+    padding: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.export-list {
+    list-style: none;
+    margin: 8px 0 0 0;
+    padding: 0;
+}
+.export-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border-color);
+    font-size: 0.95rem;
+}
+.export-list li:last-child {
+    border-bottom: none;
+}
+.export-list .export-total {
+    font-weight: 600;
+    color: var(--primary-color);
+}
 @media (pointer: coarse) {
     #cashflow-chart {
         touch-action: none;
