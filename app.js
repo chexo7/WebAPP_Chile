@@ -3714,6 +3714,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const monthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0));
         const dailyRows = [];
         const categoryTotals = {};
+        let initialBalance = 0;
+        const startIndex = exportData.periodDates.findIndex(date => date.getTime() === monthStart.getTime());
+        if (startIndex >= 0) {
+            initialBalance = startIndex === 0
+                ? (parseFloat(currentBackupData?.analysis_initial_balance) || 0)
+                : exportData.end_bal_p[startIndex - 1];
+        }
         exportData.periodDates.forEach((date, idx) => {
             if (date < monthStart || date > monthEnd) return;
             dailyRows.push({
@@ -3759,6 +3766,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentWeek) weeklyRows.push(currentWeek);
 
         const totals = {
+            initialBalance,
             income: dailyRows.reduce((acc, row) => acc + row.income, 0),
             fixed: dailyRows.reduce((acc, row) => acc + row.fixed, 0),
             variable: dailyRows.reduce((acc, row) => acc + row.variable, 0),
@@ -3767,6 +3775,58 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         return { monthStart, monthEnd, dailyRows, weeklyRows, categoryTotals, totals };
+    }
+
+    function buildCombinedDailyRows(exportData, selectedMonths = []) {
+        if (!exportData?.periodDates?.length || !selectedMonths.length) return [];
+        const monthKeys = new Set(selectedMonths.map(date => `${date.getUTCFullYear()}-${date.getUTCMonth()}`));
+        const rows = [];
+        exportData.periodDates.forEach((date, idx) => {
+            const key = `${date.getUTCFullYear()}-${date.getUTCMonth()}`;
+            if (!monthKeys.has(key)) return;
+            rows.push({
+                date,
+                income: exportData.income_p[idx],
+                fixed: exportData.fixed_exp_p[idx],
+                variable: exportData.var_exp_p[idx],
+                net: exportData.net_flow_p[idx],
+                balance: exportData.end_bal_p[idx]
+            });
+        });
+        return rows.sort((a, b) => a.date.getTime() - b.date.getTime());
+    }
+
+    function buildCombinedWeeklyRows(dailyRows = []) {
+        if (!dailyRows.length) return [];
+        const weeklyMap = new Map();
+        dailyRows.forEach(row => {
+            const [weekYear, weekNumber] = getWeekNumber(row.date);
+            const key = `${weekYear}-W${weekNumber}`;
+            const existing = weeklyMap.get(key) || {
+                weekYear,
+                weekNumber,
+                startDate: row.date,
+                endDate: row.date,
+                income: 0,
+                fixed: 0,
+                variable: 0,
+                net: 0,
+                balance: row.balance
+            };
+            existing.startDate = row.date < existing.startDate ? row.date : existing.startDate;
+            existing.endDate = row.date > existing.endDate ? row.date : existing.endDate;
+            existing.income += row.income;
+            existing.fixed += row.fixed;
+            existing.variable += row.variable;
+            existing.net += row.net;
+            existing.balance = row.balance;
+            weeklyMap.set(key, existing);
+        });
+        return Array.from(weeklyMap.values()).sort((a, b) => {
+            const aStart = getMondayOfWeek(a.weekYear, a.weekNumber).getTime();
+            const bStart = getMondayOfWeek(b.weekYear, b.weekNumber).getTime();
+            return aStart - bStart;
+        });
     }
 
     async function renderExportReportForSelectedMonth() {
@@ -3892,6 +3952,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const summaryRows = [['Indicador', ...monthLabels]];
         const summaryMetrics = [
+            { label: 'Saldo inicial estimado', key: 'initialBalance' },
             { label: 'Ingreso total', key: 'income' },
             { label: 'Gastos fijos', key: 'fixed' },
             { label: 'Gastos variables', key: 'variable' },
@@ -3907,45 +3968,47 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         XLSX.utils.book_append_sheet(wb, buildSheet(summaryRows), 'Resumen');
 
-        const dailyRows = [['Detalle', ...monthLabels]];
-        for (let day = 1; day <= 31; day++) {
-            const dayLabel = `${day.toString().padStart(2, '0')}`;
-            const metrics = [
-                { label: 'Ingresos', key: 'income' },
-                { label: 'Gastos fijos', key: 'fixed' },
-                { label: 'Gastos variables', key: 'variable' },
-                { label: 'Flujo neto', key: 'net' },
-                { label: 'Saldo final', key: 'balance' }
-            ];
-            metrics.forEach(metric => {
-                const row = [`Día ${dayLabel} · ${metric.label}`];
-                perMonthData.forEach(data => {
-                    const dayEntry = data.dailyRows.find(r => r.date.getUTCDate() === day);
-                    row.push(dayEntry ? formatCurrencyJS(dayEntry[metric.key], symbol) : '');
-                });
-                dailyRows.push(row);
-            });
-        }
+        const combinedDailyRows = buildCombinedDailyRows(exportData, selectedMonths);
+        const dailyRows = [[
+            'DIA',
+            'INGRESOS',
+            'GASTOS FIJOS',
+            'GASTOS VARIABLES',
+            'FLUJO NETO',
+            'SALDO FINAL'
+        ]];
+        combinedDailyRows.forEach(row => {
+            const dateLabel = `${(row.date.getUTCMonth() + 1).toString().padStart(2, '0')}/${row.date.getUTCDate().toString().padStart(2, '0')}/${row.date.getUTCFullYear()}`;
+            dailyRows.push([
+                dateLabel,
+                formatCurrencyJS(row.income, symbol),
+                formatCurrencyJS(row.fixed, symbol),
+                formatCurrencyJS(row.variable, symbol),
+                formatCurrencyJS(row.net, symbol),
+                formatCurrencyJS(row.balance, symbol)
+            ]);
+        });
         XLSX.utils.book_append_sheet(wb, buildSheet(dailyRows), 'Diario');
 
-        const weeklyRows = [['Detalle', ...monthLabels]];
-        for (let weekIndex = 1; weekIndex <= 6; weekIndex++) {
-            const metrics = [
-                { label: 'Ingresos', key: 'income' },
-                { label: 'Gastos fijos', key: 'fixed' },
-                { label: 'Gastos variables', key: 'variable' },
-                { label: 'Flujo neto', key: 'net' },
-                { label: 'Saldo final', key: 'balance' }
-            ];
-            metrics.forEach(metric => {
-                const row = [`Semana ${weekIndex} · ${metric.label}`];
-                perMonthData.forEach(data => {
-                    const weekEntry = data.weeklyRows.find(r => r.weekIndex === weekIndex);
-                    row.push(weekEntry ? formatCurrencyJS(weekEntry[metric.key], symbol) : '');
-                });
-                weeklyRows.push(row);
-            });
-        }
+        const combinedWeeklyRows = buildCombinedWeeklyRows(combinedDailyRows);
+        const weeklyRows = [[
+            'SEMANA',
+            'INGRESOS',
+            'GASTOS FIJOS',
+            'GASTOS VARIABLES',
+            'FLUJO NETO',
+            'SALDO FINAL'
+        ]];
+        combinedWeeklyRows.forEach(row => {
+            weeklyRows.push([
+                `Semana ${row.weekNumber} ${row.weekYear}`,
+                formatCurrencyJS(row.income, symbol),
+                formatCurrencyJS(row.fixed, symbol),
+                formatCurrencyJS(row.variable, symbol),
+                formatCurrencyJS(row.net, symbol),
+                formatCurrencyJS(row.balance, symbol)
+            ]);
+        });
         XLSX.utils.book_append_sheet(wb, buildSheet(weeklyRows), 'Semanal');
 
         const expenseCategories = currentBackupData?.expense_categories || {};
