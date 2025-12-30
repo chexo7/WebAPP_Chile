@@ -328,6 +328,7 @@ button.button-large {
 #budgets-table-view,
 #payments-table-view,
 #budget-summary-table,
+#export-summary-table,
 #export-daily-table,
 #export-weekly-table,
 #export-fixed-table,
@@ -350,6 +351,8 @@ button.button-large {
 #payments-table-view td,
 #budget-summary-table th,
 #budget-summary-table td,
+#export-summary-table th,
+#export-summary-table td,
 #export-daily-table th,
 #export-daily-table td,
 #export-weekly-table th,
@@ -389,6 +392,7 @@ button.button-large {
 #budgets-table-view thead th,
 #payments-table-view thead th,
 #budget-summary-table thead th,
+#export-summary-table thead th,
 #export-daily-table thead th,
 #export-weekly-table thead th,
 #export-fixed-table thead th,
@@ -407,6 +411,7 @@ button.button-large {
 #budgets-table-view tbody tr:hover td,
 #payments-table-view tbody tr:hover td,
 #budget-summary-table tbody tr:hover td,
+#export-summary-table tbody tr:hover td,
 #export-daily-table tbody tr:hover td,
 #export-weekly-table tbody tr:hover td,
 #export-fixed-table tbody tr:hover td,
@@ -443,6 +448,8 @@ button.button-large {
     #payments-table-view td,
     #budget-summary-table th,
     #budget-summary-table td,
+    #export-summary-table th,
+    #export-summary-table td,
     #export-daily-table th,
     #export-daily-table td,
     #export-weekly-table th,
@@ -495,29 +502,14 @@ button.button-large {
   flex: 1 1 180px;
 }
 
+.export-field select[multiple] {
+  min-height: 160px;
+}
+
 .export-report {
   display: flex;
   flex-direction: column;
   gap: 18px;
-}
-
-.export-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-}
-
-.export-card {
-  background: var(--header-bg);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  box-shadow: var(--shadow);
-}
-
-.export-value {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--text-color);
 }
 
 .export-table-scroll {

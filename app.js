@@ -226,19 +226,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const cashflowDiarioContainer = document.getElementById('cashflow-diario-container');
 
     // --- ELEMENTOS PESTAÑA EXPORTACIÓN ---
-    const exportYearSelect = document.getElementById('export-year-select');
     const exportMonthSelect = document.getElementById('export-month-select');
     const exportGenerateButton = document.getElementById('export-generate-button');
+    const exportExcelButton = document.getElementById('export-excel-button');
     const exportReportTitle = document.getElementById('export-report-title');
     const exportReportSubtitle = document.getElementById('export-report-subtitle');
-    const exportIncomeTotal = document.getElementById('export-income-total');
-    const exportFixedTotal = document.getElementById('export-fixed-total');
-    const exportVariableTotal = document.getElementById('export-variable-total');
-    const exportNetTotal = document.getElementById('export-net-total');
-    const exportEndingBalance = document.getElementById('export-ending-balance');
+    const exportSummaryTableHead = document.querySelector('#export-summary-table thead');
+    const exportSummaryTableBody = document.querySelector('#export-summary-table tbody');
+    const exportDailyTableHead = document.querySelector('#export-daily-table thead');
     const exportDailyTableBody = document.querySelector('#export-daily-table tbody');
+    const exportWeeklyTableHead = document.querySelector('#export-weekly-table thead');
     const exportWeeklyTableBody = document.querySelector('#export-weekly-table tbody');
+    const exportFixedTableHead = document.querySelector('#export-fixed-table thead');
     const exportFixedTableBody = document.querySelector('#export-fixed-table tbody');
+    const exportVariableTableHead = document.querySelector('#export-variable-table thead');
     const exportVariableTableBody = document.querySelector('#export-variable-table tbody');
 
     // --- ELEMENTOS PESTAÑA GRÁFICO ---
@@ -951,7 +952,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setPaymentPeriodicity(activePaymentsPeriodicity);
         renderCashflowTable();
         updateAnalysisModeLabels();
-        renderExportReportForSelectedMonth();
+        renderExportReportForSelectedMonths();
 
         hideElement(dataSelectionContainer);
         hideElement(loadingMessage);
@@ -1552,7 +1553,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (tabId === 'exportacion') {
             setupExportSelectors();
-            renderExportReportForSelectedMonth();
+            renderExportReportForSelectedMonths();
         }
         if (tabId === 'log') renderLogTab();
     }
@@ -3499,66 +3500,64 @@ document.addEventListener('DOMContentLoaded', () => {
             await renderCashflowTableFor('Semanal', cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle);
             await renderCashflowTableFor('Diario', cashflowDiarioTableHead, cashflowDiarioTableBody, cashflowDiarioTitle);
             refreshBudgetSummaryIfReady();
-            await renderExportReportForSelectedMonth();
+            await renderExportReportForSelectedMonths();
         } catch (error) {
             console.error('Error al renderizar el flujo de caja:', error);
         }
     }
 
     function setupExportSelectors() {
-        if (!exportYearSelect || !exportMonthSelect || !currentBackupData) return;
+        if (!exportMonthSelect || !currentBackupData) return;
         const baseStartDate = toUTCDate(currentBackupData.analysis_start_date, new Date());
         const monthStart = new Date(Date.UTC(baseStartDate.getUTCFullYear(), baseStartDate.getUTCMonth(), 1));
         const durationMonths = parseInt(currentBackupData.analysis_duration, 10) || 12;
         const lastMonth = addMonths(monthStart, durationMonths - 1);
-        const prevYear = parseInt(exportYearSelect.value, 10);
-        const prevMonth = parseInt(exportMonthSelect.value, 10);
-
-        exportYearSelect.innerHTML = '';
-        for (let year = monthStart.getUTCFullYear(); year <= lastMonth.getUTCFullYear(); year++) {
-            const option = document.createElement('option');
-            option.value = year;
-            option.textContent = year;
-            exportYearSelect.appendChild(option);
-        }
+        const selectedValues = new Set(Array.from(exportMonthSelect.selectedOptions).map(opt => opt.value));
 
         exportMonthSelect.innerHTML = '';
-        MONTH_NAMES_FULL_ES.forEach((monthName, index) => {
+        let cursor = new Date(monthStart.getTime());
+        while (cursor <= lastMonth) {
+            const year = cursor.getUTCFullYear();
+            const monthIndex = cursor.getUTCMonth();
+            const value = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
             const option = document.createElement('option');
-            option.value = index;
-            option.textContent = monthName;
+            option.value = value;
+            option.textContent = `${MONTH_NAMES_FULL_ES[monthIndex]} ${year}`;
+            if (selectedValues.has(value)) option.selected = true;
             exportMonthSelect.appendChild(option);
-        });
+            cursor = addMonths(cursor, 1);
+        }
 
-        let selectionDate = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth(), 1));
-        if (!isNaN(prevYear) && !isNaN(prevMonth)) {
-            const prevDate = new Date(Date.UTC(prevYear, prevMonth, 1));
-            if (prevDate >= monthStart && prevDate <= lastMonth) {
-                selectionDate = prevDate;
-            }
-        } else {
+        if (!exportMonthSelect.selectedOptions.length) {
             const today = getTodayUTC();
             const todayMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
             if (todayMonth >= monthStart && todayMonth <= lastMonth) {
-                selectionDate = todayMonth;
+                const defaultValue = `${todayMonth.getUTCFullYear()}-${String(todayMonth.getUTCMonth() + 1).padStart(2, '0')}`;
+                const defaultOption = Array.from(exportMonthSelect.options).find(opt => opt.value === defaultValue);
+                if (defaultOption) defaultOption.selected = true;
+            } else if (exportMonthSelect.options.length > 0) {
+                exportMonthSelect.options[0].selected = true;
             }
         }
 
-        exportYearSelect.value = selectionDate.getUTCFullYear();
-        exportMonthSelect.value = selectionDate.getUTCMonth();
-
-        [exportYearSelect, exportMonthSelect].forEach(sel => {
-            sel.removeEventListener('change', renderExportReportForSelectedMonth);
-            sel.addEventListener('change', renderExportReportForSelectedMonth);
-        });
+        exportMonthSelect.removeEventListener('change', renderExportReportForSelectedMonths);
+        exportMonthSelect.addEventListener('change', renderExportReportForSelectedMonths);
 
         if (exportGenerateButton) {
-            exportGenerateButton.removeEventListener('click', renderExportReportForSelectedMonth);
-            exportGenerateButton.addEventListener('click', renderExportReportForSelectedMonth);
+            exportGenerateButton.removeEventListener('click', renderExportReportForSelectedMonths);
+            exportGenerateButton.addEventListener('click', renderExportReportForSelectedMonths);
+        }
+        if (exportExcelButton) {
+            exportExcelButton.removeEventListener('click', exportReportToExcel);
+            exportExcelButton.addEventListener('click', exportReportToExcel);
         }
     }
 
-    function clearExportTables(message = 'No hay datos para el mes seleccionado.') {
+    function clearExportTables(message = 'No hay datos para los meses seleccionados.') {
+        const clearHead = (tableHead) => {
+            if (!tableHead) return;
+            tableHead.innerHTML = '';
+        };
         const clearTable = (tableBody, colspan) => {
             if (!tableBody) return;
             tableBody.innerHTML = '';
@@ -3568,24 +3567,31 @@ document.addEventListener('DOMContentLoaded', () => {
             cell.textContent = message;
             cell.style.textAlign = 'center';
         };
-        clearTable(exportDailyTableBody, 6);
-        clearTable(exportWeeklyTableBody, 6);
+        clearHead(exportSummaryTableHead);
+        clearHead(exportDailyTableHead);
+        clearHead(exportWeeklyTableHead);
+        clearHead(exportFixedTableHead);
+        clearHead(exportVariableTableHead);
+        clearTable(exportSummaryTableBody, 2);
+        clearTable(exportDailyTableBody, 2);
+        clearTable(exportWeeklyTableBody, 2);
         clearTable(exportFixedTableBody, 2);
         clearTable(exportVariableTableBody, 2);
-        if (exportIncomeTotal) exportIncomeTotal.textContent = '—';
-        if (exportFixedTotal) exportFixedTotal.textContent = '—';
-        if (exportVariableTotal) exportVariableTotal.textContent = '—';
-        if (exportNetTotal) exportNetTotal.textContent = '—';
-        if (exportEndingBalance) exportEndingBalance.textContent = '—';
         if (exportReportSubtitle) exportReportSubtitle.textContent = message;
     }
 
-    function getSelectedExportMonth() {
-        if (!exportYearSelect || !exportMonthSelect) return null;
-        const year = parseInt(exportYearSelect.value, 10);
-        const month = parseInt(exportMonthSelect.value, 10);
-        if (isNaN(year) || isNaN(month)) return null;
-        return new Date(Date.UTC(year, month, 1));
+    function getSelectedExportMonths() {
+        if (!exportMonthSelect) return [];
+        const selected = Array.from(exportMonthSelect.selectedOptions)
+            .map(opt => opt.value)
+            .filter(Boolean)
+            .map(value => {
+                const [year, month] = value.split('-').map(Number);
+                if (isNaN(year) || isNaN(month)) return null;
+                return new Date(Date.UTC(year, month - 1, 1));
+            })
+            .filter(Boolean);
+        return selected.sort((a, b) => a.getTime() - b.getTime());
     }
 
     async function getExportDailyCashflowData() {
@@ -3645,16 +3651,19 @@ document.addEventListener('DOMContentLoaded', () => {
         return exportDailyCache;
     }
 
-    async function renderExportReportForSelectedMonth() {
-        if (!exportDailyTableBody || !exportWeeklyTableBody || !exportFixedTableBody || !exportVariableTableBody) return;
+    async function renderExportReportForSelectedMonths() {
+        if (!exportSummaryTableBody || !exportDailyTableBody || !exportWeeklyTableBody || !exportFixedTableBody || !exportVariableTableBody) return;
         if (!currentBackupData) return;
-        const selectedMonth = getSelectedExportMonth();
-        if (!selectedMonth) return;
+        const selectedMonths = getSelectedExportMonths();
+        if (!selectedMonths.length) {
+            clearExportTables('Selecciona al menos un mes para generar el reporte.');
+            return;
+        }
 
-        const monthStart = new Date(Date.UTC(selectedMonth.getUTCFullYear(), selectedMonth.getUTCMonth(), 1));
-        const monthEnd = new Date(Date.UTC(selectedMonth.getUTCFullYear(), selectedMonth.getUTCMonth() + 1, 0));
-        const reportTitle = `${MONTH_NAMES_FULL_ES[selectedMonth.getUTCMonth()]} ${selectedMonth.getUTCFullYear()}`;
-        if (exportReportTitle) exportReportTitle.textContent = `Reporte mensual · ${reportTitle}`;
+        const reportTitle = selectedMonths.length === 1
+            ? `Reporte mensual · ${MONTH_NAMES_FULL_ES[selectedMonths[0].getUTCMonth()]} ${selectedMonths[0].getUTCFullYear()}`
+            : `Reporte mensual · ${selectedMonths.length} meses seleccionados`;
+        if (exportReportTitle) exportReportTitle.textContent = reportTitle;
 
         const exportData = await getExportDailyCashflowData();
         if (!exportData || !exportData.periodDates || exportData.periodDates.length === 0) {
@@ -3663,135 +3672,296 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const symbol = currentBackupData.display_currency_symbol || '$';
-        const dailyRows = [];
-        const categoryTotals = {};
-        exportData.periodDates.forEach((date, idx) => {
-            if (date < monthStart || date > monthEnd) return;
-            dailyRows.push({
-                date,
-                income: exportData.income_p[idx],
-                fixed: exportData.fixed_exp_p[idx],
-                variable: exportData.var_exp_p[idx],
-                net: exportData.net_flow_p[idx],
-                balance: exportData.end_bal_p[idx],
-                categories: exportData.expenses_by_cat_p[idx] || {}
+        const monthDataMap = new Map();
+        const categoryTotalsMap = new Map();
+
+        selectedMonths.forEach(monthDate => {
+            const monthStart = new Date(Date.UTC(monthDate.getUTCFullYear(), monthDate.getUTCMonth(), 1));
+            const monthEnd = new Date(Date.UTC(monthDate.getUTCFullYear(), monthDate.getUTCMonth() + 1, 0));
+            const dailyRows = [];
+            const categoryTotals = {};
+            exportData.periodDates.forEach((date, idx) => {
+                if (date < monthStart || date > monthEnd) return;
+                dailyRows.push({
+                    date,
+                    income: exportData.income_p[idx],
+                    fixed: exportData.fixed_exp_p[idx],
+                    variable: exportData.var_exp_p[idx],
+                    net: exportData.net_flow_p[idx],
+                    balance: exportData.end_bal_p[idx],
+                    categories: exportData.expenses_by_cat_p[idx] || {}
+                });
+                Object.keys(exportData.expenses_by_cat_p[idx] || {}).forEach(cat => {
+                    categoryTotals[cat] = (categoryTotals[cat] || 0) + (exportData.expenses_by_cat_p[idx][cat] || 0);
+                });
             });
-            Object.keys(exportData.expenses_by_cat_p[idx] || {}).forEach(cat => {
-                categoryTotals[cat] = (categoryTotals[cat] || 0) + (exportData.expenses_by_cat_p[idx][cat] || 0);
+
+            monthDataMap.set(monthDate.getTime(), {
+                monthStart,
+                monthEnd,
+                dailyRows
             });
+            categoryTotalsMap.set(monthDate.getTime(), categoryTotals);
         });
 
-        if (dailyRows.length === 0) {
-            clearExportTables('No hay datos para el mes seleccionado.');
+        const hasAnyData = Array.from(monthDataMap.values()).some(entry => entry.dailyRows.length);
+        if (!hasAnyData) {
+            clearExportTables('No hay datos para los meses seleccionados.');
             return;
         }
 
-        const totalIncome = dailyRows.reduce((acc, row) => acc + row.income, 0);
-        const totalFixed = dailyRows.reduce((acc, row) => acc + row.fixed, 0);
-        const totalVariable = dailyRows.reduce((acc, row) => acc + row.variable, 0);
-        const totalNet = dailyRows.reduce((acc, row) => acc + row.net, 0);
-        const endingBalance = dailyRows[dailyRows.length - 1].balance;
+        const summaryRows = [
+            { key: 'income', label: 'Ingreso total' },
+            { key: 'fixed', label: 'Gastos fijos' },
+            { key: 'variable', label: 'Gastos variables' },
+            { key: 'net', label: 'Flujo neto del mes' },
+            { key: 'balance', label: 'Saldo final estimado' }
+        ];
 
-        if (exportIncomeTotal) exportIncomeTotal.textContent = formatCurrencyJS(totalIncome, symbol);
-        if (exportFixedTotal) exportFixedTotal.textContent = formatCurrencyJS(totalFixed, symbol);
-        if (exportVariableTotal) exportVariableTotal.textContent = formatCurrencyJS(totalVariable, symbol);
-        if (exportNetTotal) exportNetTotal.textContent = formatCurrencyJS(totalNet, symbol);
-        if (exportEndingBalance) exportEndingBalance.textContent = formatCurrencyJS(endingBalance, symbol);
+        exportSummaryTableHead.innerHTML = '';
+        const summaryHeaderRow = exportSummaryTableHead.insertRow();
+        summaryHeaderRow.insertCell().textContent = 'Concepto';
+        selectedMonths.forEach(monthDate => {
+            const th = document.createElement('th');
+            th.textContent = `${MONTH_NAMES_FULL_ES[monthDate.getUTCMonth()]} ${monthDate.getUTCFullYear()}`;
+            summaryHeaderRow.appendChild(th);
+        });
+
+        exportSummaryTableBody.innerHTML = '';
+        summaryRows.forEach(rowDef => {
+            const tr = exportSummaryTableBody.insertRow();
+            tr.insertCell().textContent = rowDef.label;
+            selectedMonths.forEach(monthDate => {
+                const monthData = monthDataMap.get(monthDate.getTime());
+                const dailyRows = monthData ? monthData.dailyRows : [];
+                let value = 0;
+                if (!dailyRows.length) {
+                    tr.insertCell().textContent = '—';
+                    return;
+                }
+                if (rowDef.key === 'income') value = dailyRows.reduce((acc, row) => acc + row.income, 0);
+                if (rowDef.key === 'fixed') value = dailyRows.reduce((acc, row) => acc + row.fixed, 0);
+                if (rowDef.key === 'variable') value = dailyRows.reduce((acc, row) => acc + row.variable, 0);
+                if (rowDef.key === 'net') value = dailyRows.reduce((acc, row) => acc + row.net, 0);
+                if (rowDef.key === 'balance') value = dailyRows[dailyRows.length - 1].balance;
+                tr.insertCell().textContent = formatCurrencyJS(value, symbol);
+            });
+        });
+
         if (exportReportSubtitle) {
-            exportReportSubtitle.textContent = `Período: ${DATE_DAY_FORMAT(monthStart)} al ${DATE_DAY_FORMAT(monthEnd)} · ${dailyRows.length} días`;
+            const periodStart = monthDataMap.get(selectedMonths[0].getTime())?.monthStart;
+            const periodEnd = monthDataMap.get(selectedMonths[selectedMonths.length - 1].getTime())?.monthEnd;
+            if (periodStart && periodEnd) {
+                exportReportSubtitle.textContent = `Período: ${DATE_DAY_FORMAT(periodStart)} al ${DATE_DAY_FORMAT(periodEnd)} · ${selectedMonths.length} meses`;
+            }
         }
 
+        const buildGroupedHeader = (tableHead, label) => {
+            tableHead.innerHTML = '';
+            const headerRow = tableHead.insertRow();
+            const labelCell = document.createElement('th');
+            labelCell.textContent = label;
+            labelCell.rowSpan = 2;
+            headerRow.appendChild(labelCell);
+            selectedMonths.forEach(monthDate => {
+                const th = document.createElement('th');
+                th.colSpan = 5;
+                th.textContent = `${MONTH_NAMES_FULL_ES[monthDate.getUTCMonth()]} ${monthDate.getUTCFullYear()}`;
+                headerRow.appendChild(th);
+            });
+            const subHeaderRow = tableHead.insertRow();
+            selectedMonths.forEach(() => {
+                ['Ingresos', 'Gastos fijos', 'Gastos variables', 'Flujo neto', 'Saldo final'].forEach(labelText => {
+                    const th = document.createElement('th');
+                    th.textContent = labelText;
+                    subHeaderRow.appendChild(th);
+                });
+            });
+        };
+
+        buildGroupedHeader(exportDailyTableHead, 'Día');
         exportDailyTableBody.innerHTML = '';
-        dailyRows.forEach(row => {
+        const maxDays = 31;
+        for (let day = 1; day <= maxDays; day++) {
             const tr = exportDailyTableBody.insertRow();
-            tr.insertCell().textContent = `${DATE_DAY_FORMAT(row.date)}/${row.date.getUTCFullYear()}`;
-            tr.insertCell().textContent = formatCurrencyJS(row.income, symbol);
-            tr.insertCell().textContent = formatCurrencyJS(row.fixed, symbol);
-            tr.insertCell().textContent = formatCurrencyJS(row.variable, symbol);
-            const netCell = tr.insertCell();
-            netCell.textContent = formatCurrencyJS(row.net, symbol);
-            netCell.classList.toggle('text-green', row.net >= 0);
-            netCell.classList.toggle('text-red', row.net < 0);
-            const balanceCell = tr.insertCell();
-            balanceCell.textContent = formatCurrencyJS(row.balance, symbol);
-            balanceCell.classList.toggle('text-blue', row.balance >= 0);
-            balanceCell.classList.toggle('text-red', row.balance < 0);
-        });
+            tr.insertCell().textContent = day;
+            selectedMonths.forEach(monthDate => {
+                const monthData = monthDataMap.get(monthDate.getTime());
+                const daysInMonth = getDaysInMonth(monthDate.getUTCFullYear(), monthDate.getUTCMonth());
+                if (!monthData || day > daysInMonth) {
+                    for (let i = 0; i < 5; i++) tr.insertCell().textContent = '—';
+                    return;
+                }
+                const dailyRow = monthData.dailyRows.find(row => row.date.getUTCDate() === day);
+                if (!dailyRow) {
+                    for (let i = 0; i < 5; i++) tr.insertCell().textContent = '—';
+                    return;
+                }
+                tr.insertCell().textContent = formatCurrencyJS(dailyRow.income, symbol);
+                tr.insertCell().textContent = formatCurrencyJS(dailyRow.fixed, symbol);
+                tr.insertCell().textContent = formatCurrencyJS(dailyRow.variable, symbol);
+                const netCell = tr.insertCell();
+                netCell.textContent = formatCurrencyJS(dailyRow.net, symbol);
+                netCell.classList.toggle('text-green', dailyRow.net >= 0);
+                netCell.classList.toggle('text-red', dailyRow.net < 0);
+                const balanceCell = tr.insertCell();
+                balanceCell.textContent = formatCurrencyJS(dailyRow.balance, symbol);
+                balanceCell.classList.toggle('text-blue', dailyRow.balance >= 0);
+                balanceCell.classList.toggle('text-red', dailyRow.balance < 0);
+            });
+        }
 
-        const weeklyRows = [];
-        let currentWeekKey = null;
-        let currentWeek = null;
-        dailyRows.forEach(row => {
-            const [weekYear, weekNumber] = getWeekNumber(row.date);
-            const weekKey = `${weekYear}-W${weekNumber}`;
-            if (weekKey !== currentWeekKey) {
-                if (currentWeek) weeklyRows.push(currentWeek);
-                currentWeekKey = weekKey;
-                currentWeek = {
-                    weekYear,
-                    weekNumber,
-                    startDate: row.date,
-                    endDate: row.date,
-                    income: 0,
-                    fixed: 0,
-                    variable: 0,
-                    net: 0,
-                    balance: row.balance
-                };
-            }
-            currentWeek.endDate = row.date;
-            currentWeek.income += row.income;
-            currentWeek.fixed += row.fixed;
-            currentWeek.variable += row.variable;
-            currentWeek.net += row.net;
-            currentWeek.balance = row.balance;
-        });
-        if (currentWeek) weeklyRows.push(currentWeek);
-
+        buildGroupedHeader(exportWeeklyTableHead, 'Semana');
         exportWeeklyTableBody.innerHTML = '';
-        weeklyRows.forEach(row => {
-            const tr = exportWeeklyTableBody.insertRow();
-            const weekLabel = `Sem ${row.weekNumber} (${DATE_DAY_FORMAT(row.startDate)} - ${DATE_DAY_FORMAT(row.endDate)})`;
-            tr.insertCell().textContent = `${weekLabel} ${row.weekYear}`;
-            tr.insertCell().textContent = formatCurrencyJS(row.income, symbol);
-            tr.insertCell().textContent = formatCurrencyJS(row.fixed, symbol);
-            tr.insertCell().textContent = formatCurrencyJS(row.variable, symbol);
-            const netCell = tr.insertCell();
-            netCell.textContent = formatCurrencyJS(row.net, symbol);
-            netCell.classList.toggle('text-green', row.net >= 0);
-            netCell.classList.toggle('text-red', row.net < 0);
-            const balanceCell = tr.insertCell();
-            balanceCell.textContent = formatCurrencyJS(row.balance, symbol);
-            balanceCell.classList.toggle('text-blue', row.balance >= 0);
-            balanceCell.classList.toggle('text-red', row.balance < 0);
+        const weeklyBucketsMap = new Map();
+        let maxWeeks = 0;
+        selectedMonths.forEach(monthDate => {
+            const monthData = monthDataMap.get(monthDate.getTime());
+            const dailyRows = monthData ? monthData.dailyRows : [];
+            const weeklyRows = [];
+            let currentWeekKey = null;
+            let currentWeek = null;
+            dailyRows.forEach(row => {
+                const [weekYear, weekNumber] = getWeekNumber(row.date);
+                const weekKey = `${weekYear}-W${weekNumber}`;
+                if (weekKey !== currentWeekKey) {
+                    if (currentWeek) weeklyRows.push(currentWeek);
+                    currentWeekKey = weekKey;
+                    currentWeek = {
+                        income: 0,
+                        fixed: 0,
+                        variable: 0,
+                        net: 0,
+                        balance: row.balance
+                    };
+                }
+                currentWeek.income += row.income;
+                currentWeek.fixed += row.fixed;
+                currentWeek.variable += row.variable;
+                currentWeek.net += row.net;
+                currentWeek.balance = row.balance;
+            });
+            if (currentWeek) weeklyRows.push(currentWeek);
+            weeklyBucketsMap.set(monthDate.getTime(), weeklyRows);
+            maxWeeks = Math.max(maxWeeks, weeklyRows.length);
         });
+
+        for (let weekIdx = 0; weekIdx < maxWeeks; weekIdx++) {
+            const tr = exportWeeklyTableBody.insertRow();
+            tr.insertCell().textContent = `Semana ${weekIdx + 1}`;
+            selectedMonths.forEach(monthDate => {
+                const weeklyRows = weeklyBucketsMap.get(monthDate.getTime()) || [];
+                const weekRow = weeklyRows[weekIdx];
+                if (!weekRow) {
+                    for (let i = 0; i < 5; i++) tr.insertCell().textContent = '—';
+                    return;
+                }
+                tr.insertCell().textContent = formatCurrencyJS(weekRow.income, symbol);
+                tr.insertCell().textContent = formatCurrencyJS(weekRow.fixed, symbol);
+                tr.insertCell().textContent = formatCurrencyJS(weekRow.variable, symbol);
+                const netCell = tr.insertCell();
+                netCell.textContent = formatCurrencyJS(weekRow.net, symbol);
+                netCell.classList.toggle('text-green', weekRow.net >= 0);
+                netCell.classList.toggle('text-red', weekRow.net < 0);
+                const balanceCell = tr.insertCell();
+                balanceCell.textContent = formatCurrencyJS(weekRow.balance, symbol);
+                balanceCell.classList.toggle('text-blue', weekRow.balance >= 0);
+                balanceCell.classList.toggle('text-red', weekRow.balance < 0);
+            });
+        }
 
         const expenseCategories = currentBackupData.expense_categories || {};
         const fixedCategories = Object.keys(expenseCategories).filter(cat => expenseCategories[cat] === 'Fijo').sort();
         const variableCategories = Object.keys(expenseCategories).filter(cat => expenseCategories[cat] === 'Variable').sort();
 
-        const renderCategoryTable = (tableBody, categories) => {
+        const renderCategoryTable = (tableHead, tableBody, categories) => {
+            tableHead.innerHTML = '';
+            const headerRow = tableHead.insertRow();
+            headerRow.insertCell().textContent = 'Categoría';
+            selectedMonths.forEach(monthDate => {
+                const th = document.createElement('th');
+                th.textContent = `${MONTH_NAMES_FULL_ES[monthDate.getUTCMonth()]} ${monthDate.getUTCFullYear()}`;
+                headerRow.appendChild(th);
+            });
             tableBody.innerHTML = '';
-            const rows = categories
-                .map(cat => ({ cat, total: categoryTotals[cat] || 0 }))
-                .filter(row => row.total > 0);
-            if (rows.length === 0) {
+            const rows = categories.filter(cat => {
+                return selectedMonths.some(monthDate => {
+                    const totals = categoryTotalsMap.get(monthDate.getTime()) || {};
+                    return (totals[cat] || 0) > 0;
+                });
+            });
+            if (!rows.length) {
                 const row = tableBody.insertRow();
                 const cell = row.insertCell();
-                cell.colSpan = 2;
-                cell.textContent = 'Sin movimientos en este mes.';
+                cell.colSpan = selectedMonths.length + 1;
+                cell.textContent = 'Sin movimientos en los meses seleccionados.';
                 cell.style.textAlign = 'center';
                 return;
             }
-            rows.forEach(row => {
+            rows.forEach(cat => {
                 const tr = tableBody.insertRow();
-                tr.insertCell().textContent = row.cat;
-                tr.insertCell().textContent = formatCurrencyJS(row.total, symbol);
+                tr.insertCell().textContent = cat;
+                selectedMonths.forEach(monthDate => {
+                    const totals = categoryTotalsMap.get(monthDate.getTime()) || {};
+                    tr.insertCell().textContent = formatCurrencyJS(totals[cat] || 0, symbol);
+                });
             });
         };
 
-        renderCategoryTable(exportFixedTableBody, fixedCategories);
-        renderCategoryTable(exportVariableTableBody, variableCategories);
+        renderCategoryTable(exportFixedTableHead, exportFixedTableBody, fixedCategories);
+        renderCategoryTable(exportVariableTableHead, exportVariableTableBody, variableCategories);
+    }
+
+    function tableToAOA(tableEl) {
+        if (!tableEl) return [];
+        const rows = [];
+        tableEl.querySelectorAll('thead tr').forEach(tr => {
+            const row = [];
+            tr.querySelectorAll('th').forEach(th => row.push(th.textContent.trim()));
+            rows.push(row);
+        });
+        tableEl.querySelectorAll('tbody tr').forEach(tr => {
+            const row = [];
+            tr.querySelectorAll('td').forEach(td => row.push(td.textContent.trim()));
+            rows.push(row);
+        });
+        return rows;
+    }
+
+    async function exportReportToExcel() {
+        if (!currentBackupData) return;
+        if (typeof XLSX === 'undefined') {
+            alert('No se encontró la librería de Excel.');
+            return;
+        }
+        await renderExportReportForSelectedMonths();
+        const selectedMonths = getSelectedExportMonths();
+        if (!selectedMonths.length) {
+            alert('Selecciona al menos un mes para exportar.');
+            return;
+        }
+
+        const workbook = XLSX.utils.book_new();
+        const sheetMap = [
+            { id: 'export-summary-table', name: 'Resumen' },
+            { id: 'export-daily-table', name: 'Diario' },
+            { id: 'export-weekly-table', name: 'Semanal' },
+            { id: 'export-fixed-table', name: 'Gastos Fijos' },
+            { id: 'export-variable-table', name: 'Gastos Variables' }
+        ];
+
+        sheetMap.forEach(({ id, name }) => {
+            const tableEl = document.getElementById(id);
+            const data = tableToAOA(tableEl);
+            if (!data.length) return;
+            const worksheet = XLSX.utils.aoa_to_sheet(data);
+            XLSX.utils.book_append_sheet(workbook, worksheet, name);
+        });
+
+        const firstMonth = selectedMonths[0];
+        const lastMonth = selectedMonths[selectedMonths.length - 1];
+        const filename = `exportacion-${firstMonth.getUTCFullYear()}-${String(firstMonth.getUTCMonth() + 1).padStart(2, '0')}-a-${lastMonth.getUTCFullYear()}-${String(lastMonth.getUTCMonth() + 1).padStart(2, '0')}.xlsx`;
+        XLSX.writeFile(workbook, filename);
     }
 
     async function renderCashflowTableFor(periodicity, tableHeadEl, tableBodyEl, titleEl) {
