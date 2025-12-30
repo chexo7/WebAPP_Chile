@@ -3990,6 +3990,24 @@ document.addEventListener('DOMContentLoaded', () => {
         buildCategorySheet(fixedCategories, 'Gastos Fijos');
         buildCategorySheet(variableCategories, 'Gastos Variables');
 
+        const dailyRowCount = Math.max(2, dailyRows.length);
+        const chartCategoriesRange = `Diario!$A$2:$A$${dailyRowCount}`;
+        const chartValuesRange = `Diario!$F$2:$F$${dailyRowCount}`;
+        summarySheet['!charts'] = [{
+            type: 'line',
+            subtype: 'lineMarkers',
+            title: 'Saldo final',
+            anchor: {
+                from: { row: 8, col: 0 },
+                to: { row: 32, col: 17 }
+            },
+            series: [{
+                name: 'Saldo final',
+                categories: chartCategoriesRange,
+                values: chartValuesRange
+            }]
+        }];
+
         const filename = `exportacion-mensual-${new Date().toISOString().slice(0, 10)}.xlsx`;
         XLSX.writeFile(wb, filename);
     }
