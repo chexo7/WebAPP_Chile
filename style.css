@@ -984,6 +984,27 @@ td.reimbursement-income {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px;
 }
+.export-summary-grid {
+    margin-bottom: 16px;
+}
+.export-controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+}
+.export-control-field {
+    min-width: 200px;
+}
+.export-control-field input[type="month"] {
+    max-width: 240px;
+}
+.export-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
 .kpi-card {
     padding: 12px;
     border: 1px solid var(--border-color);
