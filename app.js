@@ -3990,9 +3990,8 @@ document.addEventListener('DOMContentLoaded', () => {
         buildCategorySheet(fixedCategories, 'Gastos Fijos');
         buildCategorySheet(variableCategories, 'Gastos Variables');
 
-        const dailyRowCount = Math.max(2, dailyRows.length);
-        const chartCategoriesRange = `Diario!$A$2:$A$${dailyRowCount}`;
-        const chartValuesRange = `Diario!$F$2:$F$${dailyRowCount}`;
+        const chartCategoriesRange = 'Diario!$A:$A';
+        const chartValuesRange = 'Diario!$F:$F';
         summarySheet['!charts'] = [{
             type: 'line',
             subtype: 'lineMarkers',
@@ -4008,7 +4007,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }]
         }];
 
-        const filename = `exportacion-mensual-${new Date().toISOString().slice(0, 10)}.xlsx`;
+        const filename = `exportacion-mensual-${new Date().toISOString().slice(0, 10)}.xlsm`;
         XLSX.writeFile(wb, filename);
     }
 
