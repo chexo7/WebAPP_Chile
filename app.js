@@ -4020,7 +4020,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const buildCategoryBreakdownSheet = (categories, sheetName) => {
             const rows = [['Categoría / Gasto', ...monthLabels]];
             categories.forEach(cat => {
-                const categoryRow = [cat];
+                const categoryRow = [`▸ ${cat}`];
                 perMonthData.forEach(data => {
                     categoryRow.push(data.categoryTotals[cat] || 0);
                 });
@@ -4031,15 +4031,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     Object.keys(breakdown[cat] || {}).forEach(name => expenseNames.add(name));
                 });
                 Array.from(expenseNames).sort().forEach(name => {
-                    const row = [`  ${name}`];
+                    const row = [`   • ${name}`];
                     perMonthExpenseBreakdowns.forEach(breakdown => {
                         row.push((breakdown[cat] && breakdown[cat][name]) || 0);
                     });
                     rows.push(row);
                 });
+                rows.push([]);
             });
             const sheet = buildSheet(rows);
             applyNumberFormatToSheet(sheet);
+            sheet['!cols'] = [{ wch: 34 }, ...monthLabels.map(() => ({ wch: 18 }))];
             XLSX.utils.book_append_sheet(wb, sheet, sheetName);
         };
 
