@@ -4030,16 +4030,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const buildCategoryBreakdownSheet = (categories, sheetName) => {
             const rows = [['Categoría / Gasto', ...monthLabels]];
             categories.forEach((cat, index) => {
-                const categoryRow = [cat];
-                perMonthData.forEach(data => {
-                    categoryRow.push(data.categoryTotals[cat] || 0);
-                });
-                rows.push(categoryRow);
-
                 const expenseNames = new Set();
                 perMonthExpenseBreakdowns.forEach(breakdown => {
                     Object.keys(breakdown[cat] || {}).forEach(name => expenseNames.add(name));
                 });
+                const categoryRow = [cat];
+                perMonthExpenseBreakdowns.forEach(breakdown => {
+                    const totals = Object.values(breakdown[cat] || {});
+                    categoryRow.push(totals.reduce((acc, value) => acc + value, 0));
+                });
+                rows.push(categoryRow);
+
                 Array.from(expenseNames).sort().forEach(name => {
                     const row = [`  ${name}`];
                     perMonthExpenseBreakdowns.forEach(breakdown => {
