@@ -3987,8 +3987,56 @@ document.addEventListener('DOMContentLoaded', () => {
             XLSX.utils.book_append_sheet(wb, sheet, sheetName);
         };
 
+        const buildExpenseBreakdownSheet = (categories, sheetName) => {
+            const rows = [['Categoría', ...monthLabels]];
+            const expenses = currentBackupData?.expenses || [];
+            const useInstantExpenses = !!currentBackupData?.use_instant_expenses;
+
+            const computeExpenseTotals = (expense) => {
+                const { normalizedExpense, amountPerOccurrence } = buildExpenseOccurrenceContext(expense, useInstantExpenses);
+                if (!normalizedExpense?.start_date) return monthLabels.map(() => 0);
+                return selectedMonths.map(monthStart => {
+                    const monthEnd = getPeriodEndDate(monthStart, 'Mensual');
+                    const occurrenceDates = getExpenseOccurrenceDatesInPeriod(normalizedExpense, monthStart, monthEnd, useInstantExpenses);
+                    if (!occurrenceDates || occurrenceDates.length === 0) return 0;
+                    let total = 0;
+                    occurrenceDates.forEach(date => {
+                        total += convertAmountToUsd(amountPerOccurrence, expense.currency, date);
+                    });
+                    return total;
+                });
+            };
+
+            categories.forEach(cat => {
+                const expensesInCategory = expenses
+                    .filter(exp => exp.category === cat)
+                    .sort((a, b) => a.name.localeCompare(b.name));
+
+                if (!expensesInCategory.length) {
+                    rows.push([cat, ...monthLabels.map(() => 0)]);
+                    return;
+                }
+
+                const categoryTotals = Array(monthLabels.length).fill(0);
+                const expenseRows = expensesInCategory.map(exp => {
+                    const totals = computeExpenseTotals(exp);
+                    totals.forEach((value, idx) => { categoryTotals[idx] += value; });
+                    return [`  ${exp.name}`, ...totals];
+                });
+
+                rows.push([cat, ...categoryTotals]);
+                expenseRows.forEach(row => rows.push(row));
+            });
+
+            const sheet = buildSheet(rows);
+            applyNumberFormatToSheet(sheet);
+            XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+        };
+
         buildCategorySheet(fixedCategories, 'Gastos Fijos');
+        buildExpenseBreakdownSheet(fixedCategories, 'Desglose Gastos Fijos');
         buildCategorySheet(variableCategories, 'Gastos Variables');
+        buildExpenseBreakdownSheet(variableCategories, 'Desglose Gastos Variables');
 
         const dailyRowCount = Math.max(2, dailyRows.length);
         const chartCategoriesRange = `Diario!$A$2:$A$${dailyRowCount}`;
