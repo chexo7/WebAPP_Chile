@@ -4034,7 +4034,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 perMonthExpenseBreakdowns.forEach(breakdown => {
                     Object.keys(breakdown[cat] || {}).forEach(name => expenseNames.add(name));
                 });
-                const categoryRow = [cat];
+                const categoryRow = [`➤ ${cat}`];
                 perMonthExpenseBreakdowns.forEach(breakdown => {
                     const totals = Object.values(breakdown[cat] || {});
                     categoryRow.push(totals.reduce((acc, value) => acc + value, 0));
@@ -4042,7 +4042,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 rows.push(categoryRow);
 
                 Array.from(expenseNames).sort().forEach(name => {
-                    const row = [`  ${name}`];
+                    const row = [`• ${name}`];
                     perMonthExpenseBreakdowns.forEach(breakdown => {
                         row.push((breakdown[cat] && breakdown[cat][name]) || 0);
                     });
