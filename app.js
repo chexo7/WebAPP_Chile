@@ -3972,6 +3972,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const expenseCategories = currentBackupData?.expense_categories || {};
         const fixedCategories = Object.keys(expenseCategories).filter(cat => expenseCategories[cat] === 'Fijo').sort();
         const variableCategories = Object.keys(expenseCategories).filter(cat => expenseCategories[cat] === 'Variable').sort();
+        const monthlyTransactions = await Promise.all(
+            selectedMonths.map(month => gatherPeriodTransactions(month, 'Mensual'))
+        );
 
         const buildCategorySheet = (categories, sheetName) => {
             const rows = [['Categoría', ...monthLabels]];
@@ -3987,8 +3990,38 @@ document.addEventListener('DOMContentLoaded', () => {
             XLSX.utils.book_append_sheet(wb, sheet, sheetName);
         };
 
+        const buildExpenseBreakdownSheet = (categories, sheetName) => {
+            const rows = [['Categoría / Gasto', ...monthLabels]];
+            categories.forEach(cat => {
+                const categoryTotals = Array(monthLabels.length).fill(0);
+                const expenseMap = new Map();
+                monthlyTransactions.forEach((transactions, monthIdx) => {
+                    transactions
+                        .filter(row => row.type === 'Gasto' && row.category === cat)
+                        .forEach(row => {
+                            const nameKey = row.name || 'Sin nombre';
+                            if (!expenseMap.has(nameKey)) {
+                                expenseMap.set(nameKey, Array(monthLabels.length).fill(0));
+                            }
+                            expenseMap.get(nameKey)[monthIdx] += row.amount;
+                            categoryTotals[monthIdx] += row.amount;
+                        });
+                });
+
+                rows.push([cat, ...categoryTotals]);
+                Array.from(expenseMap.keys()).sort().forEach(expenseName => {
+                    rows.push([`  ${expenseName}`, ...expenseMap.get(expenseName)]);
+                });
+            });
+            const sheet = buildSheet(rows);
+            applyNumberFormatToSheet(sheet);
+            XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+        };
+
         buildCategorySheet(fixedCategories, 'Gastos Fijos');
+        buildExpenseBreakdownSheet(fixedCategories, 'Desglose Gastos Fijos');
         buildCategorySheet(variableCategories, 'Gastos Variables');
+        buildExpenseBreakdownSheet(variableCategories, 'Desglose Gastos Variables');
 
         const dailyRowCount = Math.max(2, dailyRows.length);
         const chartCategoriesRange = `Diario!$A$2:$A$${dailyRowCount}`;
