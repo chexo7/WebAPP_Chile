@@ -3776,6 +3776,50 @@ document.addEventListener('DOMContentLoaded', () => {
         return { monthStart, monthEnd, dailyRows, weeklyRows, categoryTotals, totals };
     }
 
+    function computeMonthlyExpenseBreakdown(baseData, monthStart) {
+        const breakdown = {};
+        if (!baseData || !baseData.expenses) return breakdown;
+        const monthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0));
+        baseData.expenses.forEach(expense => {
+            if (!expense.start_date) return;
+            const category = expense.category;
+            if (!category) return;
+            const { normalizedExpense, amountPerOccurrence } = buildExpenseOccurrenceContext(expense, baseData.use_instant_expenses);
+            if (!normalizedExpense.start_date) return;
+            const occurrenceDates = getExpenseOccurrenceDatesInPeriod(
+                normalizedExpense,
+                monthStart,
+                monthEnd,
+                baseData.use_instant_expenses
+            );
+            if (!occurrenceDates || occurrenceDates.length === 0) return;
+            let expTotalForPeriod = 0.0;
+            occurrenceDates.forEach(date => {
+                expTotalForPeriod += convertAmountToUsd(amountPerOccurrence, expense.currency, date);
+            });
+            if (expTotalForPeriod === 0) return;
+            if (!breakdown[category]) breakdown[category] = {};
+            const name = expense.name || 'Sin nombre';
+            breakdown[category][name] = (breakdown[category][name] || 0) + expTotalForPeriod;
+        });
+        (baseData.incomes || []).forEach(income => {
+            if (!income.is_reimbursement || !income.reimbursement_category || !income.start_date) return;
+            const category = income.reimbursement_category;
+            const occurrenceDates = getIncomeOccurrenceDatesInPeriod(income, monthStart, monthEnd, 'Diario');
+            if (!occurrenceDates || occurrenceDates.length === 0) return;
+            const reimbAmount = parseFloat(income.net_monthly || 0);
+            let reimbursementTotal = 0.0;
+            occurrenceDates.forEach(date => {
+                reimbursementTotal += convertAmountToUsd(reimbAmount, income.currency, date);
+            });
+            if (reimbursementTotal === 0) return;
+            if (!breakdown[category]) breakdown[category] = {};
+            const name = `Reembolso: ${income.name || 'Sin nombre'}`;
+            breakdown[category][name] = (breakdown[category][name] || 0) - reimbursementTotal;
+        });
+        return breakdown;
+    }
+
     async function renderExportReportForSelectedMonth() {
         if (!exportDailyTableBody || !exportWeeklyTableBody || !exportFixedTableBody || !exportVariableTableBody) return;
         if (!currentBackupData) return;
@@ -3896,6 +3940,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const monthLabels = selectedMonths.map(date => `${MONTH_NAMES_FULL_ES[date.getUTCMonth()]} ${date.getUTCFullYear()}`);
         const initialBalanceBase = parseFloat(currentBackupData?.analysis_initial_balance) || 0;
         const perMonthData = selectedMonths.map(month => computeMonthlyExportData(exportData, month, initialBalanceBase));
+        const perMonthExpenseBreakdowns = selectedMonths.map(month => computeMonthlyExpenseBreakdown(currentBackupData, month));
 
         const wb = XLSX.utils.book_new();
 
@@ -3972,6 +4017,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const expenseCategories = currentBackupData?.expense_categories || {};
         const fixedCategories = Object.keys(expenseCategories).filter(cat => expenseCategories[cat] === 'Fijo').sort();
         const variableCategories = Object.keys(expenseCategories).filter(cat => expenseCategories[cat] === 'Variable').sort();
+        const categoryColumnCount = monthLabels.length + 1;
+
+        const applyCategorySheetLayout = (sheet) => {
+            if (!sheet) return;
+            sheet['!cols'] = [
+                { wch: 32 },
+                ...Array.from({ length: categoryColumnCount - 1 }, () => ({ wch: 16 }))
+            ];
+        };
 
         const buildCategorySheet = (categories, sheetName) => {
             const rows = [['Categoría', ...monthLabels]];
@@ -3984,11 +4038,44 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const sheet = buildSheet(rows);
             applyNumberFormatToSheet(sheet);
+            applyCategorySheetLayout(sheet);
+            XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+        };
+
+        const buildCategoryBreakdownSheet = (categories, sheetName) => {
+            const rows = [['Categoría / Gasto', ...monthLabels]];
+            categories.forEach((cat, index) => {
+                const categoryRow = [cat];
+                perMonthData.forEach(data => {
+                    categoryRow.push(data.categoryTotals[cat] || 0);
+                });
+                rows.push(categoryRow);
+
+                const expenseNames = new Set();
+                perMonthExpenseBreakdowns.forEach(breakdown => {
+                    Object.keys(breakdown[cat] || {}).forEach(name => expenseNames.add(name));
+                });
+                Array.from(expenseNames).sort().forEach(name => {
+                    const row = [`  ${name}`];
+                    perMonthExpenseBreakdowns.forEach(breakdown => {
+                        row.push((breakdown[cat] && breakdown[cat][name]) || 0);
+                    });
+                    rows.push(row);
+                });
+                if (index < categories.length - 1) {
+                    rows.push(Array.from({ length: categoryColumnCount }, () => ''));
+                }
+            });
+            const sheet = buildSheet(rows);
+            applyNumberFormatToSheet(sheet);
+            applyCategorySheetLayout(sheet);
             XLSX.utils.book_append_sheet(wb, sheet, sheetName);
         };
 
         buildCategorySheet(fixedCategories, 'Gastos Fijos');
+        buildCategoryBreakdownSheet(fixedCategories, 'Desglose Gastos Fijos');
         buildCategorySheet(variableCategories, 'Gastos Variables');
+        buildCategoryBreakdownSheet(variableCategories, 'Desglose Gastos Variables');
 
         const dailyRowCount = Math.max(2, dailyRows.length);
         const chartCategoriesRange = `Diario!$A$2:$A$${dailyRowCount}`;
