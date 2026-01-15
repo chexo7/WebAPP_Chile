@@ -1,17 +1,17 @@
 /* Variables globales */
 :root {
-  --primary-color: #007aff;
-  --primary-hover: #0060d5;
-  --accent-color: #34c759;
-  --accent-hover: #28a745;
+  --primary-color: #0694F6;
+  --primary-hover: #0579D0;
+  --accent-color: #0240F5;
+  --accent-hover: #0630B8;
   --danger-color: #ff3b30;
   --danger-hover: #e33228;
-  --text-color: #1c1c1e;
+  --text-color: #041830;
   --light-text: #6e6e73;
-  --background: #f5f5f7;
-  --card-bg: #ffffff;
-  --border-color: #d2d2d7;
-  --header-bg: #f0f0f5;
+  --background: #ffffff;
+  --card-bg: #82DAFE;
+  --border-color: #659CD2;
+  --header-bg: #2AC3FD;
   --shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   --transition: all 0.3s ease;
   --radius: 12px;
