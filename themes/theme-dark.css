@@ -1,0 +1,29 @@
+/* Dark Theme */
+:root {
+  --primary-color: #4fa3ff;
+  --primary-hover: #2d8cff;
+  --accent-color: #74b9ff;
+  --accent-hover: #4da3ff;
+  --danger-color: #e74c3c;
+  --danger-hover: #c0392b;
+  --text-color: #ecf0f1;
+  --light-text: #bdc3c7;
+  --background: #1e272e;
+  --card-bg: #2c3e50;
+  --border-color: #34495e;
+  --header-bg: #2f4154;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  --transition: all 0.3s ease;
+  --radius: 8px;
+  --alt-row-bg: #36474f;
+  --row-hover-bg: #3e5563;
+  --body-header-row-bg: #2f4154;
+  --text-green: #2ecc71;
+  --text-red: #e74c3c;
+  --text-orange: #f39c12;
+  --disabled-bg: #3e4c58;
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+}

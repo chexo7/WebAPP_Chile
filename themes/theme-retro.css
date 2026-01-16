@@ -1,0 +1,29 @@
+/* Retro Theme */
+:root {
+  --primary-color: #ff6b6b;
+  --primary-hover: #ee5253;
+  --accent-color: #1dd1a1;
+  --accent-hover: #10ac84;
+  --danger-color: #ff9f43;
+  --danger-hover: #ff793f;
+  --text-color: #2f3542;
+  --light-text: #57606f;
+  --background: #f8f1f1;
+  --card-bg: #ffffff;
+  --border-color: #ced6e0;
+  --header-bg: #ffe2e2;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --transition: all 0.3s ease;
+  --radius: 8px;
+  --alt-row-bg: #ffe6e6;
+  --row-hover-bg: #ffefef;
+  --body-header-row-bg: #ffe9e9;
+  --text-green: #1dd1a1;
+  --text-red: #ff6b6b;
+  --text-orange: #ffa502;
+  --disabled-bg: #f1d9d9;
+}
+
+body {
+  font-family: 'Courier New', monospace;
+}
