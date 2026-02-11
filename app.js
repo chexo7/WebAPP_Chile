@@ -226,6 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cashflowMensualContainer = document.getElementById('cashflow-mensual-container');
     const cashflowSemanalContainer = document.getElementById('cashflow-semanal-container');
     const cashflowDiarioContainer = document.getElementById('cashflow-diario-container');
+    const cashflowDiarioScrollContainer = cashflowDiarioContainer ? cashflowDiarioContainer.querySelector('.table-responsive') : null;
 
     // --- ELEMENTOS PESTAÑA EXPORTACIÓN ---
     const exportYearSelect = document.getElementById('export-year-select');
@@ -310,6 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let pendingDefaultChartRange = null;
     let lastChartRangeKey = 'all';
     let activeCashflowPeriodicity = 'Mensual';
+    let pendingCashflowDailyAutoScroll = false;
     let activePaymentsPeriodicity = 'Mensual';
     const cashflowPeriodDatesMap = { Mensual: [], Semanal: [], Diario: [] };
     const cashflowCategoryTotalsMap = { Mensual: [], Semanal: [], Diario: [] };
@@ -1556,7 +1558,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeButton) activeButton.classList.add('active');
 
         if (tabId === 'flujo-caja') {
-            setPeriodicity(activeCashflowPeriodicity, 'cashflow');
+            pendingCashflowDailyAutoScroll = true;
+            setPeriodicity('Diario', 'cashflow');
         }
         if (tabId === 'grafico') {
             setPeriodicity(activeCashflowPeriodicity, 'chart');
@@ -4295,6 +4298,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         highlightCurrentPeriodColumn(periodicity, tableHeadEl, tableBodyEl, periodDates);
+        if (periodicity === 'Diario' && pendingCashflowDailyAutoScroll) {
+            autoScrollDailyCashflowToCurrentDay(tableHeadEl, periodDates);
+            pendingCashflowDailyAutoScroll = false;
+        }
         attachCashflowCellListeners(tableBodyEl);
 
         if (periodicity === activeCashflowPeriodicity) {
@@ -5670,6 +5677,22 @@ function getMondayOfWeek(year, week) {
         if (headerCells[idx + 1]) headerCells[idx + 1].classList.add('current-period');
         Array.from(bodyEl.rows).forEach(row => {
             if (row.cells[idx + 1]) row.cells[idx + 1].classList.add('current-period');
+        });
+    }
+
+    function autoScrollDailyCashflowToCurrentDay(headEl, periodDates) {
+        if (!cashflowDiarioScrollContainer || !headEl) return;
+        const currentDayIndex = findCurrentPeriodIndex(periodDates, 'Diario');
+        if (currentDayIndex === -1) return;
+
+        const headerCells = headEl.querySelectorAll('th');
+        const lookbackCellIndex = Math.max(1, currentDayIndex - 1);
+        const anchorCell = headerCells[lookbackCellIndex] || headerCells[currentDayIndex + 1];
+        if (!anchorCell) return;
+
+        cashflowDiarioScrollContainer.scrollTo({
+            left: Math.max(0, anchorCell.offsetLeft),
+            behavior: 'smooth'
         });
     }
 
