@@ -316,6 +316,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const cashflowCategoryTotalsMap = { Mensual: [], Semanal: [], Diario: [] };
     const breakdownPopup = document.getElementById('cashflow-breakdown-popup');
     let exportDailyCache = null;
+    let usdClpCacheVersion = 0;
+    const cashflowComputationCache = new Map();
+    let warmupIdleHandle = null;
     let hoverTimer = null;
     let hoverStartX = 0;
     let hoverStartY = 0;
@@ -1694,6 +1697,7 @@ document.addEventListener('DOMContentLoaded', () => {
         latestUsdClpRateTimestamp = timestamp || Date.now();
         const todayKey = getDateKey(new Date());
         if (todayKey) usdClpRateCache[todayKey] = rate;
+        usdClpCacheVersion++;
     }
 
     restorePersistedUsdClpRate();
@@ -1711,7 +1715,158 @@ document.addEventListener('DOMContentLoaded', () => {
         usdClpRateCache[key] = rate;
         latestUsdClpRate = rate;
         latestUsdClpRateTimestamp = Date.now();
+        usdClpCacheVersion++;
         persistLatestUsdClpRate(rate, latestUsdClpRateTimestamp);
+    }
+
+    function getIdleCallback() {
+        if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+            return window.requestIdleCallback.bind(window);
+        }
+        return (callback) => setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 16 }), 60);
+    }
+
+    function cancelIdleCallbackSafe(handle) {
+        if (!handle) return;
+        if (typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+            window.cancelIdleCallback(handle);
+            return;
+        }
+        clearTimeout(handle);
+    }
+
+    function buildCashflowDataSignature(sourceData) {
+        if (!sourceData) return 'no-data';
+        const normalizeDate = (value) => {
+            if (!value) return null;
+            const d = toUTCDate(value);
+            return d instanceof Date && !isNaN(d.getTime()) ? getISODateString(d) : null;
+        };
+        const incomes = (sourceData.incomes || []).map(inc => ({
+            name: inc.name || '',
+            net_monthly: parseFloat(inc.net_monthly || 0),
+            currency: inc.currency || 'USD',
+            frequency: inc.frequency || 'Mensual',
+            day_of_week: inc.day_of_week || null,
+            is_reimbursement: !!inc.is_reimbursement,
+            reimbursement_category: inc.reimbursement_category || null,
+            start_date: normalizeDate(inc.start_date),
+            end_date: normalizeDate(inc.end_date)
+        }));
+        const expenses = (sourceData.expenses || []).map(exp => ({
+            name: exp.name || '',
+            amount: parseFloat(exp.amount || 0),
+            currency: exp.currency || 'USD',
+            category: exp.category || '',
+            type: exp.type || null,
+            frequency: exp.frequency || 'Mensual',
+            day_of_week: exp.day_of_week || null,
+            installments: parseInt(exp.installments || 1, 10),
+            is_real: !!exp.is_real,
+            movement_date: normalizeDate(exp.movement_date),
+            start_date: normalizeDate(exp.start_date),
+            end_date: normalizeDate(exp.end_date)
+        }));
+        const signatureObject = {
+            analysis_start_date: normalizeDate(sourceData.analysis_start_date),
+            analysis_duration: parseInt(sourceData.analysis_duration || 0, 10),
+            analysis_initial_balance: parseFloat(sourceData.analysis_initial_balance || 0),
+            use_instant_expenses: !!sourceData.use_instant_expenses,
+            expense_categories: sourceData.expense_categories || {},
+            incomes,
+            expenses,
+            usdClpCacheVersion
+        };
+        return JSON.stringify(signatureObject);
+    }
+
+    async function getCashflowComputation(periodicity, signature = null) {
+        if (!currentBackupData) return null;
+        const baseSignature = signature || buildCashflowDataSignature(currentBackupData);
+        const cacheKey = `${periodicity}::${baseSignature}`;
+        if (cashflowComputationCache.has(cacheKey)) {
+            return cashflowComputationCache.get(cacheKey);
+        }
+
+        const computationPromise = (async () => {
+            let baseStartDate = currentBackupData.analysis_start_date;
+            if (typeof baseStartDate === 'string') baseStartDate = toUTCDate(baseStartDate);
+            if (!(baseStartDate instanceof Date) || isNaN(baseStartDate)) {
+                return null;
+            }
+
+            const monthStart = new Date(Date.UTC(baseStartDate.getUTCFullYear(), baseStartDate.getUTCMonth(), 1));
+            let analysisStart = monthStart;
+            let duration = currentBackupData.analysis_duration;
+
+            if (periodicity === 'Semanal') {
+                analysisStart = getPeriodStartDate(monthStart, 'Semanal');
+                const endOfLastMonth = getPeriodEndDate(addMonths(monthStart, duration - 1), 'Mensual');
+                duration = 0;
+                let d = new Date(analysisStart);
+                while (d <= endOfLastMonth) { duration++; d = addWeeks(d, 1); }
+            } else if (periodicity === 'Diario') {
+                analysisStart = getPeriodStartDate(monthStart, 'Diario');
+                const endOfLastMonth = getPeriodEndDate(addMonths(monthStart, duration - 1), 'Mensual');
+                duration = 0;
+                let d = new Date(analysisStart);
+                while (d <= endOfLastMonth) { duration++; d = addDays(d, 1); }
+            }
+
+            const tempCalcData = {
+                ...currentBackupData,
+                analysis_start_date: analysisStart,
+                analysis_duration: duration,
+                analysis_periodicity: periodicity,
+                incomes: (currentBackupData.incomes || []).map(inc => ({
+                    ...inc,
+                    start_date: inc.start_date ? new Date(inc.start_date) : null,
+                    end_date: inc.end_date ? new Date(inc.end_date) : null
+                })),
+                expenses: (currentBackupData.expenses || []).map(exp => ({
+                    ...exp,
+                    start_date: exp.start_date ? new Date(exp.start_date) : null,
+                    end_date: exp.end_date ? new Date(exp.end_date) : null
+                }))
+            };
+
+            const rateDateCandidates = [];
+            let periodCursor = new Date(analysisStart.getTime());
+            for (let i = 0; i < duration; i++) {
+                const periodStart = getPeriodStartDate(periodCursor, periodicity);
+                const periodEnd = getPeriodEndDate(periodCursor, periodicity);
+                rateDateCandidates.push(...collectUsdRateDatesForExpenses(tempCalcData.expenses, periodStart, periodEnd, tempCalcData.use_instant_expenses));
+                rateDateCandidates.push(...collectUsdRateDatesForIncomes(tempCalcData.incomes, periodStart, periodEnd, periodicity));
+                periodCursor = advancePeriodStart(periodStart, periodicity);
+            }
+
+            await ensureUsdClpRatesForDates(rateDateCandidates);
+            const calculation = calculateCashFlowData(tempCalcData);
+            return {
+                ...calculation,
+                analysisStart,
+                duration,
+                tempCalcData
+            };
+        })();
+
+        cashflowComputationCache.set(cacheKey, computationPromise);
+        return computationPromise;
+    }
+
+    function scheduleCashflowWarmup(activePeriodicity, signature = null) {
+        cancelIdleCallbackSafe(warmupIdleHandle);
+        const idle = getIdleCallback();
+        const periodsToWarm = ['Mensual', 'Semanal', 'Diario'].filter(period => period !== activePeriodicity);
+        warmupIdleHandle = idle(async () => {
+            for (const period of periodsToWarm) {
+                try {
+                    await getCashflowComputation(period, signature);
+                } catch (error) {
+                    console.warn(`No se pudo precalcular flujo ${period}:`, error);
+                }
+            }
+        });
     }
 
     async function fetchUsdClpFromOpenErApi() {
@@ -3548,9 +3703,15 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             exportDailyCache = null;
             updateAnalysisModeLabels();
-            await renderCashflowTableFor('Mensual', cashflowMensualTableHead, cashflowMensualTableBody, cashflowMensualTitle);
-            await renderCashflowTableFor('Semanal', cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle);
-            await renderCashflowTableFor('Diario', cashflowDiarioTableHead, cashflowDiarioTableBody, cashflowDiarioTitle);
+            const signature = buildCashflowDataSignature(currentBackupData);
+            await renderCashflowTableFor('Mensual', cashflowMensualTableHead, cashflowMensualTableBody, cashflowMensualTitle, signature);
+            if (activeCashflowPeriodicity !== 'Mensual') {
+                const tableConfig = activeCashflowPeriodicity === 'Semanal'
+                    ? [cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle]
+                    : [cashflowDiarioTableHead, cashflowDiarioTableBody, cashflowDiarioTitle];
+                await renderCashflowTableFor(activeCashflowPeriodicity, tableConfig[0], tableConfig[1], tableConfig[2], signature);
+            }
+            scheduleCashflowWarmup(activeCashflowPeriodicity, signature);
             refreshBudgetSummaryIfReady();
             await renderExportReportForSelectedMonth();
         } catch (error) {
@@ -4135,68 +4296,28 @@ document.addEventListener('DOMContentLoaded', () => {
         XLSX.writeFile(wb, filename);
     }
 
-    async function renderCashflowTableFor(periodicity, tableHeadEl, tableBodyEl, titleEl) {
+    async function renderCashflowTableFor(periodicity, tableHeadEl, tableBodyEl, titleEl, signature = null) {
         if (!currentBackupData || !tableBodyEl || !tableHeadEl) return;
         tableHeadEl.innerHTML = '';
         tableBodyEl.innerHTML = '';
 
-        let baseStartDate = currentBackupData.analysis_start_date;
-        if (typeof baseStartDate === 'string') baseStartDate = toUTCDate(baseStartDate);
-        if (!(baseStartDate instanceof Date) || isNaN(baseStartDate)) {
+        const computation = await getCashflowComputation(periodicity, signature);
+        if (!computation) {
             tableBodyEl.innerHTML = '<tr><td colspan="2">Error: Fecha de inicio inválida.</td></tr>';
             return;
         }
 
-        const monthStart = new Date(Date.UTC(baseStartDate.getUTCFullYear(), baseStartDate.getUTCMonth(), 1));
-        let analysisStart = monthStart;
-        let duration = currentBackupData.analysis_duration;
-
-        if (periodicity === 'Semanal') {
-            analysisStart = getPeriodStartDate(monthStart, 'Semanal');
-            const endOfLastMonth = getPeriodEndDate(addMonths(monthStart, duration - 1), 'Mensual');
-            duration = 0; let d = new Date(analysisStart);
-            while (d <= endOfLastMonth) { duration++; d = addWeeks(d, 1); }
-        } else if (periodicity === 'Diario') {
-            analysisStart = getPeriodStartDate(monthStart, 'Diario');
-            const endOfLastMonth = getPeriodEndDate(addMonths(monthStart, duration - 1), 'Mensual');
-            duration = 0; let d = new Date(analysisStart);
-            while (d <= endOfLastMonth) { duration++; d = addDays(d, 1); }
-        }
-
-        const tempCalcData = {
-            ...currentBackupData,
-            analysis_start_date: analysisStart,
-            analysis_duration: duration,
-            analysis_periodicity: periodicity,
-            incomes: (currentBackupData.incomes || []).map(inc => ({
-                ...inc,
-                start_date: inc.start_date ? new Date(inc.start_date) : null,
-                end_date: inc.end_date ? new Date(inc.end_date) : null
-            })),
-            expenses: (currentBackupData.expenses || []).map(exp => ({
-                ...exp,
-                start_date: exp.start_date ? new Date(exp.start_date) : null,
-                end_date: exp.end_date ? new Date(exp.end_date) : null
-            }))
-        };
-
-        const rateDateCandidates = [];
-        let periodCursor = new Date(analysisStart.getTime());
-        for (let i = 0; i < duration; i++) {
-            const periodStart = getPeriodStartDate(periodCursor, periodicity);
-            const periodEnd = getPeriodEndDate(periodCursor, periodicity);
-            rateDateCandidates.push(
-                ...collectUsdRateDatesForExpenses(tempCalcData.expenses, periodStart, periodEnd, tempCalcData.use_instant_expenses)
-            );
-            rateDateCandidates.push(
-                ...collectUsdRateDatesForIncomes(tempCalcData.incomes, periodStart, periodEnd, periodicity)
-            );
-            periodCursor = advancePeriodStart(periodStart, periodicity);
-        }
-
-        await ensureUsdClpRatesForDates(rateDateCandidates);
-
-        const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData);
+        const {
+            periodDates,
+            income_p,
+            fixed_exp_p,
+            var_exp_p,
+            net_flow_p,
+            end_bal_p,
+            expenses_by_cat_p,
+            analysisStart,
+            tempCalcData
+        } = computation;
         cashflowPeriodDatesMap[periodicity] = periodDates;
         cashflowCategoryTotalsMap[periodicity] = expenses_by_cat_p;
 
