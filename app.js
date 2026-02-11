@@ -667,7 +667,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showMainContentScreen() {
         showElement(mainContentContainer);
-        activateTab('log'); // Activate Log tab by default
+        activateTab('flujo-caja'); // Activate Cashflow tab by default
         fetchAndUpdateUSDCLPRate(); // Fetch USD/CLP rate when main content is shown
         if (typeof updatePieMonthChart === 'function') updatePieMonthChart();
         if (typeof updatePieWeekChart === 'function') updatePieWeekChart();
@@ -5690,7 +5690,7 @@ function getMondayOfWeek(year, week) {
         const targetIdx = currentIdx >= 0 ? currentIdx : fallbackIdx;
         if (targetIdx < 0) return;
 
-        const leftAnchorIdx = Math.max(targetIdx - 2, 0);
+        const leftAnchorIdx = Math.max(targetIdx - 3, 0);
         const headerCells = headEl.querySelectorAll('th');
         const anchorCell = headerCells[leftAnchorIdx + 1];
         if (!anchorCell) return;
