@@ -42,6 +42,16 @@
             <p id="loading-message" style="display:none;"></p>
         </div>
 
+        <div id="app-loading-overlay" class="app-loading-overlay" style="display:none;" aria-live="polite" aria-label="Cargando datos">
+            <div class="app-loading-window">
+                <h3 id="app-loading-title">Cargando información</h3>
+                <div class="app-loading-progress-track">
+                    <div id="app-loading-progress-bar" class="app-loading-progress-bar"></div>
+                </div>
+                <p id="app-loading-description" class="app-loading-description">Preparando datos...</p>
+            </div>
+        </div>
+
         <div id="main-content-container" style="display:none;">
             <div class="tabs-container">
                 <button class="tab-button" data-tab="gastos">Gastos</button>
