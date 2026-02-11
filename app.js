@@ -85,6 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
     const printSummaryButton = document.getElementById('print-summary-button');
+    const cycleVisualStyleButton = document.getElementById('cycle-visual-style-button');
+    const currentVisualStyleLabel = document.getElementById('current-visual-style-label');
     const creditCardForm = document.getElementById('credit-card-form');
     const creditCardNameInput = document.getElementById('credit-card-name');
     const creditCardCutoffInput = document.getElementById('credit-card-cutoff');
@@ -94,6 +96,88 @@ document.addEventListener('DOMContentLoaded', () => {
     const addCreditCardButton = document.getElementById('add-credit-card-button');
     const cancelEditCreditCardButton = document.getElementById('cancel-edit-credit-card-button');
     let editingCreditCardIndex = null;
+
+    const VISUAL_THEMES = [
+        {
+            id: 'aurora',
+            name: 'Aurora Financiera',
+            palette: {
+                '--primary-color': '#007aff',
+                '--primary-hover': '#0060d5',
+                '--accent-color': '#34c759',
+                '--accent-hover': '#28a745',
+                '--danger-color': '#ff3b30',
+                '--danger-hover': '#e33228',
+                '--text-color': '#1c1c1e',
+                '--light-text': '#6e6e73',
+                '--background': '#f5f5f7',
+                '--card-bg': '#ffffff',
+                '--border-color': '#d2d2d7',
+                '--header-bg': '#f0f0f5',
+                '--alt-row-bg': '#f9f9fa',
+                '--row-hover-bg': '#e9e9ec',
+                '--body-header-row-bg': '#f1f1f4',
+                '--text-green': '#34c759',
+                '--text-red': '#ff3b30',
+                '--text-orange': '#ff9500',
+                '--disabled-bg': '#f0f0f0',
+                '--shadow': '0 2px 6px rgba(0, 0, 0, 0.08)'
+            }
+        },
+        {
+            id: 'midnight',
+            name: 'Neón Nocturno',
+            palette: {
+                '--primary-color': '#6ca2ff',
+                '--primary-hover': '#8bb7ff',
+                '--accent-color': '#30d8b8',
+                '--accent-hover': '#28c3a8',
+                '--danger-color': '#ff6b8a',
+                '--danger-hover': '#ff4f74',
+                '--text-color': '#e9f1ff',
+                '--light-text': '#a7b7d1',
+                '--background': '#0c1220',
+                '--card-bg': '#121b2c',
+                '--border-color': '#26364f',
+                '--header-bg': '#16233a',
+                '--alt-row-bg': '#101a2b',
+                '--row-hover-bg': '#1e2f4a',
+                '--body-header-row-bg': '#1a2942',
+                '--text-green': '#4be3c2',
+                '--text-red': '#ff7d98',
+                '--text-orange': '#ffb76d',
+                '--disabled-bg': '#1d2a41',
+                '--shadow': '0 8px 20px rgba(0, 0, 0, 0.35)'
+            }
+        },
+        {
+            id: 'sunset',
+            name: 'Atardecer Cálido',
+            palette: {
+                '--primary-color': '#8f4fff',
+                '--primary-hover': '#7c40f5',
+                '--accent-color': '#ff8a4b',
+                '--accent-hover': '#ff7430',
+                '--danger-color': '#ff4b5e',
+                '--danger-hover': '#f33649',
+                '--text-color': '#34242d',
+                '--light-text': '#7c5b68',
+                '--background': '#fff4ee',
+                '--card-bg': '#fffdfb',
+                '--border-color': '#f1d6ca',
+                '--header-bg': '#ffe8dc',
+                '--alt-row-bg': '#fff2eb',
+                '--row-hover-bg': '#ffe0d1',
+                '--body-header-row-bg': '#ffe9de',
+                '--text-green': '#1f9d68',
+                '--text-red': '#da3353',
+                '--text-orange': '#db8b1b',
+                '--disabled-bg': '#f6e6de',
+                '--shadow': '0 6px 16px rgba(143, 79, 255, 0.14)'
+            }
+        }
+    ];
+    const DEFAULT_VISUAL_THEME_ID = VISUAL_THEMES[0].id;
 
     // --- ELEMENTOS PESTAÑA INGRESOS ---
     const incomeForm = document.getElementById('income-form');
@@ -827,6 +911,7 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
             use_instant_expenses: false,
+            visual_theme: DEFAULT_VISUAL_THEME_ID,
             incomes: [],
             expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
             expenses: [],
@@ -913,6 +998,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hydrated.analysis_initial_balance = parseFloat(hydrated.analysis_initial_balance) || 0;
         hydrated.display_currency_symbol = hydrated.display_currency_symbol || "$";
         hydrated.use_instant_expenses = !!hydrated.use_instant_expenses;
+        hydrated.visual_theme = getVisualThemeById(hydrated.visual_theme).id;
 
         return hydrated;
     }
@@ -1973,6 +2059,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
+
+    function getVisualThemeById(themeId) {
+        return VISUAL_THEMES.find(theme => theme.id === themeId) || VISUAL_THEMES[0];
+    }
+
+    function applyVisualTheme(themeId) {
+        const selectedTheme = getVisualThemeById(themeId);
+        const rootStyle = document.documentElement.style;
+        Object.entries(selectedTheme.palette).forEach(([varName, varValue]) => {
+            rootStyle.setProperty(varName, varValue);
+        });
+        if (currentVisualStyleLabel) {
+            currentVisualStyleLabel.textContent = `Estilo actual: ${selectedTheme.name}`;
+        }
+    }
+
+    function cycleVisualTheme() {
+        if (!currentBackupData) {
+            alert('Primero carga una versión para ajustar el estilo visual.');
+            return;
+        }
+        const activeThemeId = currentBackupData.visual_theme || DEFAULT_VISUAL_THEME_ID;
+        const currentIndex = VISUAL_THEMES.findIndex(theme => theme.id === activeThemeId);
+        const nextTheme = VISUAL_THEMES[(currentIndex + 1 + VISUAL_THEMES.length) % VISUAL_THEMES.length];
+        currentBackupData.visual_theme = nextTheme.id;
+        applyVisualTheme(nextTheme.id);
+    }
+
     function populateSettingsForm() {
         if (!currentBackupData) return;
         analysisDurationInput.value = currentBackupData.analysis_duration || 12;
@@ -1980,6 +2094,7 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisInitialBalanceInput.value = currentBackupData.analysis_initial_balance || 0;
         displayCurrencySymbolInput.value = currentBackupData.display_currency_symbol || "$";
         if (instantExpenseToggle) instantExpenseToggle.checked = !!currentBackupData.use_instant_expenses;
+        applyVisualTheme(currentBackupData.visual_theme || DEFAULT_VISUAL_THEME_ID);
         // usdClpRateInput.value = currentBackupData.usd_clp_rate || ''; // No longer used
         // updateUsdClpInfoLabel(); // This will be handled by fetchAndUpdateUSDCLPRate
         updateAnalysisDurationLabel();
@@ -2142,6 +2257,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentBackupData.analysis_initial_balance = parseFloat(analysisInitialBalanceInput.value);
         currentBackupData.display_currency_symbol = displayCurrencySymbolInput.value.trim() || "$";
         currentBackupData.use_instant_expenses = instantExpenseToggle ? instantExpenseToggle.checked : false;
+        currentBackupData.visual_theme = currentBackupData.visual_theme || DEFAULT_VISUAL_THEME_ID;
         // currentBackupData.usd_clp_rate = parseFloat(usdClpRateInput.value) || null; // No longer stored
 
         updateAnalysisDurationLabel();
@@ -2156,6 +2272,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderBudgetSummaryTableForSelectedPeriod();
     });
+
+    if (cycleVisualStyleButton) {
+        cycleVisualStyleButton.addEventListener('click', cycleVisualTheme);
+    }
 
     if (printSummaryButton) {
         printSummaryButton.addEventListener('click', printCashflowSummary);
