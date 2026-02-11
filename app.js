@@ -310,6 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let pendingDefaultChartRange = null;
     let lastChartRangeKey = 'all';
     let activeCashflowPeriodicity = 'Mensual';
+    let shouldAutoFocusDailyCashflow = false;
     let activePaymentsPeriodicity = 'Mensual';
     const cashflowPeriodDatesMap = { Mensual: [], Semanal: [], Diario: [] };
     const cashflowCategoryTotalsMap = { Mensual: [], Semanal: [], Diario: [] };
@@ -666,7 +667,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showMainContentScreen() {
         showElement(mainContentContainer);
-        activateTab('log'); // Activate Log tab by default
+        activateTab('flujo-caja'); // Activate Cashflow tab by default
         fetchAndUpdateUSDCLPRate(); // Fetch USD/CLP rate when main content is shown
         if (typeof updatePieMonthChart === 'function') updatePieMonthChart();
         if (typeof updatePieWeekChart === 'function') updatePieWeekChart();
@@ -1556,7 +1557,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeButton) activeButton.classList.add('active');
 
         if (tabId === 'flujo-caja') {
-            setPeriodicity(activeCashflowPeriodicity, 'cashflow');
+            shouldAutoFocusDailyCashflow = true;
+            setPeriodicity('Diario', 'cashflow');
         }
         if (tabId === 'grafico') {
             setPeriodicity(activeCashflowPeriodicity, 'chart');
@@ -4295,6 +4297,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         highlightCurrentPeriodColumn(periodicity, tableHeadEl, tableBodyEl, periodDates);
+        if (periodicity === 'Diario' && shouldAutoFocusDailyCashflow) {
+            scrollDailyCashflowToCurrentDay(tableHeadEl, periodDates);
+            shouldAutoFocusDailyCashflow = false;
+        }
         attachCashflowCellListeners(tableBodyEl);
 
         if (periodicity === activeCashflowPeriodicity) {
@@ -5671,6 +5677,30 @@ function getMondayOfWeek(year, week) {
         Array.from(bodyEl.rows).forEach(row => {
             if (row.cells[idx + 1]) row.cells[idx + 1].classList.add('current-period');
         });
+    }
+
+    function scrollDailyCashflowToCurrentDay(headEl, periodDates) {
+        if (!headEl || !Array.isArray(periodDates) || periodDates.length === 0) return;
+        const tableContainer = headEl.closest('.table-responsive');
+        if (!tableContainer) return;
+
+        const today = new Date();
+        const currentIdx = findCurrentPeriodIndex(periodDates, 'Diario');
+        const fallbackIdx = findNearestPeriodIndex(periodDates, today);
+        const targetIdx = currentIdx >= 0 ? currentIdx : fallbackIdx;
+        if (targetIdx < 0) return;
+
+        const headerCells = headEl.querySelectorAll('th');
+        const targetCell = headerCells[targetIdx + 1];
+        if (!targetCell) return;
+
+        const containerWidth = tableContainer.clientWidth || 0;
+        const targetCenter = targetCell.offsetLeft + (targetCell.offsetWidth / 2);
+        const centeredLeft = targetCenter - (containerWidth / 2);
+        const maxScrollLeft = Math.max(tableContainer.scrollWidth - containerWidth, 0);
+        const targetLeft = Math.min(Math.max(centeredLeft, 0), maxScrollLeft);
+
+        tableContainer.scrollTo({ left: targetLeft, behavior: 'smooth' });
     }
 
     function attachCashflowCellListeners(tbodyEl) {
