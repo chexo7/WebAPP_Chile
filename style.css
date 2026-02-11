@@ -24,6 +24,66 @@
   --disabled-bg: #f0f0f0;
 }
 
+body[data-theme="neon-andino"] {
+  --primary-color: #37d6ff;
+  --primary-hover: #14b9e6;
+  --accent-color: #ff4fd8;
+  --accent-hover: #e13fbe;
+  --danger-color: #ff6b6b;
+  --danger-hover: #ff5252;
+  --text-color: #eef6ff;
+  --light-text: #c3d7f3;
+  --background: linear-gradient(140deg, #071321 0%, #101d34 60%, #191133 100%);
+  --card-bg: #12243d;
+  --border-color: #2e4a71;
+  --header-bg: #183154;
+  --shadow: 0 10px 25px rgba(12, 26, 56, 0.45);
+  --alt-row-bg: #152b47;
+  --row-hover-bg: #223a5e;
+  --body-header-row-bg: #1a3457;
+  --disabled-bg: #1a2f49;
+}
+
+body[data-theme="editorial-premium"] {
+  --primary-color: #3f3a35;
+  --primary-hover: #2c2824;
+  --accent-color: #7a8d5d;
+  --accent-hover: #64764b;
+  --danger-color: #b2463d;
+  --danger-hover: #8f392f;
+  --text-color: #2f2924;
+  --light-text: #6c5f53;
+  --background: #f6f1e8;
+  --card-bg: #fffdf7;
+  --border-color: #d8cbba;
+  --header-bg: #f1e8d8;
+  --shadow: 0 8px 18px rgba(84, 66, 43, 0.12);
+  --alt-row-bg: #f8f2e8;
+  --row-hover-bg: #efe2ce;
+  --body-header-row-bg: #efe3d1;
+  --disabled-bg: #ebe3d7;
+}
+
+body[data-theme="bruma-pacifico"] {
+  --primary-color: #0d8ea0;
+  --primary-hover: #0a7483;
+  --accent-color: #4db7ac;
+  --accent-hover: #3f9f95;
+  --danger-color: #e56f61;
+  --danger-hover: #d35a4c;
+  --text-color: #1c3b4f;
+  --light-text: #4a6f80;
+  --background: linear-gradient(145deg, #e6f5f7 0%, #d9edf2 45%, #f0f7f4 100%);
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --border-color: #bbd7de;
+  --header-bg: #dfeff3;
+  --shadow: 0 8px 22px rgba(37, 93, 110, 0.14);
+  --alt-row-bg: rgba(238, 247, 249, 0.95);
+  --row-hover-bg: rgba(221, 238, 242, 0.95);
+  --body-header-row-bg: rgba(218, 234, 238, 0.95);
+  --disabled-bg: #e4edf0;
+}
+
 /* Reseteo y estilos base */
 * {
   margin: 0;

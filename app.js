@@ -81,6 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const analysisStartDateInput = document.getElementById('analysis-start-date-input');
     const analysisInitialBalanceInput = document.getElementById('analysis-initial-balance-input');
     const displayCurrencySymbolInput = document.getElementById('display-currency-symbol-input');
+    const uiThemeSelect = document.getElementById('ui-theme-select');
     const instantExpenseToggle = document.getElementById('instant-expense-toggle');
     const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
@@ -94,6 +95,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const addCreditCardButton = document.getElementById('add-credit-card-button');
     const cancelEditCreditCardButton = document.getElementById('cancel-edit-credit-card-button');
     let editingCreditCardIndex = null;
+    const AVAILABLE_UI_THEMES = ['clasico', 'neon-andino', 'editorial-premium', 'bruma-pacifico'];
+
+    function sanitizeUiTheme(themeValue) {
+        return AVAILABLE_UI_THEMES.includes(themeValue) ? themeValue : 'clasico';
+    }
+
+    function applyUITheme(themeValue) {
+        const safeTheme = sanitizeUiTheme(themeValue);
+        document.body.setAttribute('data-theme', safeTheme);
+    }
 
     // --- ELEMENTOS PESTAÑA INGRESOS ---
     const incomeForm = document.getElementById('income-form');
@@ -826,6 +837,7 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis_periodicity: "Mensual",
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
+            ui_theme: 'clasico',
             use_instant_expenses: false,
             incomes: [],
             expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
@@ -912,6 +924,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hydrated.analysis_periodicity = hydrated.analysis_periodicity || "Mensual";
         hydrated.analysis_initial_balance = parseFloat(hydrated.analysis_initial_balance) || 0;
         hydrated.display_currency_symbol = hydrated.display_currency_symbol || "$";
+        hydrated.ui_theme = sanitizeUiTheme(hydrated.ui_theme);
         hydrated.use_instant_expenses = !!hydrated.use_instant_expenses;
 
         return hydrated;
@@ -1166,6 +1179,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (getISODateString(new Date(prevData.analysis_start_date)) !== getISODateString(new Date(currentData.analysis_start_date))) details.push(`Ajuste: Fecha de inicio cambiada de ${getISODateString(new Date(prevData.analysis_start_date))} a ${getISODateString(new Date(currentData.analysis_start_date))}.`);
         if (prevData.analysis_initial_balance !== currentData.analysis_initial_balance) details.push(`Ajuste: Saldo inicial cambiado de ${formatCurrencyJS(prevData.analysis_initial_balance, symbol)} a ${formatCurrencyJS(currentData.analysis_initial_balance, symbol)}.`);
         if (prevData.display_currency_symbol !== currentData.display_currency_symbol) details.push(`Ajuste: Símbolo de moneda cambiado de '${prevData.display_currency_symbol}' a '${currentData.display_currency_symbol}'.`);
+        if (sanitizeUiTheme(prevData.ui_theme) !== sanitizeUiTheme(currentData.ui_theme)) {
+            details.push(`Ajuste: Estilo visual cambiado de '${sanitizeUiTheme(prevData.ui_theme)}' a '${sanitizeUiTheme(currentData.ui_theme)}'.`);
+        }
     
         // --- Income Change Detection ---
         const prevIncomes = prevData.incomes || [];
@@ -1408,6 +1424,7 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis_periodicity: "Mensual",
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
+            ui_theme: 'clasico',
             use_instant_expenses: false,
             // usd_clp_rate: null, // No longer stored
             incomes: [],
@@ -1979,6 +1996,8 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisStartDateInput.value = getISODateString(currentBackupData.analysis_start_date ? new Date(currentBackupData.analysis_start_date) : new Date());
         analysisInitialBalanceInput.value = currentBackupData.analysis_initial_balance || 0;
         displayCurrencySymbolInput.value = currentBackupData.display_currency_symbol || "$";
+        if (uiThemeSelect) uiThemeSelect.value = sanitizeUiTheme(currentBackupData.ui_theme);
+        applyUITheme(currentBackupData.ui_theme);
         if (instantExpenseToggle) instantExpenseToggle.checked = !!currentBackupData.use_instant_expenses;
         // usdClpRateInput.value = currentBackupData.usd_clp_rate || ''; // No longer used
         // updateUsdClpInfoLabel(); // This will be handled by fetchAndUpdateUSDCLPRate
@@ -2141,6 +2160,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentBackupData.analysis_start_date = toUTCDate(analysisStartDateInput.value);
         currentBackupData.analysis_initial_balance = parseFloat(analysisInitialBalanceInput.value);
         currentBackupData.display_currency_symbol = displayCurrencySymbolInput.value.trim() || "$";
+        currentBackupData.ui_theme = sanitizeUiTheme(uiThemeSelect ? uiThemeSelect.value : currentBackupData.ui_theme);
+        applyUITheme(currentBackupData.ui_theme);
         currentBackupData.use_instant_expenses = instantExpenseToggle ? instantExpenseToggle.checked : false;
         // currentBackupData.usd_clp_rate = parseFloat(usdClpRateInput.value) || null; // No longer stored
 
