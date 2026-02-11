@@ -784,6 +784,18 @@
     <div id="cashflow-breakdown-popup" class="breakdown-popup"></div>
 
     <script src="config.js"></script>
+
+    <div id="app-loading-overlay" class="app-loading-overlay" style="display:none;" aria-live="polite" aria-busy="true">
+        <div class="app-loading-modal" role="status" aria-label="Cargando aplicación">
+            <h3>Preparando tu información</h3>
+            <p id="app-loading-title">Iniciando carga...</p>
+            <div class="app-loading-progress-track" aria-hidden="true">
+                <div id="app-loading-progress-fill" class="app-loading-progress-fill"></div>
+            </div>
+            <p id="app-loading-detail" class="small-text">Espera un momento por favor.</p>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
