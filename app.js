@@ -93,6 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const creditCardExample = document.getElementById('credit-card-example');
     const addCreditCardButton = document.getElementById('add-credit-card-button');
     const cancelEditCreditCardButton = document.getElementById('cancel-edit-credit-card-button');
+    const cycleThemeButton = document.getElementById('cycle-theme-button');
+    const activeThemeDescription = document.getElementById('active-theme-description');
     let editingCreditCardIndex = null;
 
     // --- ELEMENTOS PESTAÑA INGRESOS ---
@@ -166,6 +168,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     let parsedJsonExpenses = [];
     let lastImportedJsonRange = null;
+
+    const APP_THEMES = [
+        { id: 'aurora', label: 'Aurora', description: 'Aurora: limpio, fresco y moderno.' },
+        { id: 'graphite', label: 'Graphite Pro', description: 'Graphite Pro: elegante, sobrio y de alto contraste.' },
+        { id: 'sunset', label: 'Sunset Glow', description: 'Sunset Glow: cálido, vibrante y con energía creativa.' }
+    ];
 
     const usdClpRateCache = {};
     const usdClpRatePending = {};
@@ -827,6 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
             use_instant_expenses: false,
+            ui_theme: 'aurora',
             incomes: [],
             expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
             expenses: [],
@@ -913,6 +922,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hydrated.analysis_initial_balance = parseFloat(hydrated.analysis_initial_balance) || 0;
         hydrated.display_currency_symbol = hydrated.display_currency_symbol || "$";
         hydrated.use_instant_expenses = !!hydrated.use_instant_expenses;
+        hydrated.ui_theme = APP_THEMES.some(theme => theme.id === hydrated.ui_theme) ? hydrated.ui_theme : 'aurora';
 
         return hydrated;
     }
@@ -1409,6 +1419,7 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
             use_instant_expenses: false,
+            ui_theme: 'aurora',
             // usd_clp_rate: null, // No longer stored
             incomes: [],
             expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
@@ -1973,6 +1984,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
+    function getThemeById(themeId) {
+        return APP_THEMES.find(theme => theme.id === themeId) || APP_THEMES[0];
+    }
+
+    function applyAppTheme(themeId) {
+        const selectedTheme = getThemeById(themeId);
+        document.body.setAttribute('data-theme', selectedTheme.id);
+        if (cycleThemeButton) cycleThemeButton.textContent = `Cambiar estilo: ${selectedTheme.label}`;
+        if (activeThemeDescription) activeThemeDescription.textContent = selectedTheme.description;
+        if (currentBackupData) currentBackupData.ui_theme = selectedTheme.id;
+    }
+
+    function cycleAppTheme() {
+        const activeTheme = document.body.getAttribute('data-theme') || APP_THEMES[0].id;
+        const currentIndex = APP_THEMES.findIndex(theme => theme.id === activeTheme);
+        const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % APP_THEMES.length : 0;
+        applyAppTheme(APP_THEMES[nextIndex].id);
+    }
+
+    if (cycleThemeButton) {
+        cycleThemeButton.addEventListener('click', cycleAppTheme);
+    }
+
     function populateSettingsForm() {
         if (!currentBackupData) return;
         analysisDurationInput.value = currentBackupData.analysis_duration || 12;
@@ -1980,6 +2014,7 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisInitialBalanceInput.value = currentBackupData.analysis_initial_balance || 0;
         displayCurrencySymbolInput.value = currentBackupData.display_currency_symbol || "$";
         if (instantExpenseToggle) instantExpenseToggle.checked = !!currentBackupData.use_instant_expenses;
+        applyAppTheme(currentBackupData.ui_theme || 'aurora');
         // usdClpRateInput.value = currentBackupData.usd_clp_rate || ''; // No longer used
         // updateUsdClpInfoLabel(); // This will be handled by fetchAndUpdateUSDCLPRate
         updateAnalysisDurationLabel();
@@ -2142,6 +2177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentBackupData.analysis_initial_balance = parseFloat(analysisInitialBalanceInput.value);
         currentBackupData.display_currency_symbol = displayCurrencySymbolInput.value.trim() || "$";
         currentBackupData.use_instant_expenses = instantExpenseToggle ? instantExpenseToggle.checked : false;
+        currentBackupData.ui_theme = document.body.getAttribute('data-theme') || 'aurora';
         // currentBackupData.usd_clp_rate = parseFloat(usdClpRateInput.value) || null; // No longer stored
 
         updateAnalysisDurationLabel();
