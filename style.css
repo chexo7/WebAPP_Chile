@@ -831,6 +831,54 @@ td.reimbursement-income {
 }
 @keyframes pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
 
+/* Overlay de carga para transición de versión */
+.app-loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(1px);
+}
+
+.app-loading-window {
+  width: min(460px, 92vw);
+  border-radius: 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.25);
+  padding: 22px;
+}
+
+.app-loading-window h3 {
+  margin: 0 0 14px 0;
+  color: var(--text-color);
+}
+
+.app-loading-bar-track {
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.09);
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.app-loading-bar {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary-color), #60a5fa);
+  transition: width 220ms ease;
+}
+
+.app-loading-description {
+  margin: 10px 0 0;
+  color: var(--light-text);
+  font-size: 0.93rem;
+}
+
 /* Tabs Styling */
 .tabs-container {
   display: flex;

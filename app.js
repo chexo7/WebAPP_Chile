@@ -49,6 +49,34 @@ document.addEventListener('DOMContentLoaded', () => {
     function hideElement(element) {
         setElementDisplay(element, 'none');
     }
+
+    function showAppLoadingOverlay(description = 'Preparando información...', progress = 8) {
+        if (!appLoadingOverlay || !appLoadingBar || !appLoadingDescription) return;
+        appLoadingProgress = Math.max(0, Math.min(100, progress));
+        appLoadingDescription.textContent = description;
+        appLoadingBar.style.width = `${appLoadingProgress}%`;
+        showElement(appLoadingOverlay, 'flex');
+    }
+
+    function updateAppLoadingOverlay(progress, description = null) {
+        if (!appLoadingOverlay || !appLoadingBar || !appLoadingDescription) return;
+        const nextProgress = Math.max(appLoadingProgress, Math.max(0, Math.min(100, progress)));
+        appLoadingProgress = nextProgress;
+        appLoadingBar.style.width = `${nextProgress}%`;
+        if (typeof description === 'string' && description.trim()) {
+            appLoadingDescription.textContent = description;
+        }
+    }
+
+    function hideAppLoadingOverlay(delayMs = 280) {
+        if (!appLoadingOverlay || !appLoadingBar || !appLoadingDescription) return;
+        appLoadingProgress = 0;
+        setTimeout(() => {
+            hideElement(appLoadingOverlay);
+            appLoadingBar.style.width = '0%';
+            appLoadingDescription.textContent = 'Iniciando proceso...';
+        }, delayMs);
+    }
     // --- ELEMENTOS GLOBALES ---
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
@@ -65,6 +93,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadBackupButton = document.getElementById('load-backup-button');
     const loadLatestVersionButton = document.getElementById('load-latest-version-button');
     const loadingMessage = document.getElementById('loading-message');
+    const appLoadingOverlay = document.getElementById('app-loading-overlay');
+    const appLoadingBar = document.getElementById('app-loading-bar');
+    const appLoadingDescription = document.getElementById('app-loading-description');
 
     const mainContentContainer = document.getElementById('main-content-container');
     const tabsContainer = document.querySelector('.tabs-container');
@@ -323,6 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let hoverStartX = 0;
     let hoverStartY = 0;
     let hoveredCell = null;
+    let appLoadingProgress = 0;
 
     // --- ELEMENTOS PESTAÑA BABY STEPS ---
     const babyStepsContainer = document.getElementById('baby-steps-container');
@@ -934,10 +966,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return hydrated;
     }
 
-    function applyBackupDataToApp(backupData, key = null) {
+    async function applyBackupDataToApp(backupData, key = null) {
         if (!backupData) {
             return;
         }
+
+        showAppLoadingOverlay('Cargando versión seleccionada...', 10);
 
         currentBackupData = backupData;
         currentBackupKey = key;
@@ -953,6 +987,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        updateAppLoadingOverlay(24, 'Preparando formularios y categorías...');
         populateSettingsForm();
         renderCreditCards();
         populateExpenseCategoriesDropdowns();
@@ -964,19 +999,27 @@ document.addEventListener('DOMContentLoaded', () => {
         renderReminders();
         renderLogTab();
 
+        updateAppLoadingOverlay(44, 'Configurando períodos de visualización...');
         activePaymentsPeriodicity = currentBackupData.analysis_periodicity || 'Mensual';
         setupPaymentPeriodSelectors();
         setupBudgetPeriodSelectors();
         setupExportSelectors();
         setPaymentPeriodicity(activePaymentsPeriodicity);
-        renderCashflowTable();
+
+        updateAppLoadingOverlay(68, 'Calculando flujo de caja y tablas...');
+        await renderCashflowTable();
         updateAnalysisModeLabels();
-        renderExportReportForSelectedMonth();
+
+        updateAppLoadingOverlay(86, 'Generando gráficos y finalizando detalles...');
 
         hideElement(dataSelectionContainer);
         hideElement(loadingMessage);
         showMainContentScreen();
+
+        updateAppLoadingOverlay(100, 'Todo listo. Ya puedes usar la aplicación.');
+        hideAppLoadingOverlay();
     }
+
 
     function cloneBackupDataForExport(data) {
         return JSON.parse(JSON.stringify(data, (key, value) => {
@@ -1014,7 +1057,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const reader = new FileReader();
-        reader.onload = e => {
+        reader.onload = async e => {
             try {
                 const text = e.target.result;
                 let parsed = JSON.parse(text);
@@ -1049,7 +1092,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const keyFromMetadata = metadata.sourceBackupKey || null;
-                applyBackupDataToApp(hydratedData, keyFromMetadata);
+                await applyBackupDataToApp(hydratedData, keyFromMetadata);
                 if (metadata.savedAt) {
                     const savedDate = new Date(metadata.savedAt);
                     if (!isNaN(savedDate.getTime())) {
@@ -1076,7 +1119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsText(file);
     }
 
-    function loadSpecificBackup(key) {
+    async function loadSpecificBackup(key) {
         const userRef = getUserDataRef();
         if (!userRef) {
             alert("Error: No se pudo obtener la referencia de datos del usuario para cargar el backup.");
@@ -1089,31 +1132,35 @@ document.addEventListener('DOMContentLoaded', () => {
         clearAllDataViews();
         originalLoadedData = null;
 
-        // MODIFICADO: Apunta a `users/${userSubPath}/backups/${key}`
-        userRef.child(`backups/${key}`).once('value')
-            .then(snapshot => {
-                if (snapshot.exists()) {
-                    const hydratedData = hydrateBackupData(snapshot.val());
-                    applyBackupDataToApp(hydratedData, key);
-                    if (backupSelector) {
-                        backupSelector.value = key;
-                    }
-                } else {
-                    alert("La versión seleccionada no contiene datos válidos o está vacía. Se cargarán los datos por defecto.");
-                    const defaultData = hydrateBackupData(createDefaultBackupData());
-                    applyBackupDataToApp(defaultData, null);
+        showAppLoadingOverlay('Descargando la versión seleccionada...', 8);
+
+        try {
+            const snapshot = await userRef.child(`backups/${key}`).once('value');
+            updateAppLoadingOverlay(18, 'Procesando datos descargados...');
+
+            if (snapshot.exists()) {
+                const hydratedData = hydrateBackupData(snapshot.val());
+                await applyBackupDataToApp(hydratedData, key);
+                if (backupSelector) {
+                    backupSelector.value = key;
                 }
-            })
-            .catch(error => {
-                console.error("Error loading backup data:", error);
-                alert(`Error al cargar datos de la versión: ${error.message}`);
-                loadingMessage.textContent = "Error al cargar datos.";
-                currentBackupData = null;
-                originalLoadedData = null;
-                currentBackupKey = null;
-                changeLogEntries = [];
-            });
+            } else {
+                alert("La versión seleccionada no contiene datos válidos o está vacía. Se cargarán los datos por defecto.");
+                const defaultData = hydrateBackupData(createDefaultBackupData());
+                await applyBackupDataToApp(defaultData, null);
+            }
+        } catch (error) {
+            console.error("Error loading backup data:", error);
+            alert(`Error al cargar datos de la versión: ${error.message}`);
+            loadingMessage.textContent = "Error al cargar datos.";
+            currentBackupData = null;
+            originalLoadedData = null;
+            currentBackupKey = null;
+            changeLogEntries = [];
+            hideAppLoadingOverlay(0);
+        }
     }
+
 
     if (downloadLocalBackupButton) {
         downloadLocalBackupButton.addEventListener('click', () => {
