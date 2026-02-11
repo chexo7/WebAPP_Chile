@@ -785,5 +785,17 @@
 
     <script src="config.js"></script>
     <script src="app.js"></script>
+
+
+    <div id="app-loading-overlay" class="app-loading-overlay" style="display:none;" aria-live="polite" aria-hidden="true">
+        <div class="app-loading-card">
+            <h3 id="app-loading-title">Preparando tu información</h3>
+            <div class="app-loading-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Progreso de carga">
+                <div id="app-loading-progress-fill" class="app-loading-progress-fill"></div>
+            </div>
+            <p id="app-loading-status">Iniciando...</p>
+        </div>
+    </div>
+
 </body>
 </html>
