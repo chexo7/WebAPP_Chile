@@ -24,6 +24,92 @@
   --disabled-bg: #f0f0f0;
 }
 
+
+.theme-switcher-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+#active-visual-style-label {
+  font-weight: 600;
+  color: var(--light-text);
+}
+
+body.theme-neon-nocturno {
+  --primary-color: #8b5cf6;
+  --primary-hover: #7c3aed;
+  --accent-color: #22d3ee;
+  --accent-hover: #06b6d4;
+  --danger-color: #fb7185;
+  --danger-hover: #f43f5e;
+  --text-color: #e2e8f0;
+  --light-text: #a5b4fc;
+  --background: radial-gradient(circle at 20% 15%, #1f1a5a 0%, #0f1126 42%, #070913 100%);
+  --card-bg: rgba(17, 24, 39, 0.88);
+  --border-color: rgba(139, 92, 246, 0.35);
+  --header-bg: rgba(31, 41, 55, 0.85);
+  --shadow: 0 12px 30px rgba(2, 6, 23, 0.45);
+  --alt-row-bg: rgba(30, 41, 59, 0.45);
+  --row-hover-bg: rgba(56, 189, 248, 0.15);
+  --body-header-row-bg: rgba(139, 92, 246, 0.2);
+  --disabled-bg: rgba(15, 23, 42, 0.7);
+}
+
+body.theme-neon-nocturno .container,
+body.theme-neon-nocturno .form-container,
+body.theme-neon-nocturno #auth-container,
+body.theme-neon-nocturno #data-selection-container,
+body.theme-neon-nocturno #main-content-container {
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border-color);
+}
+
+body.theme-neon-nocturno table,
+body.theme-neon-nocturno th,
+body.theme-neon-nocturno td {
+  border-color: rgba(129, 140, 248, 0.32);
+}
+
+body.theme-neon-nocturno input,
+body.theme-neon-nocturno select,
+body.theme-neon-nocturno textarea {
+  color: var(--text-color);
+  background-color: rgba(15, 23, 42, 0.7);
+}
+
+body.theme-papel-calido {
+  --primary-color: #b45309;
+  --primary-hover: #92400e;
+  --accent-color: #4d7c0f;
+  --accent-hover: #3f6212;
+  --danger-color: #b91c1c;
+  --danger-hover: #991b1b;
+  --text-color: #3f2d1b;
+  --light-text: #7c5b3b;
+  --background: linear-gradient(155deg, #fef3c7 0%, #fef9e7 45%, #fdf6e3 100%);
+  --card-bg: #fff9eb;
+  --border-color: #e2c799;
+  --header-bg: #f7e8cf;
+  --shadow: 0 4px 14px rgba(120, 82, 39, 0.15);
+  --alt-row-bg: #fff3db;
+  --row-hover-bg: #fde8b8;
+  --body-header-row-bg: #f7ebcf;
+  --disabled-bg: #f4e6cf;
+}
+
+body.theme-papel-calido .tabs-container {
+  background: linear-gradient(90deg, rgba(180, 83, 9, 0.08), rgba(217, 119, 6, 0.04));
+  border-radius: calc(var(--radius) + 2px);
+  padding: 6px;
+}
+
+body.theme-papel-calido button.ghost {
+  background: rgba(255, 255, 255, 0.75);
+}
+
 /* Reseteo y estilos base */
 * {
   margin: 0;
