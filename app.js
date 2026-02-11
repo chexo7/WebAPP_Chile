@@ -85,6 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
     const printSummaryButton = document.getElementById('print-summary-button');
+    const cycleVisualStyleButton = document.getElementById('cycle-visual-style-button');
+    const activeVisualStyleLabel = document.getElementById('active-visual-style-label');
     const creditCardForm = document.getElementById('credit-card-form');
     const creditCardNameInput = document.getElementById('credit-card-name');
     const creditCardCutoffInput = document.getElementById('credit-card-cutoff');
@@ -340,6 +342,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentBackupData = null;
     let originalLoadedData = null;
     let currentBackupKey = null;
+    const VISUAL_THEMES = [
+        { key: 'claro-pro', label: 'Claro Pro', bodyClass: '' },
+        { key: 'neon-nocturno', label: 'Neón Nocturno', bodyClass: 'theme-neon-nocturno' },
+        { key: 'papel-calido', label: 'Papel Cálido', bodyClass: 'theme-papel-calido' }
+    ];
+    const VISUAL_THEME_BODY_CLASSES = VISUAL_THEMES.map(theme => theme.bodyClass).filter(Boolean);
+    const DEFAULT_VISUAL_THEME_KEY = VISUAL_THEMES[0].key;
     let changeLogEntries = [];
     const FIREBASE_FORBIDDEN_KEY_CHARS = ['.', '$', '#', '[', ']', '/'];
     const FIREBASE_FORBIDDEN_CHARS_DISPLAY = FIREBASE_FORBIDDEN_KEY_CHARS.join(" ");
@@ -741,6 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     baby_steps_status: Array.from({ length: 7 }, () => ({ dos: [], donts: [] })),
                     change_log: [],
                     display_currency_symbol: "",
+                    visual_theme: DEFAULT_VISUAL_THEME_KEY,
                     expense_categories: {},
                     version: ""
                 };
@@ -826,6 +836,7 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis_periodicity: "Mensual",
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
+            visual_theme: DEFAULT_VISUAL_THEME_KEY,
             use_instant_expenses: false,
             incomes: [],
             expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
@@ -912,6 +923,8 @@ document.addEventListener('DOMContentLoaded', () => {
         hydrated.analysis_periodicity = hydrated.analysis_periodicity || "Mensual";
         hydrated.analysis_initial_balance = parseFloat(hydrated.analysis_initial_balance) || 0;
         hydrated.display_currency_symbol = hydrated.display_currency_symbol || "$";
+        const requestedTheme = typeof hydrated.visual_theme === 'string' ? hydrated.visual_theme : DEFAULT_VISUAL_THEME_KEY;
+        hydrated.visual_theme = VISUAL_THEMES.some(theme => theme.key === requestedTheme) ? requestedTheme : DEFAULT_VISUAL_THEME_KEY;
         hydrated.use_instant_expenses = !!hydrated.use_instant_expenses;
 
         return hydrated;
@@ -1166,6 +1179,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (getISODateString(new Date(prevData.analysis_start_date)) !== getISODateString(new Date(currentData.analysis_start_date))) details.push(`Ajuste: Fecha de inicio cambiada de ${getISODateString(new Date(prevData.analysis_start_date))} a ${getISODateString(new Date(currentData.analysis_start_date))}.`);
         if (prevData.analysis_initial_balance !== currentData.analysis_initial_balance) details.push(`Ajuste: Saldo inicial cambiado de ${formatCurrencyJS(prevData.analysis_initial_balance, symbol)} a ${formatCurrencyJS(currentData.analysis_initial_balance, symbol)}.`);
         if (prevData.display_currency_symbol !== currentData.display_currency_symbol) details.push(`Ajuste: Símbolo de moneda cambiado de '${prevData.display_currency_symbol}' a '${currentData.display_currency_symbol}'.`);
+        if ((prevData.visual_theme || DEFAULT_VISUAL_THEME_KEY) !== (currentData.visual_theme || DEFAULT_VISUAL_THEME_KEY)) details.push(`Ajuste: Estilo visual cambiado a '${getVisualThemeByKey(currentData.visual_theme).label}'.`);
     
         // --- Income Change Detection ---
         const prevIncomes = prevData.incomes || [];
@@ -1973,6 +1987,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
+    function getVisualThemeByKey(themeKey) {
+        return VISUAL_THEMES.find(theme => theme.key === themeKey) || VISUAL_THEMES[0];
+    }
+
+    function applyVisualTheme(themeKey) {
+        const selectedTheme = getVisualThemeByKey(themeKey);
+        document.body.classList.remove(...VISUAL_THEME_BODY_CLASSES);
+        if (selectedTheme.bodyClass) {
+            document.body.classList.add(selectedTheme.bodyClass);
+        }
+        if (activeVisualStyleLabel) {
+            activeVisualStyleLabel.textContent = `Estilo actual: ${selectedTheme.label}`;
+        }
+        return selectedTheme;
+    }
+
+    function cycleVisualTheme() {
+        const currentThemeKey = currentBackupData && currentBackupData.visual_theme ? currentBackupData.visual_theme : DEFAULT_VISUAL_THEME_KEY;
+        const currentIndex = VISUAL_THEMES.findIndex(theme => theme.key === currentThemeKey);
+        const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % VISUAL_THEMES.length : 0;
+        const nextTheme = VISUAL_THEMES[nextIndex];
+        if (currentBackupData) {
+            currentBackupData.visual_theme = nextTheme.key;
+        }
+        applyVisualTheme(nextTheme.key);
+    }
+
     function populateSettingsForm() {
         if (!currentBackupData) return;
         analysisDurationInput.value = currentBackupData.analysis_duration || 12;
@@ -1980,6 +2021,7 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisInitialBalanceInput.value = currentBackupData.analysis_initial_balance || 0;
         displayCurrencySymbolInput.value = currentBackupData.display_currency_symbol || "$";
         if (instantExpenseToggle) instantExpenseToggle.checked = !!currentBackupData.use_instant_expenses;
+        applyVisualTheme(currentBackupData.visual_theme || DEFAULT_VISUAL_THEME_KEY);
         // usdClpRateInput.value = currentBackupData.usd_clp_rate || ''; // No longer used
         // updateUsdClpInfoLabel(); // This will be handled by fetchAndUpdateUSDCLPRate
         updateAnalysisDurationLabel();
@@ -2141,7 +2183,9 @@ document.addEventListener('DOMContentLoaded', () => {
         currentBackupData.analysis_start_date = toUTCDate(analysisStartDateInput.value);
         currentBackupData.analysis_initial_balance = parseFloat(analysisInitialBalanceInput.value);
         currentBackupData.display_currency_symbol = displayCurrencySymbolInput.value.trim() || "$";
+        currentBackupData.visual_theme = getVisualThemeByKey(currentBackupData.visual_theme).key;
         currentBackupData.use_instant_expenses = instantExpenseToggle ? instantExpenseToggle.checked : false;
+        applyVisualTheme(currentBackupData.visual_theme);
         // currentBackupData.usd_clp_rate = parseFloat(usdClpRateInput.value) || null; // No longer stored
 
         updateAnalysisDurationLabel();
@@ -2156,6 +2200,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderBudgetSummaryTableForSelectedPeriod();
     });
+
+    if (cycleVisualStyleButton) {
+        cycleVisualStyleButton.addEventListener('click', cycleVisualTheme);
+    }
 
     if (printSummaryButton) {
         printSummaryButton.addEventListener('click', printCashflowSummary);
