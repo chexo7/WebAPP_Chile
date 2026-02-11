@@ -24,6 +24,47 @@
   --disabled-bg: #f0f0f0;
 }
 
+body[data-theme='graphite'] {
+  --primary-color: #7c9cff;
+  --primary-hover: #5f7ff2;
+  --accent-color: #38d39f;
+  --accent-hover: #23b784;
+  --danger-color: #ff5d7a;
+  --danger-hover: #f04364;
+  --text-color: #e8edf7;
+  --light-text: #a5afc4;
+  --background: #10131a;
+  --card-bg: #171b24;
+  --border-color: #2a3140;
+  --header-bg: #1d2230;
+  --shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  --alt-row-bg: #1a1f2b;
+  --row-hover-bg: #262d3d;
+  --body-header-row-bg: #202737;
+  --disabled-bg: #222836;
+}
+
+body[data-theme='sunset'] {
+  --primary-color: #ff7a59;
+  --primary-hover: #f1603f;
+  --accent-color: #f6b73c;
+  --accent-hover: #e5a31f;
+  --danger-color: #ff4f5e;
+  --danger-hover: #e53b4a;
+  --text-color: #3e2c3f;
+  --light-text: #7b5c77;
+  --background: #fff3ea;
+  --card-bg: #fffaf5;
+  --border-color: #f1c8ae;
+  --header-bg: #ffe6d8;
+  --shadow: 0 5px 16px rgba(211, 108, 74, 0.18);
+  --alt-row-bg: #fff1e6;
+  --row-hover-bg: #ffe5d5;
+  --body-header-row-bg: #ffe9dc;
+  --disabled-bg: #fce8dc;
+}
+
+
 /* Reseteo y estilos base */
 * {
   margin: 0;
@@ -38,6 +79,7 @@ body {
   background: var(--background);
   color: var(--text-color);
   line-height: 1.6;
+  transition: background-color 0.35s ease, color 0.35s ease;
 }
 
 .container {
@@ -856,6 +898,24 @@ td.reimbursement-income {
 }
 #settings-form label {
     margin-top: 10px;
+}
+.theme-picker-container {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-color);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--card-bg) 80%, var(--primary-color) 20%), var(--card-bg));
+}
+
+#cycle-theme-button {
+    width: 100%;
+    margin: 6px 0 4px;
+    font-weight: 600;
+}
+
+#active-theme-description {
+    margin-top: 4px;
+    color: var(--light-text);
 }
 /* Ajuste para la etiqueta informativa de la tasa de cambio */
 .informative-rate {
