@@ -5690,12 +5690,16 @@ function getMondayOfWeek(year, week) {
         const targetIdx = currentIdx >= 0 ? currentIdx : fallbackIdx;
         if (targetIdx < 0) return;
 
-        const leftAnchorIdx = Math.max(targetIdx - 3, 0);
         const headerCells = headEl.querySelectorAll('th');
-        const anchorCell = headerCells[leftAnchorIdx + 1];
-        if (!anchorCell) return;
+        const targetCell = headerCells[targetIdx + 1];
+        if (!targetCell) return;
 
-        const targetLeft = Math.max(anchorCell.offsetLeft - 8, 0);
+        const containerWidth = tableContainer.clientWidth || 0;
+        const targetCenter = targetCell.offsetLeft + (targetCell.offsetWidth / 2);
+        const centeredLeft = targetCenter - (containerWidth / 2);
+        const maxScrollLeft = Math.max(tableContainer.scrollWidth - containerWidth, 0);
+        const targetLeft = Math.min(Math.max(centeredLeft, 0), maxScrollLeft);
+
         tableContainer.scrollTo({ left: targetLeft, behavior: 'smooth' });
     }
 
