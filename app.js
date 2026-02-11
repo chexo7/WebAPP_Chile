@@ -310,6 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let pendingDefaultChartRange = null;
     let lastChartRangeKey = 'all';
     let activeCashflowPeriodicity = 'Mensual';
+    let shouldAutoFocusDailyCashflow = false;
     let activePaymentsPeriodicity = 'Mensual';
     const cashflowPeriodDatesMap = { Mensual: [], Semanal: [], Diario: [] };
     const cashflowCategoryTotalsMap = { Mensual: [], Semanal: [], Diario: [] };
@@ -1556,7 +1557,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeButton) activeButton.classList.add('active');
 
         if (tabId === 'flujo-caja') {
-            setPeriodicity(activeCashflowPeriodicity, 'cashflow');
+            shouldAutoFocusDailyCashflow = true;
+            setPeriodicity('Diario', 'cashflow');
         }
         if (tabId === 'grafico') {
             setPeriodicity(activeCashflowPeriodicity, 'chart');
@@ -4295,6 +4297,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         highlightCurrentPeriodColumn(periodicity, tableHeadEl, tableBodyEl, periodDates);
+        if (periodicity === 'Diario' && shouldAutoFocusDailyCashflow) {
+            scrollDailyCashflowToCurrentDay(tableHeadEl, periodDates);
+            shouldAutoFocusDailyCashflow = false;
+        }
         attachCashflowCellListeners(tableBodyEl);
 
         if (periodicity === activeCashflowPeriodicity) {
@@ -5671,6 +5677,26 @@ function getMondayOfWeek(year, week) {
         Array.from(bodyEl.rows).forEach(row => {
             if (row.cells[idx + 1]) row.cells[idx + 1].classList.add('current-period');
         });
+    }
+
+    function scrollDailyCashflowToCurrentDay(headEl, periodDates) {
+        if (!headEl || !Array.isArray(periodDates) || periodDates.length === 0) return;
+        const tableContainer = headEl.closest('.table-responsive');
+        if (!tableContainer) return;
+
+        const today = new Date();
+        const currentIdx = findCurrentPeriodIndex(periodDates, 'Diario');
+        const fallbackIdx = findNearestPeriodIndex(periodDates, today);
+        const targetIdx = currentIdx >= 0 ? currentIdx : fallbackIdx;
+        if (targetIdx < 0) return;
+
+        const leftAnchorIdx = Math.max(targetIdx - 2, 0);
+        const headerCells = headEl.querySelectorAll('th');
+        const anchorCell = headerCells[leftAnchorIdx + 1];
+        if (!anchorCell) return;
+
+        const targetLeft = Math.max(anchorCell.offsetLeft - 8, 0);
+        tableContainer.scrollTo({ left: targetLeft, behavior: 'smooth' });
     }
 
     function attachCashflowCellListeners(tbodyEl) {
