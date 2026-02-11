@@ -49,6 +49,35 @@ document.addEventListener('DOMContentLoaded', () => {
     function hideElement(element) {
         setElementDisplay(element, 'none');
     }
+
+    function waitForUiFrame() {
+        return new Promise(resolve => setTimeout(resolve, 24));
+    }
+
+    function showAppLoadingOverlay(title = 'Preparando tu información') {
+        if (!appLoadingOverlay) return;
+        appLoadingOverlay.style.display = 'flex';
+        appLoadingOverlay.setAttribute('aria-hidden', 'false');
+        if (appLoadingTitle) appLoadingTitle.textContent = title;
+    }
+
+    function hideAppLoadingOverlay() {
+        if (!appLoadingOverlay) return;
+        appLoadingOverlay.style.display = 'none';
+        appLoadingOverlay.setAttribute('aria-hidden', 'true');
+    }
+
+    function updateAppLoadingOverlay(progress, statusText) {
+        const clamped = Math.max(0, Math.min(100, Math.round(progress)));
+        if (appLoadingProgressFill) {
+            appLoadingProgressFill.style.width = `${clamped}%`;
+            const track = appLoadingProgressFill.parentElement;
+            if (track) track.setAttribute('aria-valuenow', String(clamped));
+        }
+        if (appLoadingStatus && statusText) {
+            appLoadingStatus.textContent = statusText;
+        }
+    }
     // --- ELEMENTOS GLOBALES ---
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
@@ -65,6 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadBackupButton = document.getElementById('load-backup-button');
     const loadLatestVersionButton = document.getElementById('load-latest-version-button');
     const loadingMessage = document.getElementById('loading-message');
+    const appLoadingOverlay = document.getElementById('app-loading-overlay');
+    const appLoadingTitle = document.getElementById('app-loading-title');
+    const appLoadingProgressFill = document.getElementById('app-loading-progress-fill');
+    const appLoadingStatus = document.getElementById('app-loading-status');
 
     const mainContentContainer = document.getElementById('main-content-container');
     const tabsContainer = document.querySelector('.tabs-container');
@@ -314,6 +347,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let activePaymentsPeriodicity = 'Mensual';
     const cashflowPeriodDatesMap = { Mensual: [], Semanal: [], Diario: [] };
     const cashflowCategoryTotalsMap = { Mensual: [], Semanal: [], Diario: [] };
+    const cashflowSeriesMap = { Mensual: null, Semanal: null, Diario: null };
+    let lastCashflowDataSignature = null;
+    let cashflowPrewarmJobId = null;
     const breakdownPopup = document.getElementById('cashflow-breakdown-popup');
     let exportDailyCache = null;
     let hoverTimer = null;
@@ -931,10 +967,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return hydrated;
     }
 
-    function applyBackupDataToApp(backupData, key = null) {
+    async function applyBackupDataToApp(backupData, key = null) {
         if (!backupData) {
             return;
         }
+
+        showAppLoadingOverlay('Preparando tu información');
+        updateAppLoadingOverlay(8, 'Validando la versión seleccionada...');
+        await waitForUiFrame();
 
         currentBackupData = backupData;
         currentBackupKey = key;
@@ -950,29 +990,46 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        updateAppLoadingOverlay(22, 'Aplicando configuración base...');
         populateSettingsForm();
         renderCreditCards();
         populateExpenseCategoriesDropdowns();
         populateIncomeReimbursementCategoriesDropdown();
+        await waitForUiFrame();
+
+        updateAppLoadingOverlay(42, 'Construyendo tablas de ingresos y gastos...');
         renderIncomesTable();
         renderExpensesTable();
         renderBudgetsTable();
         renderBabySteps();
         renderReminders();
         renderLogTab();
+        await waitForUiFrame();
 
+        updateAppLoadingOverlay(62, 'Ajustando períodos y selectores...');
         activePaymentsPeriodicity = currentBackupData.analysis_periodicity || 'Mensual';
         setupPaymentPeriodSelectors();
         setupBudgetPeriodSelectors();
         setupExportSelectors();
         setPaymentPeriodicity(activePaymentsPeriodicity);
-        renderCashflowTable();
-        updateAnalysisModeLabels();
-        renderExportReportForSelectedMonth();
+        await waitForUiFrame();
 
+        updateAppLoadingOverlay(82, 'Calculando flujos de caja y gráficos...');
+        await renderCashflowTable();
+        updateAnalysisModeLabels();
+        await renderExportReportForSelectedMonth();
+
+        updateAppLoadingOverlay(97, 'Finalizando carga de la aplicación...');
         hideElement(dataSelectionContainer);
         hideElement(loadingMessage);
         showMainContentScreen();
+        await waitForUiFrame();
+
+        updateAppLoadingOverlay(100, '¡Listo! Ya puedes usar la aplicación.');
+        setTimeout(() => {
+            hideAppLoadingOverlay();
+            updateAppLoadingOverlay(0, 'Iniciando...');
+        }, 320);
     }
 
     function cloneBackupDataForExport(data) {
@@ -1011,7 +1068,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const reader = new FileReader();
-        reader.onload = e => {
+        reader.onload = async e => {
             try {
                 const text = e.target.result;
                 let parsed = JSON.parse(text);
@@ -1046,7 +1103,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const keyFromMetadata = metadata.sourceBackupKey || null;
-                applyBackupDataToApp(hydratedData, keyFromMetadata);
+                await applyBackupDataToApp(hydratedData, keyFromMetadata);
                 if (metadata.savedAt) {
                     const savedDate = new Date(metadata.savedAt);
                     if (!isNaN(savedDate.getTime())) {
@@ -1082,29 +1139,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loadingMessage.textContent = `Cargando datos de la versión: ${formatBackupKey(key)}...`;
         showElement(loadingMessage);
+        showAppLoadingOverlay('Cargando versión de datos');
+        updateAppLoadingOverlay(5, 'Descargando datos desde la base...');
         hideElement(mainContentContainer);
         clearAllDataViews();
         originalLoadedData = null;
 
         // MODIFICADO: Apunta a `users/${userSubPath}/backups/${key}`
         userRef.child(`backups/${key}`).once('value')
-            .then(snapshot => {
+            .then(async snapshot => {
                 if (snapshot.exists()) {
+                    updateAppLoadingOverlay(12, 'Preparando estructura de datos...');
                     const hydratedData = hydrateBackupData(snapshot.val());
-                    applyBackupDataToApp(hydratedData, key);
+                    await applyBackupDataToApp(hydratedData, key);
                     if (backupSelector) {
                         backupSelector.value = key;
                     }
                 } else {
                     alert("La versión seleccionada no contiene datos válidos o está vacía. Se cargarán los datos por defecto.");
                     const defaultData = hydrateBackupData(createDefaultBackupData());
-                    applyBackupDataToApp(defaultData, null);
+                    await applyBackupDataToApp(defaultData, null);
                 }
             })
             .catch(error => {
                 console.error("Error loading backup data:", error);
                 alert(`Error al cargar datos de la versión: ${error.message}`);
                 loadingMessage.textContent = "Error al cargar datos.";
+                hideAppLoadingOverlay();
                 currentBackupData = null;
                 originalLoadedData = null;
                 currentBackupKey = null;
@@ -1599,7 +1660,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 setElementDisplay(cashflowSemanalContainer, periodicity === 'Semanal' ? 'block' : 'none');
                 setElementDisplay(cashflowDiarioContainer, periodicity === 'Diario' ? 'block' : 'none');
             }
-            renderCashflowTable();
+            scheduleCashflowPrewarm();
+            renderCashflowTable({ preferWarmCache: true });
         }
         if (parent === 'chart' && chartSubtabs) {
             chartSubtabs.querySelectorAll('.subtab-button').forEach(btn => btn.classList.remove('active'));
@@ -1617,7 +1679,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (periodicity === 'Mensual' && typeof updatePieMonthChart === 'function') updatePieMonthChart();
             if (periodicity === 'Semanal' && typeof updatePieWeekChart === 'function') updatePieWeekChart();
             pendingDefaultChartRange = periodicity;
-            renderCashflowTable();
+            scheduleCashflowPrewarm();
+            renderCashflowTable({ preferWarmCache: true });
         }
     }
 
@@ -3544,13 +3607,150 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- LÓGICA PESTAÑA FLUJO DE CAJA ---
-    async function renderCashflowTable() {
+    function buildCashflowDataSignature(data) {
+        if (!data) return 'no-data';
+        const analysisStart = toUTCDate(data.analysis_start_date);
+        const analysisStartKey = analysisStart ? getISODateString(analysisStart) : 'invalid-date';
+        return JSON.stringify({
+            analysisStartKey,
+            analysisDuration: parseInt(data.analysis_duration, 10) || 0,
+            analysisPeriodicity: data.analysis_periodicity || 'Mensual',
+            initialBalance: parseFloat(data.analysis_initial_balance) || 0,
+            useInstantExpenses: !!data.use_instant_expenses,
+            incomes: (data.incomes || []).map(income => ({
+                name: income.name,
+                amount: income.net_monthly,
+                currency: income.currency,
+                frequency: income.frequency,
+                start: income.start_date,
+                end: income.end_date,
+                reimbursement: !!income.is_reimbursement,
+                reimbursementCategory: income.reimbursement_category || null
+            })),
+            expenses: (data.expenses || []).map(expense => ({
+                name: expense.name,
+                amount: expense.amount,
+                currency: expense.currency,
+                category: expense.category,
+                frequency: expense.frequency,
+                start: expense.start_date,
+                end: expense.end_date,
+                installments: expense.installments,
+                movementDate: expense.movement_date,
+                type: expense.type
+            })),
+            categories: data.expense_categories || {}
+        });
+    }
+
+    function invalidateCashflowComputationCache() {
+        cashflowSeriesMap.Mensual = null;
+        cashflowSeriesMap.Semanal = null;
+        cashflowSeriesMap.Diario = null;
+        cashflowPrewarmJobId = null;
+    }
+
+    async function computeCashflowSeries(periodicity) {
+        if (!currentBackupData) return null;
+        let baseStartDate = currentBackupData.analysis_start_date;
+        if (typeof baseStartDate === 'string') baseStartDate = toUTCDate(baseStartDate);
+        if (!(baseStartDate instanceof Date) || isNaN(baseStartDate)) return null;
+
+        const monthStart = new Date(Date.UTC(baseStartDate.getUTCFullYear(), baseStartDate.getUTCMonth(), 1));
+        let analysisStart = monthStart;
+        let duration = currentBackupData.analysis_duration;
+
+        if (periodicity === 'Semanal') {
+            analysisStart = getPeriodStartDate(monthStart, 'Semanal');
+            const endOfLastMonth = getPeriodEndDate(addMonths(monthStart, duration - 1), 'Mensual');
+            duration = 0;
+            let d = new Date(analysisStart);
+            while (d <= endOfLastMonth) { duration++; d = addWeeks(d, 1); }
+        } else if (periodicity === 'Diario') {
+            analysisStart = getPeriodStartDate(monthStart, 'Diario');
+            const endOfLastMonth = getPeriodEndDate(addMonths(monthStart, duration - 1), 'Mensual');
+            duration = 0;
+            let d = new Date(analysisStart);
+            while (d <= endOfLastMonth) { duration++; d = addDays(d, 1); }
+        }
+
+        const tempCalcData = {
+            ...currentBackupData,
+            analysis_start_date: analysisStart,
+            analysis_duration: duration,
+            analysis_periodicity: periodicity,
+            incomes: (currentBackupData.incomes || []).map(inc => ({
+                ...inc,
+                start_date: inc.start_date ? new Date(inc.start_date) : null,
+                end_date: inc.end_date ? new Date(inc.end_date) : null
+            })),
+            expenses: (currentBackupData.expenses || []).map(exp => ({
+                ...exp,
+                start_date: exp.start_date ? new Date(exp.start_date) : null,
+                end_date: exp.end_date ? new Date(exp.end_date) : null
+            }))
+        };
+
+        const rateDateCandidates = [];
+        let periodCursor = new Date(analysisStart.getTime());
+        for (let i = 0; i < duration; i++) {
+            const periodStart = getPeriodStartDate(periodCursor, periodicity);
+            const periodEnd = getPeriodEndDate(periodCursor, periodicity);
+            rateDateCandidates.push(...collectUsdRateDatesForExpenses(tempCalcData.expenses, periodStart, periodEnd, tempCalcData.use_instant_expenses));
+            rateDateCandidates.push(...collectUsdRateDatesForIncomes(tempCalcData.incomes, periodStart, periodEnd, periodicity));
+            periodCursor = advancePeriodStart(periodStart, periodicity);
+        }
+
+        await ensureUsdClpRatesForDates(rateDateCandidates);
+
+        const calculated = calculateCashFlowData(tempCalcData);
+        return { ...calculated, analysisStart, tempCalcData };
+    }
+
+    function scheduleCashflowPrewarm() {
+        if (!currentBackupData) return;
+        const signature = buildCashflowDataSignature(currentBackupData);
+        if (lastCashflowDataSignature !== signature) {
+            invalidateCashflowComputationCache();
+            lastCashflowDataSignature = signature;
+        }
+        const jobId = Date.now();
+        cashflowPrewarmJobId = jobId;
+        setTimeout(async () => {
+            if (cashflowPrewarmJobId !== jobId) return;
+            const periodicities = ['Mensual', 'Semanal', 'Diario'];
+            for (const periodicity of periodicities) {
+                if (cashflowPrewarmJobId !== jobId) return;
+                if (!cashflowSeriesMap[periodicity]) {
+                    try {
+                        cashflowSeriesMap[periodicity] = await computeCashflowSeries(periodicity);
+                    } catch (error) {
+                        console.warn(`No se pudo precalentar ${periodicity}:`, error);
+                        return;
+                    }
+                }
+            }
+        }, 80);
+    }
+
+    async function renderCashflowTable(options = {}) {
         try {
+            const { preferWarmCache = false } = options;
             exportDailyCache = null;
             updateAnalysisModeLabels();
-            await renderCashflowTableFor('Mensual', cashflowMensualTableHead, cashflowMensualTableBody, cashflowMensualTitle);
-            await renderCashflowTableFor('Semanal', cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle);
-            await renderCashflowTableFor('Diario', cashflowDiarioTableHead, cashflowDiarioTableBody, cashflowDiarioTitle);
+            const signature = buildCashflowDataSignature(currentBackupData);
+            if (lastCashflowDataSignature !== signature) {
+                invalidateCashflowComputationCache();
+                lastCashflowDataSignature = signature;
+            }
+
+            await renderCashflowTableFor('Mensual', cashflowMensualTableHead, cashflowMensualTableBody, cashflowMensualTitle, { preferWarmCache });
+            await renderCashflowTableFor('Semanal', cashflowSemanalTableHead, cashflowSemanalTableBody, cashflowSemanalTitle, { preferWarmCache });
+            await renderCashflowTableFor('Diario', cashflowDiarioTableHead, cashflowDiarioTableBody, cashflowDiarioTitle, { preferWarmCache });
+
+            if (!preferWarmCache) {
+                scheduleCashflowPrewarm();
+            }
             refreshBudgetSummaryIfReady();
             await renderExportReportForSelectedMonth();
         } catch (error) {
@@ -4135,68 +4335,24 @@ document.addEventListener('DOMContentLoaded', () => {
         XLSX.writeFile(wb, filename);
     }
 
-    async function renderCashflowTableFor(periodicity, tableHeadEl, tableBodyEl, titleEl) {
+    async function renderCashflowTableFor(periodicity, tableHeadEl, tableBodyEl, titleEl, options = {}) {
+        const { preferWarmCache = false } = options;
         if (!currentBackupData || !tableBodyEl || !tableHeadEl) return;
         tableHeadEl.innerHTML = '';
         tableBodyEl.innerHTML = '';
 
-        let baseStartDate = currentBackupData.analysis_start_date;
-        if (typeof baseStartDate === 'string') baseStartDate = toUTCDate(baseStartDate);
-        if (!(baseStartDate instanceof Date) || isNaN(baseStartDate)) {
+        let precomputedSeries = preferWarmCache ? cashflowSeriesMap[periodicity] : null;
+        if (!precomputedSeries) {
+            precomputedSeries = await computeCashflowSeries(periodicity);
+            cashflowSeriesMap[periodicity] = precomputedSeries;
+        }
+
+        if (!precomputedSeries || !precomputedSeries.analysisStart) {
             tableBodyEl.innerHTML = '<tr><td colspan="2">Error: Fecha de inicio inválida.</td></tr>';
             return;
         }
 
-        const monthStart = new Date(Date.UTC(baseStartDate.getUTCFullYear(), baseStartDate.getUTCMonth(), 1));
-        let analysisStart = monthStart;
-        let duration = currentBackupData.analysis_duration;
-
-        if (periodicity === 'Semanal') {
-            analysisStart = getPeriodStartDate(monthStart, 'Semanal');
-            const endOfLastMonth = getPeriodEndDate(addMonths(monthStart, duration - 1), 'Mensual');
-            duration = 0; let d = new Date(analysisStart);
-            while (d <= endOfLastMonth) { duration++; d = addWeeks(d, 1); }
-        } else if (periodicity === 'Diario') {
-            analysisStart = getPeriodStartDate(monthStart, 'Diario');
-            const endOfLastMonth = getPeriodEndDate(addMonths(monthStart, duration - 1), 'Mensual');
-            duration = 0; let d = new Date(analysisStart);
-            while (d <= endOfLastMonth) { duration++; d = addDays(d, 1); }
-        }
-
-        const tempCalcData = {
-            ...currentBackupData,
-            analysis_start_date: analysisStart,
-            analysis_duration: duration,
-            analysis_periodicity: periodicity,
-            incomes: (currentBackupData.incomes || []).map(inc => ({
-                ...inc,
-                start_date: inc.start_date ? new Date(inc.start_date) : null,
-                end_date: inc.end_date ? new Date(inc.end_date) : null
-            })),
-            expenses: (currentBackupData.expenses || []).map(exp => ({
-                ...exp,
-                start_date: exp.start_date ? new Date(exp.start_date) : null,
-                end_date: exp.end_date ? new Date(exp.end_date) : null
-            }))
-        };
-
-        const rateDateCandidates = [];
-        let periodCursor = new Date(analysisStart.getTime());
-        for (let i = 0; i < duration; i++) {
-            const periodStart = getPeriodStartDate(periodCursor, periodicity);
-            const periodEnd = getPeriodEndDate(periodCursor, periodicity);
-            rateDateCandidates.push(
-                ...collectUsdRateDatesForExpenses(tempCalcData.expenses, periodStart, periodEnd, tempCalcData.use_instant_expenses)
-            );
-            rateDateCandidates.push(
-                ...collectUsdRateDatesForIncomes(tempCalcData.incomes, periodStart, periodEnd, periodicity)
-            );
-            periodCursor = advancePeriodStart(periodStart, periodicity);
-        }
-
-        await ensureUsdClpRatesForDates(rateDateCandidates);
-
-        const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p } = calculateCashFlowData(tempCalcData);
+        const { periodDates, income_p, fixed_exp_p, var_exp_p, net_flow_p, end_bal_p, expenses_by_cat_p, analysisStart, tempCalcData } = precomputedSeries;
         cashflowPeriodDatesMap[periodicity] = periodDates;
         cashflowCategoryTotalsMap[periodicity] = expenses_by_cat_p;
 

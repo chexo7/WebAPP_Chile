@@ -831,6 +831,52 @@ td.reimbursement-income {
 }
 @keyframes pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
 
+.app-loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 2200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.app-loading-card {
+  width: min(500px, calc(100% - 32px));
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border-color);
+  padding: 20px;
+}
+
+#app-loading-title {
+  margin: 0 0 14px 0;
+  color: var(--text-color);
+}
+
+.app-loading-progress-track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.app-loading-progress-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #0ea5e9);
+  transition: width 280ms ease;
+}
+
+#app-loading-status {
+  margin: 12px 0 0 0;
+  color: var(--light-text);
+  font-size: 0.95rem;
+}
+
 /* Tabs Styling */
 .tabs-container {
   display: flex;
