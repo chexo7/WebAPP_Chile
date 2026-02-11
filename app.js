@@ -82,6 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const analysisInitialBalanceInput = document.getElementById('analysis-initial-balance-input');
     const displayCurrencySymbolInput = document.getElementById('display-currency-symbol-input');
     const instantExpenseToggle = document.getElementById('instant-expense-toggle');
+    const cycleVisualThemeButton = document.getElementById('cycle-visual-theme-button');
+    const visualThemeName = document.getElementById('visual-theme-name');
     const usdClpInfoLabel = document.getElementById('usd-clp-info-label'); // Etiqueta para mostrar la tasa
     const applySettingsButton = document.getElementById('apply-settings-button');
     const printSummaryButton = document.getElementById('print-summary-button');
@@ -337,6 +339,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const MONTH_NAMES_FULL_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const DATE_WEEK_START_FORMAT = (date) => `${date.getUTCDate()}-${MONTH_NAMES_ES[date.getUTCMonth()]}`;
     const DATE_DAY_FORMAT = (date) => `${('0' + date.getUTCDate()).slice(-2)}/${('0' + (date.getUTCMonth() + 1)).slice(-2)}`;
+    const VISUAL_THEMES = [
+        { key: 'aurora', name: 'Aurora Minimalista' },
+        { key: 'sunset', name: 'Atardecer Cálido' },
+        { key: 'midnight', name: 'Medianoche Neón' }
+    ];
+
+    function getNextVisualThemeKey(currentKey) {
+        const currentIndex = VISUAL_THEMES.findIndex(theme => theme.key === currentKey);
+        if (currentIndex === -1) return VISUAL_THEMES[0].key;
+        return VISUAL_THEMES[(currentIndex + 1) % VISUAL_THEMES.length].key;
+    }
+
+    function applyVisualTheme(themeKey) {
+        const selectedTheme = VISUAL_THEMES.find(theme => theme.key === themeKey) || VISUAL_THEMES[0];
+        document.body.setAttribute('data-visual-theme', selectedTheme.key);
+        if (visualThemeName) {
+            visualThemeName.textContent = `Tema activo: ${selectedTheme.name}`;
+        }
+        return selectedTheme.key;
+    }
+
+    applyVisualTheme('aurora');
+
     let currentBackupData = null;
     let originalLoadedData = null;
     let currentBackupKey = null;
@@ -827,6 +852,7 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
             use_instant_expenses: false,
+            visual_theme: "aurora",
             incomes: [],
             expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
             expenses: [],
@@ -913,6 +939,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hydrated.analysis_initial_balance = parseFloat(hydrated.analysis_initial_balance) || 0;
         hydrated.display_currency_symbol = hydrated.display_currency_symbol || "$";
         hydrated.use_instant_expenses = !!hydrated.use_instant_expenses;
+        hydrated.visual_theme = hydrated.visual_theme || 'aurora';
 
         return hydrated;
     }
@@ -1166,6 +1193,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (getISODateString(new Date(prevData.analysis_start_date)) !== getISODateString(new Date(currentData.analysis_start_date))) details.push(`Ajuste: Fecha de inicio cambiada de ${getISODateString(new Date(prevData.analysis_start_date))} a ${getISODateString(new Date(currentData.analysis_start_date))}.`);
         if (prevData.analysis_initial_balance !== currentData.analysis_initial_balance) details.push(`Ajuste: Saldo inicial cambiado de ${formatCurrencyJS(prevData.analysis_initial_balance, symbol)} a ${formatCurrencyJS(currentData.analysis_initial_balance, symbol)}.`);
         if (prevData.display_currency_symbol !== currentData.display_currency_symbol) details.push(`Ajuste: Símbolo de moneda cambiado de '${prevData.display_currency_symbol}' a '${currentData.display_currency_symbol}'.`);
+        if ((prevData.visual_theme || 'aurora') !== (currentData.visual_theme || 'aurora')) details.push(`Ajuste: Tema visual cambiado de '${prevData.visual_theme || 'aurora'}' a '${currentData.visual_theme || 'aurora'}'.`);
     
         // --- Income Change Detection ---
         const prevIncomes = prevData.incomes || [];
@@ -1409,6 +1437,7 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis_initial_balance: 0,
             display_currency_symbol: "$",
             use_instant_expenses: false,
+            visual_theme: "aurora",
             // usd_clp_rate: null, // No longer stored
             incomes: [],
             expense_categories: JSON.parse(JSON.stringify(DEFAULT_EXPENSE_CATEGORIES_JS)),
@@ -1980,6 +2009,7 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisInitialBalanceInput.value = currentBackupData.analysis_initial_balance || 0;
         displayCurrencySymbolInput.value = currentBackupData.display_currency_symbol || "$";
         if (instantExpenseToggle) instantExpenseToggle.checked = !!currentBackupData.use_instant_expenses;
+        applyVisualTheme(currentBackupData.visual_theme);
         // usdClpRateInput.value = currentBackupData.usd_clp_rate || ''; // No longer used
         // updateUsdClpInfoLabel(); // This will be handled by fetchAndUpdateUSDCLPRate
         updateAnalysisDurationLabel();
@@ -2135,6 +2165,17 @@ document.addEventListener('DOMContentLoaded', () => {
     //     const rate = parseFloat(usdClpRateInput.value);
     //     usdClpInfoLabel.textContent = (rate && rate > 0) ? `1 USD = ${rate.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "1 USD = $CLP (No se usa en cálculos aún)";
     // }
+    if (cycleVisualThemeButton) {
+        cycleVisualThemeButton.addEventListener('click', () => {
+            const activeTheme = currentBackupData ? currentBackupData.visual_theme : document.body.getAttribute('data-visual-theme');
+            const nextTheme = getNextVisualThemeKey(activeTheme);
+            applyVisualTheme(nextTheme);
+            if (currentBackupData) {
+                currentBackupData.visual_theme = nextTheme;
+            }
+        });
+    }
+
     applySettingsButton.addEventListener('click', () => {
         if (!currentBackupData) { alert("No hay datos cargados para aplicar ajustes."); return; }
         currentBackupData.analysis_duration = parseInt(analysisDurationInput.value, 10);
@@ -2142,6 +2183,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentBackupData.analysis_initial_balance = parseFloat(analysisInitialBalanceInput.value);
         currentBackupData.display_currency_symbol = displayCurrencySymbolInput.value.trim() || "$";
         currentBackupData.use_instant_expenses = instantExpenseToggle ? instantExpenseToggle.checked : false;
+        currentBackupData.visual_theme = document.body.getAttribute('data-visual-theme') || currentBackupData.visual_theme || 'aurora';
         // currentBackupData.usd_clp_rate = parseFloat(usdClpRateInput.value) || null; // No longer stored
 
         updateAnalysisDurationLabel();

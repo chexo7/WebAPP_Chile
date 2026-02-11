@@ -24,6 +24,43 @@
   --disabled-bg: #f0f0f0;
 }
 
+
+
+body[data-visual-theme="sunset"] {
+  --primary-color: #d3542f;
+  --primary-hover: #b64625;
+  --accent-color: #ff8a3d;
+  --accent-hover: #f46f1f;
+  --background: #fff7ef;
+  --card-bg: #fffdf9;
+  --header-bg: #ffe9d5;
+  --border-color: #f2c7a5;
+  --light-text: #8a5b47;
+  --alt-row-bg: #fff2e8;
+  --row-hover-bg: #ffe2ce;
+  --body-header-row-bg: #ffe8d7;
+}
+
+body[data-visual-theme="midnight"] {
+  --primary-color: #7c8bff;
+  --primary-hover: #6574f0;
+  --accent-color: #20d6b0;
+  --accent-hover: #12b696;
+  --danger-color: #ff5b8a;
+  --danger-hover: #e34c79;
+  --text-color: #e8ebff;
+  --light-text: #aeb7db;
+  --background: #0e1228;
+  --card-bg: #171d3a;
+  --border-color: #2f3868;
+  --header-bg: #1f2850;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --alt-row-bg: #1e2547;
+  --row-hover-bg: #2a3463;
+  --body-header-row-bg: #242d55;
+  --disabled-bg: #252e55;
+}
+
 /* Reseteo y estilos base */
 * {
   margin: 0;
@@ -1878,3 +1915,27 @@ td.reimbursement-income {
     padding: 0;
 }
 .breakdown-popup li { margin: 2px 0; }
+
+
+.visual-style-picker {
+  background: var(--header-bg);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.visual-style-picker label {
+  margin-bottom: 8px;
+}
+
+#cycle-visual-theme-button {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+#visual-theme-name {
+  margin-bottom: 0;
+  color: var(--light-text);
+  font-style: italic;
+}
