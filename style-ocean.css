@@ -1,0 +1,28 @@
+@import url("style.css");
+
+/* Ocean theme overrides */
+:root {
+  --primary-color: #008080;
+  --primary-hover: #006666;
+  --accent-color: #00cec9;
+  --accent-hover: #00b3b1;
+  --danger-color: #d63031;
+  --danger-hover: #b52a2a;
+  --text-color: #032d3c;
+  --light-text: #0984e3;
+  --background: #e0f7fa;
+  --card-bg: #ffffff;
+  --border-color: #b2ebf2;
+  --header-bg: #b2f0ff;
+  --shadow: 0 4px 12px rgba(0, 128, 128, 0.2);
+  --alt-row-bg: #d0f0f0;
+  --row-hover-bg: #b2e4e4;
+  --body-header-row-bg: #c8f3f9;
+  --disabled-bg: #e0e0e0;
+}
+
+body {
+  background: linear-gradient(135deg, var(--background) 0%, #d0f4f9 100%);
+  color: var(--text-color);
+  font-family: 'Arial', sans-serif;
+}

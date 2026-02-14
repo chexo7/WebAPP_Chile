@@ -100,3 +100,12 @@ La aplicación utiliza Firebase Realtime Database para almacenar todos los datos
 
 *   **Tasa de Cambio USD/CLP:** La aplicación obtiene la tasa de cambio entre USD y CLP de forma automática desde la API de open.er-api.com (ExchangeRate-API). Esta tasa se muestra en la pestaña de "Ajustes" y es solo para fines informativos, no se almacena persistente con los datos del usuario en Firebase.
 *   **Validación de Nombres/Claves:** Para asegurar la compatibilidad con Firebase Realtime Database, los nombres de ingresos, gastos y categorías no deben contener caracteres prohibidos por Firebase para las claves (ej: `.`, `$`, `#`, `[`, `]`, `/`). La aplicación incluye validaciones para prevenir el guardado de datos con estos caracteres en nombres que podrían ser usados como claves.
+## Temas de Diseño
+
+Se incluyen cuatro archivos CSS con variaciones de diseño para la aplicación. El comportamiento y el HTML se mantienen intactos; únicamente cambian los estilos visuales. Para probar un tema diferente, sustituye la referencia a `style.css` en `index.html` por el archivo correspondiente.
+
+- `style.css`: tema por defecto.
+- `style-dark.css`: paleta oscura con tonos azules.
+- `style-ocean.css`: apariencia inspirada en el mar.
+- `style-retro.css`: estilo retro con colores cálidos y tipografía monoespaciada.
+
