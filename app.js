@@ -4308,6 +4308,34 @@ document.addEventListener('DOMContentLoaded', () => {
             XLSX.utils.book_append_sheet(wb, sheet, sheetName);
         };
 
+        const buildCategoryBreakdownSheet = (categories, sheetName) => {
+            const rows = [['Categoría / Gasto', ...monthLabels]];
+            categories.forEach(cat => {
+                const categoryRow = [`▸ ${cat}`];
+                perMonthData.forEach(data => {
+                    categoryRow.push(data.categoryTotals[cat] || 0);
+                });
+                rows.push(categoryRow);
+
+                const expenseNames = new Set();
+                perMonthExpenseBreakdowns.forEach(breakdown => {
+                    Object.keys(breakdown[cat] || {}).forEach(name => expenseNames.add(name));
+                });
+                Array.from(expenseNames).sort().forEach(name => {
+                    const row = [`   • ${name}`];
+                    perMonthExpenseBreakdowns.forEach(breakdown => {
+                        row.push((breakdown[cat] && breakdown[cat][name]) || 0);
+                    });
+                    rows.push(row);
+                });
+                rows.push([]);
+            });
+            const sheet = buildSheet(rows);
+            applyNumberFormatToSheet(sheet);
+            sheet['!cols'] = [{ wch: 34 }, ...monthLabels.map(() => ({ wch: 18 }))];
+            XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+        };
+
         buildCategorySheet(fixedCategories, 'Gastos Fijos');
         buildCategoryBreakdownSheet(fixedCategories, 'Desglose Gastos Fijos');
         buildCategorySheet(variableCategories, 'Gastos Variables');
