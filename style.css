@@ -1,23 +1,23 @@
 /* Variables globales */
 :root {
-  --primary-color: #007aff;
-  --primary-hover: #0060d5;
-  --accent-color: #34c759;
-  --accent-hover: #28a745;
+  --primary-color: #056DA4;
+  --primary-hover: #00557A;
+  --accent-color: #0694F6;
+  --accent-hover: #0579D0;
   --danger-color: #ff3b30;
   --danger-hover: #e33228;
-  --text-color: #1c1c1e;
-  --light-text: #6e6e73;
+  --text-color: #041830;
+  --light-text: #317EC4;
   --background: #f5f5f7;
   --card-bg: #ffffff;
-  --border-color: #d2d2d7;
-  --header-bg: #f0f0f5;
+  --border-color: #659CD2;
+  --header-bg: #82DAFE;
   --shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   --transition: all 0.3s ease;
   --radius: 12px;
-  --alt-row-bg: #f9f9fa;
-  --row-hover-bg: #e9e9ec;
-  --body-header-row-bg: #f1f1f4;
+  --alt-row-bg: #82DAFE;
+  --row-hover-bg: #2AC3FD;
+  --body-header-row-bg: #5D84F9;
   --text-green: #34c759;
   --text-red: #ff3b30;
   --text-orange: #ff9500;
@@ -994,7 +994,7 @@ td.reimbursement-income {
     margin-top: 15px; /* Más espacio arriba */
     margin-bottom: 10px;
     padding: 8px;
-    background-color: #f0f4f8; /* Un fondo sutil */
+    background-color: #82DAFE; /* Un fondo sutil */
     border-left: 3px solid var(--primary-color);
     font-size: 0.9em;
     border-radius: 4px;
@@ -1584,7 +1584,7 @@ td.reimbursement-income {
     font-weight: 600; 
     color: var(--primary-color);
     padding: 2px 6px; 
-    background-color: #eef3f8; 
+    background-color: #82DAFE;
     border-radius: 4px; 
     white-space: nowrap;
 }
